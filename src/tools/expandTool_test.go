@@ -5,28 +5,22 @@ import (
 	"testing"
 
 	agentforge "github.com/thinktwice/agentForge/src"
+	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
-// mockDiscoverableTool is a mock tool that implements Discoverable
-type mockDiscoverableTool struct {
-	*BaseTool
-}
-
+// mockDiscoverableTool creates a mock tool for testing
 func newMockDiscoverableTool() llms.Tool {
-	return &mockDiscoverableTool{
-		BaseTool: NewBaseTool(
-			"mock-tool",
-			"A mock tool for testing",
-			"Advanced mock tool with detailed capabilities",
-			"Troubleshooting: Check parameters carefully",
-			[]Parameter{},
-		),
-	}
-}
-
-func (m *mockDiscoverableTool) Call(agentContext map[string]any, args map[string]any) llms.ToolReturn {
-	return NewSuccessResponse("mock result")
+	return core.NewTool(
+		"mock-tool",
+		"A mock tool for testing",
+		"Advanced mock tool with detailed capabilities",
+		"Troubleshooting: Check parameters carefully",
+		[]core.Parameter{},
+		func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+			return core.NewSuccessResponse("mock result")
+		},
+	)
 }
 
 // mockDiscoverableAgent is a mock agent that implements SubAgent and Discoverable
@@ -41,7 +35,7 @@ func (m *mockDiscoverableAgent) Name() string {
 	return m.name
 }
 
-func (m *mockDiscoverableAgent) ChatStream(message string) IResponseChStarter {
+func (m *mockDiscoverableAgent) ChatStream(message string) *core.ResponseCh {
 	return nil // Not needed for this test
 }
 
@@ -173,7 +167,7 @@ func TestExpandTool_ExpandAgent(t *testing.T) {
 
 	// Create agent context with sub-agents
 	agentContext := map[string]any{
-		"subAgents": []SubAgent{mockAgent},
+		"subAgents": []core.SubAgent{mockAgent},
 	}
 
 	// Test expanding the agent
@@ -237,7 +231,7 @@ func TestExpandTool_AgentNotFound(t *testing.T) {
 
 	// Create agent context with empty sub-agents
 	agentContext := map[string]any{
-		"subAgents": []SubAgent{},
+		"subAgents": []core.SubAgent{},
 	}
 
 	// Test expanding a non-existent agent

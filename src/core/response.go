@@ -1,4 +1,4 @@
-package agents
+package core
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 //
 // This struct includes all properties from ChunkResponse plus agentName and trace
 // fields for enhanced context in multi-agent scenarios.
-type extendedChunkResponse struct {
+type ExtendedChunkResponse struct {
 	Content          string            `json:"content"`                    // Current chunk content
 	Delta            string            `json:"delta"`                      // Incremental delta
 	FullContent      string            `json:"fullContent"`                // Accumulated full content
@@ -32,7 +32,7 @@ type extendedChunkResponse struct {
 //
 // This struct provides a channel-based API for receiving streaming responses
 // from the agent. The Start() method returns a channel that can be ranged over.
-type responseCh struct {
+type ResponseCh struct {
 	Response chan []byte // Channel for JSON-serialized ChunkResponse
 	Error    chan error  // Channel for errors
 
@@ -44,7 +44,7 @@ type responseCh struct {
 	mu      sync.Mutex
 }
 
-// newResponseCh creates a new ResponseCh instance.
+// NewResponseCh creates a new ResponseCh instance.
 //
 // Parameters:
 //   - agentName: Name of the agent associated with this response channel
@@ -52,8 +52,8 @@ type responseCh struct {
 //
 // Returns:
 //   - *ResponseCh: A new ResponseCh instance
-func newResponseCh(agentName string, trace string) *responseCh {
-	return &responseCh{
+func NewResponseCh(agentName string, trace string) *ResponseCh {
+	return &ResponseCh{
 		Response:  make(chan []byte, 10), // Buffered channel
 		Error:     make(chan error, 1),   // Buffered channel for errors
 		agentName: agentName,
@@ -71,14 +71,14 @@ func newResponseCh(agentName string, trace string) *responseCh {
 //
 // Usage:
 //
-//	for chunk := range agentResponseCh.Start() {
+//	for chunk := range responseCh.Start() {
 //	    // Process chunk
 //	}
 //
 // Returns:
 //   - <-chan ExtendedChunkResponse: A receive-only channel of ExtendedChunkResponse that can be ranged over
-func (arc *responseCh) Start() <-chan extendedChunkResponse {
-	chunkChan := make(chan extendedChunkResponse)
+func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
+	chunkChan := make(chan ExtendedChunkResponse)
 
 	go func() {
 		defer close(chunkChan)
@@ -91,11 +91,11 @@ func (arc *responseCh) Start() <-chan extendedChunkResponse {
 					return
 				}
 
-				// Try to deserialize as extendedChunkResponse first (may have AgentName/Trace already)
-				var extendedChunk extendedChunkResponse
+				// Try to deserialize as ExtendedChunkResponse first (may have AgentName/Trace already)
+				var extendedChunk ExtendedChunkResponse
 				if err := json.Unmarshal(chunkBytes, &extendedChunk); err != nil {
 					// Send error as extended chunk
-					chunkChan <- extendedChunkResponse{
+					chunkChan <- ExtendedChunkResponse{
 						Status:    llms.StatusError,
 						Content:   fmt.Sprintf("Error deserializing chunk: %v", err),
 						AgentName: arc.agentName,
@@ -119,7 +119,7 @@ func (arc *responseCh) Start() <-chan extendedChunkResponse {
 			case err := <-arc.Error:
 				if err != nil {
 					// Send error as extended chunk
-					chunkChan <- extendedChunkResponse{
+					chunkChan <- ExtendedChunkResponse{
 						Content:   err.Error(),
 						Status:    llms.StatusError,
 						AgentName: arc.agentName,
@@ -138,7 +138,7 @@ func (arc *responseCh) Start() <-chan extendedChunkResponse {
 //
 // This should be called when done listening to clean up resources.
 // Safe to call multiple times - will only close channels once.
-func (arc *responseCh) Close() {
+func (arc *ResponseCh) Close() {
 	arc.mu.Lock()
 	defer arc.mu.Unlock()
 
@@ -153,29 +153,14 @@ func (arc *responseCh) Close() {
 
 // GetResponseChan returns the response channel for sending chunks.
 // This method is used by tools to send custom chunks during execution.
-func (arc *responseCh) GetResponseChan() chan<- []byte {
+// This implements IParentResponseCh.
+func (arc *ResponseCh) GetResponseChan() chan<- []byte {
 	return arc.Response
 }
 
 // GetErrorChan returns the error channel for sending errors.
 // This method is used by tools to report errors during execution.
-func (arc *responseCh) GetErrorChan() chan<- error {
+// This implements IParentResponseCh.
+func (arc *ResponseCh) GetErrorChan() chan<- error {
 	return arc.Error
-}
-
-// responseChAdapter wraps responseCh to provide a generic Start() method
-// that returns interface{} instead of the concrete channel type.
-// This allows responseCh to be used polymorphically in tools.
-type responseChAdapter struct {
-	*responseCh
-}
-
-// Start returns the channel as interface{} for polymorphic use
-func (rca *responseChAdapter) Start() interface{} {
-	return rca.responseCh.Start()
-}
-
-// AsGeneric wraps this responseCh in an adapter that provides generic Start() method
-func (arc *responseCh) AsGeneric() *responseChAdapter {
-	return &responseChAdapter{responseCh: arc}
 }

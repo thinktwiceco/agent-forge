@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	agentforge "github.com/thinktwice/agentForge/src"
+	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
@@ -15,9 +16,9 @@ import (
 //
 // The tool expects the following items in agentContext:
 //   - "tools": []llms.Tool - list of available tools
-//   - "subAgents": []SubAgent - list of available sub-agents
+//   - "subAgents": []core.SubAgent - list of available sub-agents
 func NewExpandTool() llms.Tool {
-	return NewContextAwareTool(
+	return core.NewTool(
 		"expand",
 		"Get detailed information about a tool or sub-agent. Use this to discover advanced capabilities and troubleshooting information.",
 		`Advanced Details:
@@ -40,7 +41,7 @@ func NewExpandTool() llms.Tool {
 - "Does not implement Discoverable": The tool/agent doesn't support discovery
 - Empty descriptions: The tool/agent may not have advanced descriptions configured
 - Tool not in context: Ensure the tool is added to the agent's tool list`,
-		[]Parameter{
+		[]core.Parameter{
 			{
 				Name:        "subject_type",
 				Type:        "string",
@@ -72,7 +73,7 @@ func NewExpandTool() llms.Tool {
 
 			// Validate subject_type
 			if subjectType != "tool" && subjectType != "agent" {
-				return NewErrorResponse(fmt.Sprintf(
+				return core.NewErrorResponse(fmt.Sprintf(
 					"Invalid subject_type '%s'. Must be either 'tool' or 'agent'",
 					subjectType,
 				))
@@ -85,7 +86,7 @@ func NewExpandTool() llms.Tool {
 			if subjectType == "tool" {
 				discoverable, found = findTool(agentContext, subjectName)
 				if !found {
-					return NewErrorResponse(fmt.Sprintf(
+					return core.NewErrorResponse(fmt.Sprintf(
 						"Tool '%s' not found in context. Available tools can be seen in your system prompt or by listing your tools.",
 						subjectName,
 					))
@@ -93,7 +94,7 @@ func NewExpandTool() llms.Tool {
 			} else { // subjectType == "agent"
 				discoverable, found = findAgent(agentContext, subjectName)
 				if !found {
-					return NewErrorResponse(fmt.Sprintf(
+					return core.NewErrorResponse(fmt.Sprintf(
 						"Agent '%s' not found in context. Available agents are listed in your system prompt under [SUB AGENTS].",
 						subjectName,
 					))
@@ -131,7 +132,7 @@ func NewExpandTool() llms.Tool {
 				response.WriteString("\n")
 			}
 
-			return NewSuccessResponse(response.String())
+			return core.NewSuccessResponse(response.String())
 		},
 	)
 }
@@ -161,9 +162,9 @@ func findTool(agentContext map[string]any, toolName string) (agentforge.Discover
 	return nil, false
 }
 
-// SubAgentDiscoverable wraps a SubAgent to provide Discoverable interface access
+// SubAgentDiscoverable wraps a core.SubAgent to provide Discoverable interface access
 type SubAgentDiscoverable interface {
-	SubAgent
+	core.SubAgent
 	agentforge.Discoverable
 }
 
@@ -175,7 +176,7 @@ func findAgent(agentContext map[string]any, agentName string) (agentforge.Discov
 	}
 
 	// The subAgents in context could be various types, we need to handle them
-	// They should be SubAgent interfaces that also implement Discoverable
+	// They should be core.SubAgent interfaces that also implement Discoverable
 	switch subAgents := subAgentsInterface.(type) {
 	case []SubAgentDiscoverable:
 		for _, agent := range subAgents {
@@ -183,7 +184,7 @@ func findAgent(agentContext map[string]any, agentName string) (agentforge.Discov
 				return agent, true
 			}
 		}
-	case []SubAgent:
+	case []core.SubAgent:
 		for _, agent := range subAgents {
 			if agent.Name() == agentName {
 				// Try to cast to Discoverable

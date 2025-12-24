@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -93,7 +92,6 @@ func printBanner() {
 
 // initializeAgent creates and configures the agent with the specified provider
 func initializeAgent(provider string) (*agents.Agent, error) {
-	ctx := context.Background()
 
 	var llmEngine llms.LLMEngine
 	var err error
@@ -101,12 +99,16 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 	// Create LLM engine based on provider
 	switch strings.ToLower(provider) {
 	case "openai":
-		llmEngine, err = llms.GetOpenAILLM(ctx, "gpt-4o")
+		llmEngine, err = llms.NewOpenAILLMBuilder("openai").
+			SetModel(llms.OPENAI_GPT5_1).
+			Build()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create OpenAI LLM: %w", err)
 		}
 	case "togetherai":
-		llmEngine, err = llms.GetTogetherAILLM(ctx, llms.Llama3170BInstructTurbo)
+		llmEngine, err = llms.NewOpenAILLMBuilder("togetherai").
+			SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
+			Build()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TogetherAI LLM: %w", err)
 		}
@@ -150,6 +152,7 @@ func processResponse(agent *agents.Agent, message string) error {
 	currentTrace := ""
 
 	// Process streaming response
+	// No casting needed - Start() returns the concrete channel type
 	for chunk := range responseCh.Start() {
 		// Check for errors
 		if chunk.Status == llms.StatusError {

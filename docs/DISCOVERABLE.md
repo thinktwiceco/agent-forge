@@ -49,15 +49,15 @@ troubleshooting := agent.Troubleshooting() // Returns Troubleshooting field
 
 ### Tools
 
-Tools implement the `Discoverable` interface through the tool constructors:
+Tools implement the `Discoverable` interface through the universal tool constructor:
 
 ```go
-tool := tools.NewSimpleTool(
+tool := core.NewTool(
     "tool-name",
     "Basic one-line description",
     "Advanced description with detailed parameters and usage",
     "Troubleshooting information and common issues",
-    []tools.Parameter{
+    []core.Parameter{
         {Name: "param1", Type: "string", Required: true},
     },
     handlerFunc,
@@ -144,7 +144,7 @@ config := agents.AgentConfig{
 ### Example Tool with All Descriptions
 
 ```go
-calculatorTool := tools.NewSimpleTool(
+calculatorTool := core.NewTool(
     "calculate",
     "Performs mathematical calculations",
     `Advanced Details:
@@ -156,7 +156,7 @@ calculatorTool := tools.NewSimpleTool(
 - Invalid expression: Check syntax (e.g., "2+2" not "2 plus 2")
 - Division by zero: Returns error message
 - Large numbers: May lose precision beyond 15 digits`,
-    []tools.Parameter{
+    []core.Parameter{
         {Name: "expression", Type: "string", Required: true},
     },
     calculatorHandler,

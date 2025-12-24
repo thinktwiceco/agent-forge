@@ -35,16 +35,6 @@ agentforge.InitLogger(config)
 agentforge.Info("Application started with log level: %s", config.AFLogLevel)
 ```
 
-### Load from Specific .env File
-
-```go
-// Load configuration from a specific .env file path
-config, err := agentforge.NewConfigFromPath("/path/to/.env")
-if err != nil {
-    log.Fatalf("Failed to load config: %v", err)
-}
-```
-
 ## Environment Variables
 
 ### Setting Environment Variables
@@ -104,7 +94,7 @@ AF_LOG_LEVEL=INFO
 To add a new configuration field:
 
 1. Add the field to the `Config` struct in `config.go`
-2. Load the field in `NewConfig()` and `NewConfigFromPath()` using `getEnv()`
+2. Load the field in `NewConfig()` using `getEnv()`
 3. Add validation logic in the `validate()` method if needed
 4. Update this documentation
 

@@ -3,32 +3,15 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 
 	agentforge "github.com/thinktwice/agentForge/src"
+	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
-// IResponseChStarter provides a Start method that returns a channel
-type IResponseChStarter interface {
-	Start() interface{} // Returns a receive-only channel that can be ranged over
-}
-
-// IParentResponseCh represents the parent agent's response channel
-// that can be used to send updates during tool execution
-type IParentResponseCh interface {
-	GetResponseChan() chan<- []byte
-	GetErrorChan() chan<- error
-}
-
-type SubAgent interface {
-	ChatStream(message string) IResponseChStarter
-	Name() string
-}
-
 // NewDelegateTool creates a new DelegateTool with the given sub agents.
-func NewDelegateTool(subAgents []SubAgent) llms.Tool {
-	return NewContextAwareTool(
+func NewDelegateTool(subAgents []core.SubAgent) llms.Tool {
+	return core.NewTool(
 		"delegate",
 		"Delegate a task to a sub agent",
 		`Advanced Details:
@@ -50,7 +33,7 @@ func NewDelegateTool(subAgents []SubAgent) llms.Tool {
 - Delegation loops: Avoid having sub-agents delegate back to parent agents
 - Performance: Long-running delegations are normal for complex tasks
 - Context isolation: Sub-agents don't see parent agent's history - include all relevant info in message`,
-		[]Parameter{
+		[]core.Parameter{
 			{
 				Name:        "subAgent",
 				Type:        "string",
@@ -70,13 +53,13 @@ func NewDelegateTool(subAgents []SubAgent) llms.Tool {
 			message := args["message"].(string)
 
 			// Extract parent response channel from context
-			var parentResponseCh IParentResponseCh
-			if responseCh, ok := agentContext["responseCh"].(IParentResponseCh); ok {
+			var parentResponseCh *core.ResponseCh
+			if responseCh, ok := agentContext["responseCh"].(*core.ResponseCh); ok {
 				parentResponseCh = responseCh
 			}
 
 			// Find the sub agent
-			var assignedSubAgent SubAgent
+			var assignedSubAgent core.SubAgent
 			for _, subAgent := range subAgents {
 				if subAgent.Name() == subAgentName {
 					assignedSubAgent = subAgent
@@ -85,7 +68,7 @@ func NewDelegateTool(subAgents []SubAgent) llms.Tool {
 			}
 
 			if assignedSubAgent == nil {
-				return NewErrorResponse(fmt.Sprintf("sub agent '%s' not found", subAgentName))
+				return core.NewErrorResponse(fmt.Sprintf("sub agent '%s' not found", subAgentName))
 			}
 
 			// Send delegation start notification if parent response channel is available
@@ -103,63 +86,33 @@ func NewDelegateTool(subAgents []SubAgent) llms.Tool {
 			// Get parent agent name from context
 			parentAgentName, ok := agentContext["agentName"].(string)
 			if !ok {
-				return NewErrorResponse("agentName must be a string")
+				return core.NewErrorResponse("agentName must be a string")
 			}
 
 			agentforge.Info("%s ➡️ %s ➡️ %s", parentAgentName, subAgentName, message)
 
 			// Execute delegation by calling sub agent's ChatStream
-			delegateResponseChStarter := assignedSubAgent.ChatStream(message)
+			delegateResponseCh := assignedSubAgent.ChatStream(message)
 
 			// Accumulate the full response
 			var fullResponse string
 			var delegationError error
 
-			// Get the channel from Start() - it returns interface{} so we use reflection to iterate
-			chunkChannel := delegateResponseChStarter.Start()
-			chValue := reflect.ValueOf(chunkChannel)
-
-			// Use reflection to receive from the channel
-			for {
-				chunk, ok := chValue.Recv()
-				if !ok {
-					// Channel closed
-					break
+			// Process chunks from the sub-agent - no reflection needed!
+			for chunk := range delegateResponseCh.Start() {
+				// Accumulate content
+				if chunk.Content != "" {
+					fullResponse += chunk.Content
 				}
 
-				// Get the chunk as an interface{}
-				chunkInterface := chunk.Interface()
-
-				// Try to extract Content and Status using reflection
-				chunkVal := reflect.ValueOf(chunkInterface)
-				if chunkVal.Kind() == reflect.Struct {
-					// Try to get Content field
-					contentField := chunkVal.FieldByName("Content")
-					if contentField.IsValid() && contentField.Kind() == reflect.String {
-						content := contentField.String()
-						if content != "" {
-							fullResponse += content
-						}
-					}
-
-					// Try to get Status field
-					statusField := chunkVal.FieldByName("Status")
-					if statusField.IsValid() && statusField.Kind() == reflect.String {
-						status := statusField.String()
-						if status == llms.StatusError {
-							// Get error content
-							if contentField.IsValid() && contentField.Kind() == reflect.String {
-								delegationError = fmt.Errorf("delegation error: %s", contentField.String())
-							} else {
-								delegationError = fmt.Errorf("delegation error occurred")
-							}
-						}
-					}
+				// Check for errors
+				if chunk.Status == llms.StatusError {
+					delegationError = fmt.Errorf("delegation error: %s", chunk.Content)
 				}
 
 				// Forward chunk to parent if available
 				if parentResponseCh != nil {
-					if chunkBytes, err := json.Marshal(chunkInterface); err == nil {
+					if chunkBytes, err := json.Marshal(chunk); err == nil {
 						parentResponseCh.GetResponseChan() <- chunkBytes
 					}
 				}
@@ -179,10 +132,10 @@ func NewDelegateTool(subAgents []SubAgent) llms.Tool {
 
 			// Return the accumulated result
 			if delegationError != nil {
-				return NewFailureResponse(delegationError.Error(), fullResponse)
+				return core.NewFailureResponse(delegationError.Error(), fullResponse)
 			}
 
-			return NewSuccessResponse(fullResponse)
+			return core.NewSuccessResponse(fullResponse)
 		},
 	)
 }

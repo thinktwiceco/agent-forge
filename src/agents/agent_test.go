@@ -1,7 +1,6 @@
 package agents
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -9,8 +8,6 @@ import (
 	"github.com/thinktwice/agentForge/src/llms"
 	"github.com/thinktwice/agentForge/src/tools"
 )
-
-const TEST_MODEL = llms.Qwen257BInstructTurbo
 
 // TestAgent_fooTool_WithRealLLM tests the agent with automatic tool execution using TogetherAI.
 // This test uses TogetherAI's GPT-OSS-120B model.
@@ -20,15 +17,14 @@ const TEST_MODEL = llms.Qwen257BInstructTurbo
 // This test will verify streaming works and check if tool execution happens.
 //
 // For guaranteed tool execution testing, use a model like:
-// - DeepSeek (llms.GetDeepSeekLLM)
-// - OpenAI GPT-4 (requires OpenAI API key)
+// - OpenAI GPT-5 (requires OpenAI API key)
 //
 // Set TOGETHERAI_API_KEY environment variable to run this test.
 func TestAgent_fooTool_WithRealLLM(t *testing.T) {
-	ctx := context.Background()
-
 	// Use TogetherAI's model
-	llm, err := llms.GetTogetherAILLM(ctx, TEST_MODEL)
+	llm, err := llms.NewOpenAILLMBuilder("togetherai").
+		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
+		Build()
 	if err != nil {
 		t.Skipf("Skipping real LLM test - TogetherAI API not available: %v", err)
 	}
@@ -55,6 +51,7 @@ func TestAgent_fooTool_WithRealLLM(t *testing.T) {
 	)
 
 	fmt.Println("\n=== Streaming Response ===")
+	// No casting needed - Start() returns the concrete channel type
 	for chunk := range responseCh.Start() {
 		if chunk.Status == llms.StatusToolCall && len(chunk.ToolCalls) > 0 {
 			sawToolCall = true
@@ -147,8 +144,9 @@ func TestAgent_fooTool_WithRealLLM(t *testing.T) {
 // This is a basic streaming test. For comprehensive tool execution testing with
 // all chunk verification, see TestAgent_fooTool_WithRealLLM.
 func TestAgent_fooTool(t *testing.T) {
-	ctx := context.Background()
-	llm, err := llms.GetTogetherAILLM(ctx, TEST_MODEL)
+	llm, err := llms.NewOpenAILLMBuilder("togetherai").
+		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
+		Build()
 	if err != nil {
 		t.Fatalf("failed to get together llm: %v", err)
 	}
@@ -164,6 +162,7 @@ func TestAgent_fooTool(t *testing.T) {
 
 	var sawContent bool
 
+	// No casting needed - Start() returns the concrete channel type
 	for chunk := range responseCh.Start() {
 		if chunk.Content != "" {
 			sawContent = true
@@ -178,8 +177,9 @@ func TestAgent_fooTool(t *testing.T) {
 
 // TestAgentConfig_validate tests the validation of AgentConfig.
 func TestAgentConfig_validate(t *testing.T) {
-	ctx := context.Background()
-	llm, err := llms.GetTogetherAILLM(ctx, TEST_MODEL)
+	llm, err := llms.NewOpenAILLMBuilder("togetherai").
+		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
+		Build()
 	if err != nil {
 		t.Skipf("skipping validation test: failed to get together llm: %v", err)
 	}
@@ -249,8 +249,9 @@ func TestAgentConfig_validate(t *testing.T) {
 
 // TestNewAgent_validation tests that NewAgent panics on invalid config.
 func TestNewAgent_validation(t *testing.T) {
-	ctx := context.Background()
-	llm, err := llms.GetTogetherAILLM(ctx, TEST_MODEL)
+	llm, err := llms.NewOpenAILLMBuilder("togetherai").
+		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
+		Build()
 	if err != nil {
 		t.Skipf("skipping NewAgent validation test: failed to get together llm: %v", err)
 	}
