@@ -1,0 +1,55 @@
+# Binaries
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace
+go.work
+
+# Data
+/data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+.env
+.env.*
+!*.example
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Frontend build
+/frontend/dist/
+/frontend/build/
+/frontend/.vite/
+
+# IDEs
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+.DS_Store
+*.user
+
+# Logs
+*.log
+/logs/
+
+# Temporary files
+*.tmp
+*.temp
+__pycache__/
+*.pyc
+
+# History
+history/
