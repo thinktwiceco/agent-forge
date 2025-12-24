@@ -148,7 +148,7 @@ The expand tool requires the following in `agentContext`:
 ```go
 agentContext := map[string]any{
     "tools":     []llms.Tool{...},      // Available tools
-    "subAgents": []tools.SubAgent{...}, // Available sub-agents
+    "subAgents": []core.SubAgent{...}, // Available sub-agents
 }
 ```
 
@@ -234,20 +234,20 @@ type Discoverable interface {
 }
 ```
 
-### Agent Adapter
+### Agent Implementation
 
-Sub-agents are wrapped in an adapter that implements both `SubAgent` and `Discoverable`:
+Agents directly implement the `core.SubAgent` interface which includes `Discoverable` methods:
 
 ```go
-type agentSubAgentAdapter struct {
-    agent *Agent
-}
-
-func (a *agentSubAgentAdapter) BasicDescription() string {
-    return a.agent.BasicDescription()
-}
-// ... other Discoverable methods
+// Agent implements core.SubAgent interface
+func (a *Agent) ChatStream(message string) core.IResponseChStarter { ... }
+func (a *Agent) Name() string { return a.agentName }
+func (a *Agent) BasicDescription() string { return a.description }
+func (a *Agent) AdvanceDescription() string { return a.advanceDescription }
+func (a *Agent) Troubleshooting() string { return a.troubleshooting }
 ```
+
+No adapter is needed - agents can be used directly as sub-agents.
 
 ## Testing
 

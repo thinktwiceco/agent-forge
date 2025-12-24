@@ -1,7 +1,6 @@
 package agents
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -16,12 +15,12 @@ import (
 // This test will fail until the delegate tool is implemented, because
 // the main agent won't be able to delegate to the reasoning agent.
 func TestAgent_Reasoning_TwoTraces(t *testing.T) {
-	ctx := context.Background()
 
-	// Use TogetherAI's model
-	llm, err := llms.GetTogetherAILLM(ctx, llms.Llama3170BInstructTurbo)
+	llm, err := llms.NewOpenAILLMBuilder("togetherai").
+		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
+		Build()
 	if err != nil {
-		t.Skipf("Skipping reasoning test - TogetherAI API not available: %v", err)
+		t.Skipf("Skipping reasoning test: %v", err)
 	}
 
 	// Create agent with reasoning enabled
@@ -39,6 +38,7 @@ func TestAgent_Reasoning_TwoTraces(t *testing.T) {
 	observedTraces := make(map[string]bool)
 
 	fmt.Println("\n=== Streaming Response ===")
+	// No casting needed - Start() returns the concrete channel type
 	for chunk := range responseCh.Start() {
 		// Record the trace
 		if chunk.Trace != "" {

@@ -144,16 +144,16 @@ import "github.com/thinktwice/agentForge/src/llms"
 
 ## Creating Tools
 
-Tools extend agent capabilities. There are two types of tools:
+Tools extend agent capabilities using a universal tool system where all tools receive agent context:
 
-### 1. Simple Tools
+### Creating Tools
 
-Simple tools receive only the validated arguments:
+All tools are created with `core.NewTool` and receive both agent context and arguments:
 
 ```go
-import "github.com/thinktwice/agentForge/src/tools"
+import "github.com/thinktwice/agentForge/src/core"
 
-calculatorTool := tools.NewSimpleTool(
+calculatorTool := core.NewTool(
     "calculate",                                    // Tool name
     "Performs mathematical calculations",           // Basic description
     `Advanced Details:                              // Advanced description
@@ -162,7 +162,7 @@ calculatorTool := tools.NewSimpleTool(
     `Troubleshooting:                               // Troubleshooting info
 - Division by zero returns error
 - Use proper syntax: "2 + 2"`,
-    []tools.Parameter{                              // Parameters
+    []core.Parameter{                               // Parameters
         {
             Name:        "expression",
             Type:        "string",
@@ -170,28 +170,29 @@ calculatorTool := tools.NewSimpleTool(
             Required:    true,
         },
     },
-    func(args map[string]any) llms.ToolReturn {     // Handler function
+    func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+        // Tools that don't need context can ignore it
         expression := args["expression"].(string)
         
         // Perform calculation
         result := calculate(expression)
         
-        return tools.NewSuccessResponse(result)
+        return core.NewSuccessResponse(result)
     },
 )
 ```
 
-### 2. Context-Aware Tools
+### Using Agent Context
 
-Context-aware tools receive both agent context and arguments:
+Tools can access agent context for advanced functionality:
 
 ```go
-loggerTool := tools.NewContextAwareTool(
+loggerTool := core.NewTool(
     "log_message",
     "Logs a message with agent context",
     "Logs messages with agent name and trace information",
     "Check file permissions if logging fails",
-    []tools.Parameter{
+    []core.Parameter{
         {Name: "message", Type: "string", Required: true},
         {Name: "level", Type: "string", Required: false},
     },
@@ -203,7 +204,7 @@ loggerTool := tools.NewContextAwareTool(
         // Log with context
         log.Printf("[%s] %s", agentName, message)
         
-        return tools.NewSuccessResponse("Logged successfully")
+        return core.NewSuccessResponse("Logged successfully")
     },
 )
 ```
@@ -213,7 +214,7 @@ loggerTool := tools.NewContextAwareTool(
 Supported parameter types with automatic validation:
 
 ```go
-[]tools.Parameter{
+[]core.Parameter{
     {Name: "text", Type: "string", Required: true},
     {Name: "count", Type: "number", Required: true},
     {Name: "enabled", Type: "boolean", Required: false},
@@ -246,13 +247,13 @@ Add custom validators for complex validation logic:
 
 ```go
 // Success response
-return tools.NewSuccessResponse("Operation completed successfully")
+return core.NewSuccessResponse("Operation completed successfully")
 
 // Error response (no data)
-return tools.NewErrorResponse("Invalid parameter: count must be positive")
+return core.NewErrorResponse("Invalid parameter: count must be positive")
 
 // Failure response (with partial data)
-return tools.NewFailureResponse("Timeout occurred", "Partial result: 42")
+return core.NewFailureResponse("Timeout occurred", "Partial result: 42")
 ```
 
 ### Adding Tools to Agents
@@ -433,30 +434,32 @@ agent := agents.NewAgent(agents.AgentConfig{
 })
 
 // Tools can access this context
-customTool := tools.NewContextAwareTool(
+customTool := core.NewTool(
     "query_db",
     "Queries the database",
     "...",
     "...",
-    []tools.Parameter{{Name: "query", Type: "string", Required: true}},
+    []core.Parameter{{Name: "query", Type: "string", Required: true}},
     func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
         db := agentContext["database"].(*sql.DB)
         userID := agentContext["user_id"].(string)
         // Use context in tool execution
-        return tools.NewSuccessResponse(result)
+        return core.NewSuccessResponse(result)
     },
 )
 ```
 
 ### Discoverable Interface
 
-Make your tools and agents discoverable:
+All tools created with `core.NewTool` automatically implement the Discoverable interface:
 
 ```go
-// Tools created with NewSimpleTool or NewContextAwareTool automatically
-// implement the Discoverable interface
+// Tools automatically provide:
+// - BasicDescription() - returns the description parameter
+// - AdvanceDescription() - returns the advanceDescription parameter
+// - Troubleshooting() - returns the troubleshooting parameter
 
-// For custom implementations:
+// For custom tool implementations, implement the interface:
 type MyCustomTool struct {
     // ... your fields
 }
@@ -497,18 +500,18 @@ func main() {
     }
     
     // Create a calculator tool
-    calcTool := tools.NewSimpleTool(
+    calcTool := core.NewTool(
         "calculate",
         "Performs mathematical calculations",
         "Supports +, -, *, / operations",
         "Use proper syntax: '2 + 2'",
-        []tools.Parameter{
+        []core.Parameter{
             {Name: "expression", Type: "string", Required: true},
         },
-        func(args map[string]any) llms.ToolReturn {
+        func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
             expr := args["expression"].(string)
             result := evaluate(expr)
-            return tools.NewSuccessResponse(fmt.Sprintf("Result: %s", result))
+            return core.NewSuccessResponse(fmt.Sprintf("Result: %s", result))
         },
     )
     

@@ -1,12 +1,13 @@
 package tools
 
 import (
+	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
 // NewFooTool creates a new FooTool instance
 func NewFooTool() llms.Tool {
-	return NewSimpleTool(
+	return core.NewTool(
 		"foo",
 		"A test tool that returns the echo argument. Use this to test only.",
 		`Advanced Details:
@@ -19,11 +20,11 @@ func NewFooTool() llms.Tool {
 - If the tool fails, ensure the 'echo' parameter is provided as a string
 - Empty strings are valid and will be returned as-is
 - This tool has no external dependencies and should always succeed if called correctly`,
-		[]Parameter{
+		[]core.Parameter{
 			{Name: "echo", Type: "string", Required: true},
 		},
-		func(args map[string]any) llms.ToolReturn {
-			return NewSuccessResponse(args["echo"].(string))
+		func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+			return core.NewSuccessResponse(args["echo"].(string))
 		},
 	)
 }

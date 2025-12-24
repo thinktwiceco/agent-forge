@@ -7,115 +7,106 @@ import (
 	agentforge "github.com/thinktwice/agentForge/src"
 )
 
-const (
-	// DeepSeekBaseURL is the base URL for DeepSeek's API
-	DeepSeekBaseURL = "https://api.deepseek.com/v1"
-	// DeepSeekAPIKeyEnvVar is the environment variable name for DeepSeek API key
-	DeepSeekAPIKeyEnvVar = "DEEPSEEK_API_KEY"
-	// TogetherAIBaseURL is the base URL for TogetherAI's API
-	TogetherAIBaseURL = "https://api.together.xyz/v1"
-	// TogetherAIAPIKeyEnvVar is the environment variable name for TogetherAI API key
-	TogetherAIAPIKeyEnvVar = "TOGETHERAI_API_KEY"
-	// OpenAIAPIKeyEnvVar is the environment variable name for OpenAI API key
-	OpenAIAPIKeyEnvVar = "OPENAI_API_KEY"
-)
-
-// GetDeepSeekLLM creates a new LLM engine instance configured for DeepSeek.
-//
-// DeepSeek uses an OpenAI-compatible API, so this function creates an
-// engine with DeepSeek's base URL and default model.
-//
-// This function automatically loads the API key from:
-// 1. .env file (searches current directory and parent directories)
-// 2. os.Getenv("DEEPSEEK_API_KEY")
-// 3. Returns error if API key is not found
-//
-// Parameters:
-//   - ctx: Context for cancellation
-//   - model: Model name (e.g., "deepseek-chat", defaults to "deepseek-chat" if empty)
-//
-// Returns:
-//   - LLMEngine: LLMEngine instance configured for DeepSeek
-//   - error: Error if API key is not found
-func GetDeepSeekLLM(ctx context.Context, model string) (LLMEngine, error) {
-	// Get API key from .env file or os environment
-	apiKey, err := agentforge.GetEnvVar(DeepSeekAPIKeyEnvVar)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get DeepSeek API key: %w", err)
-	}
-
-	// Default to deepseek-chat if no model specified
-	if model == "" {
-		model = "deepseek-chat"
-	}
-
-	// Create engine instance
-	engine := newOpenAILLM(ctx, DeepSeekBaseURL, model, apiKey)
-
-	return engine, nil
+type OpenAILLMBuilder struct {
+	ApiKey   string
+	Model    string
+	BaseURL  string
+	Provider string
+	Ctx      context.Context
 }
 
-// GetTogetherAILLM creates a new LLM engine instance configured for TogetherAI.
-//
-// TogetherAI uses an OpenAI-compatible API, so this function creates an
-// engine with TogetherAI's base URL and default model.
-//
-// This function automatically loads the API key from:
-// 1. .env file (searches current directory and parent directories)
-// 2. os.Getenv("TOGETHER_API_KEY")
-// 3. Returns error if API key is not found
-//
-// Parameters:
-//   - ctx: Context for cancellation
-//   - model: Model name (e.g., "meta-llama/Llama-3-8b-chat-hf", defaults to "meta-llama/Llama-3-8b-chat-hf" if empty)
-//
-// Returns:
-//   - LLMEngine: LLMEngine instance configured for TogetherAI
-//   - error: Error if API key is not found
-func GetTogetherAILLM(ctx context.Context, model string) (LLMEngine, error) {
-	// Get API key from .env file or os environment
-	apiKey, err := agentforge.GetEnvVar(TogetherAIAPIKeyEnvVar)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get TogetherAI API key: %w", err)
+func NewOpenAILLMBuilder(provider string) *OpenAILLMBuilder {
+	if provider != "openai" && provider != "deepseek" && provider != "togetherai" {
+		panic(fmt.Sprintf("Invalid provider: %s", provider))
 	}
-
-	if model == "" {
-		model = Llama323BInstructTurbo
+	return &OpenAILLMBuilder{
+		Provider: provider,
+		Ctx:      context.Background(),
 	}
-
-	// Create engine instance
-	engine := newOpenAILLM(ctx, TogetherAIBaseURL, model, apiKey)
-
-	return engine, nil
 }
 
-// GetOpenAILLM creates a new LLM engine instance configured for OpenAI.
-//
-// This function automatically loads the API key from:
-// 1. .env file (searches current directory and parent directories)
-// 2. os.Getenv("OPENAI_API_KEY")
-// 3. Returns error if API key is not found
-//
-// Parameters:
-//   - ctx: Context for cancellation
-//   - model: Model name (e.g., "gpt-4", "gpt-3.5-turbo", defaults to "gpt-4o" if empty)
-//
-// Returns:
-//   - LLMEngine: LLMEngine instance configured for OpenAI
-//   - error: Error if API key is not found
-func GetOpenAILLM(ctx context.Context, model string) (LLMEngine, error) {
-	// Get API key from .env file or os environment
-	apiKey, err := agentforge.GetEnvVar(OpenAIAPIKeyEnvVar)
+func (b *OpenAILLMBuilder) validate() {
+	c, err := agentforge.NewConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get OpenAI API key: %w", err)
+		agentforge.Error(fmt.Sprintf("Failed to load config: %v", err))
 	}
 
-	if model == "" {
-		model = "gpt-4o"
+	if b.Provider == "" {
+		agentforge.Error("Provider is required")
 	}
 
-	// Create engine instance (empty baseURL uses default OpenAI URL)
-	engine := newOpenAILLM(ctx, "", model, apiKey)
+	if b.ApiKey == "" {
+		if b.Provider == "openai" {
+			b.ApiKey = c.AFOpenAIAPIKey
+		} else if b.Provider == "deepseek" {
+			b.ApiKey = c.AFDeepSeekAPIKey
+		} else if b.Provider == "togetherai" {
+			b.ApiKey = c.AFTogetherAIAPIKey
+		}
+	}
 
-	return engine, nil
+	if b.ApiKey == "" {
+		agentforge.Warn("No API key found for provider: %s", b.Provider)
+	}
+
+	if b.Ctx == nil {
+		b.Ctx = context.Background()
+	}
+
+	if b.BaseURL == "" {
+		canidateBaseURL, ok := DefaultBaseURL[b.Provider]
+		if ok {
+			b.BaseURL = canidateBaseURL
+		} else {
+			panic(fmt.Sprintf("No default base URL found for provider: %s", b.Provider))
+		}
+	}
+
+	if b.Model == "" {
+		canidateModel, ok := DefaultModel[b.Provider]
+		if ok {
+			b.Model = canidateModel
+		} else {
+			panic(fmt.Sprintf("No default model found for provider: %s", b.Provider))
+		}
+	}
+
+	agentforge.Info("LLM builder validated: %+v", b)
+	agentforge.Info("LLM builder validated: %+v", b.Provider)
+	agentforge.Info("LLM builder validated: %+d", len(b.ApiKey))
+	agentforge.Info("LLM builder validated: %+v", b.Model)
+	agentforge.Info("LLM builder validated: %+v", b.BaseURL)
+	agentforge.Info("LLM builder validated: %+v", b.Ctx)
+}
+
+func (b *OpenAILLMBuilder) SetProvider(p string) *OpenAILLMBuilder {
+	b.Provider = p
+	return b
+}
+
+func (b *OpenAILLMBuilder) SetApiKey(apiKey string) *OpenAILLMBuilder {
+	b.ApiKey = apiKey
+	return b
+}
+
+func (b *OpenAILLMBuilder) SetModel(model string) *OpenAILLMBuilder {
+	b.Model = model
+	return b
+}
+
+func (b *OpenAILLMBuilder) SetBaseURL(baseURL string) *OpenAILLMBuilder {
+	b.BaseURL = baseURL
+	return b
+}
+
+func (b *OpenAILLMBuilder) SetCtx(ctx context.Context) *OpenAILLMBuilder {
+	b.Ctx = ctx
+	return b
+}
+
+func (b *OpenAILLMBuilder) Build() (LLMEngine, error) {
+
+	b.validate()
+
+	return newOpenAILLM(b.Ctx, b.BaseURL, b.Model, b.ApiKey), nil
 }

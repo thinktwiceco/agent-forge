@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	agentforge "github.com/thinktwice/agentForge/src"
+	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 	"github.com/thinktwice/agentForge/src/persistence"
 	"github.com/thinktwice/agentForge/src/tools"
@@ -95,10 +96,10 @@ func NewAgent(config AgentConfig) *Agent {
 
 	// Add delegate tool if there are sub agents
 	if len(subAgents) > 0 {
-		// Convert sub agents to SubAgent interface using adapters
-		var subAgentInterfaces []tools.SubAgent
+		// Convert sub agents to core.SubAgent interface
+		var subAgentInterfaces []core.SubAgent
 		for _, sa := range subAgents {
-			subAgentInterfaces = append(subAgentInterfaces, newAgentSubAgentAdapter(sa))
+			subAgentInterfaces = append(subAgentInterfaces, sa)
 		}
 		delegateTool := tools.NewDelegateTool(subAgentInterfaces)
 		agentTools = append(agentTools, delegateTool)
@@ -124,19 +125,21 @@ func NewAgent(config AgentConfig) *Agent {
 
 ////// PUBLIC METHODS //////
 
-// ChatStream sends a message to the underlying LLM engine and returns a ResponseCh
+// ChatStream sends a message to the underlying LLM engine and returns a response channel
 // for streaming responses with agent-specific context.
 //
 // This method creates a ResponseCh with channels for receiving streaming chunks
 // and errors. The chunks are forwarded from the underlying LLM's ResponseCh and enriched
 // with agent name and trace information.
 //
+// This method implements the core.SubAgent interface.
+//
 // Parameters:
 //   - message: The user message to send
 //
 // Returns:
-//   - *ResponseCh: ResponseCh instance with channels for streaming
-func (a *Agent) ChatStream(message string) *responseCh {
+//   - *core.ResponseCh: Response channel that can be used to receive streaming chunks
+func (a *Agent) ChatStream(message string) *core.ResponseCh {
 	// Retrieve history
 	a.ensureHistory()
 	a.history.get()
@@ -148,7 +151,7 @@ func (a *Agent) ChatStream(message string) *responseCh {
 	agentforge.Debug("messages-> %+v", messages)
 
 	// Create agent-specific response channel
-	agentResponseCh := newResponseCh(a.agentName, a.trace)
+	agentResponseCh := core.NewResponseCh(a.agentName, a.trace)
 
 	// Start the tool execution loop in a goroutine
 	go func() {
@@ -223,7 +226,7 @@ func (a *Agent) Troubleshooting() string {
 
 // executeChatWithTools executes the chat loop with automatic tool execution.
 // It handles streaming responses, tool call detection, execution, and iteration.
-func (a *Agent) executeChatWithTools(agentResponseCh *responseCh) error {
+func (a *Agent) executeChatWithTools(agentResponseCh *core.ResponseCh) error {
 	iteration := 0
 
 	for iteration < a.maxToolIterations {
@@ -350,7 +353,7 @@ func (a *Agent) executeChatWithTools(agentResponseCh *responseCh) error {
 }
 
 // executeTool finds and executes a tool by name.
-func (a *Agent) executeTool(toolCall llms.ToolCall, agentResponseCh *responseCh) llms.ToolResult {
+func (a *Agent) executeTool(toolCall llms.ToolCall, agentResponseCh *core.ResponseCh) llms.ToolResult {
 	// Prepare agent context
 	agentContext := make(map[string]any)
 	agentContext["agentName"] = a.agentName
@@ -358,7 +361,7 @@ func (a *Agent) executeTool(toolCall llms.ToolCall, agentResponseCh *responseCh)
 	agentContext["responseCh"] = agentResponseCh
 	// Add tools and subAgents for discovery tools (like expand)
 	agentContext["tools"] = a.tools
-	agentContext["subAgents"] = a.convertSubAgentsToInterfaces()
+	agentContext["subAgents"] = a.getSubAgentsAsInterfaces()
 	// Add custom context
 	for k, v := range a.toolExecutionContext {
 		agentContext[k] = v
@@ -518,54 +521,12 @@ func (a *Agent) handleSystemPromptInjection() []llms.UnifiedMessage {
 	return a.history.History()
 }
 
-// convertSubAgentsToInterfaces converts internal sub-agents to SubAgent interfaces
+// getSubAgentsAsInterfaces converts internal sub-agents to core.SubAgent interfaces
 // for use in tool execution context (e.g., for the expand tool)
-func (a *Agent) convertSubAgentsToInterfaces() []tools.SubAgent {
-	var subAgentInterfaces []tools.SubAgent
+func (a *Agent) getSubAgentsAsInterfaces() []core.SubAgent {
+	var subAgentInterfaces []core.SubAgent
 	for _, sa := range a.subAgents {
-		subAgentInterfaces = append(subAgentInterfaces, newAgentSubAgentAdapter(sa))
+		subAgentInterfaces = append(subAgentInterfaces, sa)
 	}
 	return subAgentInterfaces
-}
-
-// agentSubAgentAdapter adapts an Agent to implement the SubAgent interface
-// required by the delegate tool. This allows agents to be used as sub agents
-// without circular dependencies between packages.
-type agentSubAgentAdapter struct {
-	agent *Agent
-}
-
-// newAgentSubAgentAdapter creates a new adapter that wraps an Agent
-func newAgentSubAgentAdapter(agent *Agent) *agentSubAgentAdapter {
-	return &agentSubAgentAdapter{agent: agent}
-}
-
-// ChatStream delegates to the agent's ChatStream method and returns an adapter
-// that satisfies the IResponseChStarter interface
-func (a *agentSubAgentAdapter) ChatStream(message string) tools.IResponseChStarter {
-	responseCh := a.agent.ChatStream(message)
-	return responseCh.AsGeneric()
-}
-
-// Name returns the agent's name
-func (a *agentSubAgentAdapter) Name() string {
-	return a.agent.Name()
-}
-
-// BasicDescription returns the agent's basic description
-// This allows the adapter to implement the Discoverable interface
-func (a *agentSubAgentAdapter) BasicDescription() string {
-	return a.agent.BasicDescription()
-}
-
-// AdvanceDescription returns the agent's advanced description
-// This allows the adapter to implement the Discoverable interface
-func (a *agentSubAgentAdapter) AdvanceDescription() string {
-	return a.agent.AdvanceDescription()
-}
-
-// Troubleshooting returns the agent's troubleshooting information
-// This allows the adapter to implement the Discoverable interface
-func (a *agentSubAgentAdapter) Troubleshooting() string {
-	return a.agent.Troubleshooting()
 }
