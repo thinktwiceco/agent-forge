@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -25,12 +26,22 @@ const (
 )
 
 func main() {
+	// Parse command-line flags
+	provider := flag.String("provider", "togetherai", "LLM provider to use: togetherai or openai")
+	flag.Parse()
+
 	printBanner()
-	fmt.Println("Chat with a reasoning agent powered by TogetherAI and Llama")
+
+	// Display provider information
+	providerName := "TogetherAI and Llama"
+	if *provider == "openai" {
+		providerName = "OpenAI"
+	}
+	fmt.Printf("Chat with a reasoning agent powered by %s\n", providerName)
 	fmt.Printf("%sType 'exit' or 'quit' to end the conversation%s\n\n", ColorDim, ColorReset)
 
 	// Initialize the agent
-	agent, err := initializeAgent()
+	agent, err := initializeAgent(*provider)
 	if err != nil {
 		fmt.Printf("%sError initializing agent: %v%s\n", ColorRed, err, ColorReset)
 		os.Exit(1)
@@ -80,14 +91,27 @@ func printBanner() {
 	fmt.Print(ColorReset)
 }
 
-// initializeAgent creates and configures the agent with TogetherAI and Llama
-func initializeAgent() (*agents.Agent, error) {
+// initializeAgent creates and configures the agent with the specified provider
+func initializeAgent(provider string) (*agents.Agent, error) {
 	ctx := context.Background()
 
-	// Get TogetherAI LLM engine with Llama model
-	llmEngine, err := llms.GetTogetherAILLM(ctx, llms.Llama3170BInstructTurbo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create TogetherAI LLM: %w", err)
+	var llmEngine llms.LLMEngine
+	var err error
+
+	// Create LLM engine based on provider
+	switch strings.ToLower(provider) {
+	case "openai":
+		llmEngine, err = llms.GetOpenAILLM(ctx, "gpt-4o")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create OpenAI LLM: %w", err)
+		}
+	case "togetherai":
+		llmEngine, err = llms.GetTogetherAILLM(ctx, llms.Llama3170BInstructTurbo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create TogetherAI LLM: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported provider: %s (supported: togetherai, openai)", provider)
 	}
 
 	// Create agent configuration with reasoning enabled

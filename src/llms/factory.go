@@ -16,6 +16,8 @@ const (
 	TogetherAIBaseURL = "https://api.together.xyz/v1"
 	// TogetherAIAPIKeyEnvVar is the environment variable name for TogetherAI API key
 	TogetherAIAPIKeyEnvVar = "TOGETHERAI_API_KEY"
+	// OpenAIAPIKeyEnvVar is the environment variable name for OpenAI API key
+	OpenAIAPIKeyEnvVar = "OPENAI_API_KEY"
 )
 
 // GetDeepSeekLLM creates a new LLM engine instance configured for DeepSeek.
@@ -83,6 +85,37 @@ func GetTogetherAILLM(ctx context.Context, model string) (LLMEngine, error) {
 
 	// Create engine instance
 	engine := newOpenAILLM(ctx, TogetherAIBaseURL, model, apiKey)
+
+	return engine, nil
+}
+
+// GetOpenAILLM creates a new LLM engine instance configured for OpenAI.
+//
+// This function automatically loads the API key from:
+// 1. .env file (searches current directory and parent directories)
+// 2. os.Getenv("OPENAI_API_KEY")
+// 3. Returns error if API key is not found
+//
+// Parameters:
+//   - ctx: Context for cancellation
+//   - model: Model name (e.g., "gpt-4", "gpt-3.5-turbo", defaults to "gpt-4o" if empty)
+//
+// Returns:
+//   - LLMEngine: LLMEngine instance configured for OpenAI
+//   - error: Error if API key is not found
+func GetOpenAILLM(ctx context.Context, model string) (LLMEngine, error) {
+	// Get API key from .env file or os environment
+	apiKey, err := agentforge.GetEnvVar(OpenAIAPIKeyEnvVar)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OpenAI API key: %w", err)
+	}
+
+	if model == "" {
+		model = "gpt-4o"
+	}
+
+	// Create engine instance (empty baseURL uses default OpenAI URL)
+	engine := newOpenAILLM(ctx, "", model, apiKey)
 
 	return engine, nil
 }
