@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/thinktwice/agentForge/src/agents"
+	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
@@ -90,6 +91,35 @@ func printBanner() {
 	fmt.Print(ColorReset)
 }
 
+func initializeFileSystemAgent() (*agents.Agent, error) {
+	llmEngine, err := llms.NewOpenAILLMBuilder("togetherai").
+		SetModel(llms.TOGETHERAI_Qwen257BInstructTurbo).
+		Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create TogetherAI LLM: %w", err)
+	}
+
+	fsAgent := agents.NewAgent(&agents.AgentConfig{
+		LLMEngine:   llmEngine,
+		AgentName:   "FileSystemAgent",
+		Description: "A helpful assistant that can read and write files to the file system",
+		Trace:       "file-system-agent",
+		Reasoning:   false,
+		SystemPrompt: `You are a helpful assistant that can read and write files to the file system.
+		You can read and write files to the file system using the "read_file" and "write_file" tools.`,
+		MainAgent: false,
+		AdvanceDescription: `
+		=== File System Agent ===
+		Can perform operations on a sandboxed file system.
+		Ask the agent to perform operations on a file.
+		`,
+		Troubleshooting: `
+		=== File System Agent Troubleshooting ===
+		`,
+	})
+	return fsAgent, nil
+}
+
 // initializeAgent creates and configures the agent with the specified provider
 func initializeAgent(provider string) (*agents.Agent, error) {
 
@@ -116,6 +146,14 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 		return nil, fmt.Errorf("unsupported provider: %s (supported: togetherai, openai)", provider)
 	}
 
+	fsAgent, err := initializeFileSystemAgent()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create FileSystemAgent: %w", err)
+	}
+
+	subAgents := make([]*core.SubAgent, 0)
+	subAgents = append(subAgents)
+
 	// Create agent configuration with reasoning enabled
 	config := agents.AgentConfig{
 		LLMEngine:   llmEngine,
@@ -135,10 +173,11 @@ For simple questions, greetings, casual conversation, or straightforward tasks, 
 `,
 		MainAgent:   true,
 		Persistence: "json",
+		SubAgents:   []*core.SubAgent{fsAgent.AgentAsSubAgent()},
 	}
 
 	// Create the agent
-	agent := agents.NewAgent(config)
+	agent := agents.NewAgent(&config)
 	return agent, nil
 }
 

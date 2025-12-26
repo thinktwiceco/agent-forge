@@ -30,7 +30,7 @@ func TestAgent_fooTool_WithRealLLM(t *testing.T) {
 	}
 
 	// Create agent with the LLM and foo tool
-	agent := NewAgent(AgentConfig{
+	agent := NewAgent(&AgentConfig{
 		LLMEngine: llm,
 		AgentName: "test agent",
 		Trace:     "testing",
@@ -150,7 +150,7 @@ func TestAgent_fooTool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get together llm: %v", err)
 	}
-	agent := NewAgent(AgentConfig{
+	agent := NewAgent(&AgentConfig{
 		LLMEngine: llm,
 		AgentName: "test agent",
 		Trace:     "testing",
@@ -310,7 +310,7 @@ func TestNewAgent_validation(t *testing.T) {
 				}
 			}()
 
-			_ = NewAgent(tt.config)
+			_ = NewAgent(&tt.config)
 		})
 	}
 }
