@@ -10,7 +10,7 @@ import (
 )
 
 // NewDelegateTool creates a new DelegateTool with the given sub agents.
-func NewDelegateTool(subAgents []core.SubAgent) llms.Tool {
+func NewDelegateTool(subAgents []*core.SubAgent) llms.Tool {
 	return core.NewTool(
 		"delegate",
 		"Delegate a task to a sub agent",
@@ -61,8 +61,8 @@ func NewDelegateTool(subAgents []core.SubAgent) llms.Tool {
 			// Find the sub agent
 			var assignedSubAgent core.SubAgent
 			for _, subAgent := range subAgents {
-				if subAgent.Name() == subAgentName {
-					assignedSubAgent = subAgent
+				if (*subAgent).Name() == subAgentName {
+					assignedSubAgent = *subAgent
 					break
 				}
 			}
@@ -76,7 +76,7 @@ func NewDelegateTool(subAgents []core.SubAgent) llms.Tool {
 				startChunk := llms.ChunkResponse{
 					Status:  llms.StatusStreaming,
 					Type:    llms.TypeContent,
-					Content: fmt.Sprintf("\n [🛠️ Delegating to %s...]\n", subAgentName),
+					Content: fmt.Sprintf("\n [🛠️ Delegating to %s...]\nQuestion: %s\n", subAgentName, message),
 				}
 				if startBytes, err := json.Marshal(startChunk); err == nil {
 					parentResponseCh.GetResponseChan() <- startBytes

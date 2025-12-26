@@ -104,4 +104,3 @@ func TestTool_HooksNilByDefault(t *testing.T) {
 		t.Error("Hooks should be nil by default")
 	}
 }
-

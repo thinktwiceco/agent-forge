@@ -24,7 +24,7 @@ func TestAgent_Reasoning_TwoTraces(t *testing.T) {
 	}
 
 	// Create agent with reasoning enabled
-	agent := NewAgent(AgentConfig{
+	agent := NewAgent(&AgentConfig{
 		LLMEngine: llm,
 		AgentName: "main agent",
 		Trace:     "main-trace",

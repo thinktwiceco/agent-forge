@@ -3,6 +3,7 @@ package agents
 import (
 	"fmt"
 
+	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
@@ -46,10 +47,6 @@ type AgentConfig struct {
 	// to prevent infinite loops. Defaults to 10 if not set.
 	MaxToolIterations int
 
-	// ToolExecutionContext is custom context passed to tool execution.
-	// Can be nil if no custom context is needed.
-	ToolExecutionContext map[string]any
-
 	// MainAgent indicates whether the agent is the main agent.
 	// This parameter is reserved for future use.
 	MainAgent bool
@@ -63,6 +60,9 @@ type AgentConfig struct {
 	// Supported values: "" (none), "json"
 	// If empty or not set, no persistence is used.
 	Persistence string
+
+	// SubAgents is the list of sub-agents available for delegation
+	SubAgents []*core.SubAgent
 }
 
 // validate validates that all required fields in AgentConfig are set.

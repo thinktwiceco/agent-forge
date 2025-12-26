@@ -1,7 +1,6 @@
 package agents
 
 import (
-	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/llms"
 	"github.com/thinktwice/agentForge/src/persistence"
 )
@@ -43,8 +42,6 @@ func (h *History) addToolMessage(toolCallID, result string) {
 func (h *History) save() {
 	if h.persistence != nil {
 		h.persistence.SaveHystory(h.history)
-	} else {
-		agentforge.Warn("No persistence layer configured, history will not be saved")
 	}
 }
 
@@ -53,7 +50,5 @@ func (h *History) get() {
 	var offset = 0
 	if h.persistence != nil {
 		h.history = h.persistence.GetHystory(limit, offset)
-	} else {
-		agentforge.Warn("No persistence layer configured, history will not be returned")
 	}
 }
