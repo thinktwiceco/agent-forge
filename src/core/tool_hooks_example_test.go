@@ -34,22 +34,19 @@ func (m *mockHooks) IsSafeCommand(cmd string) bool {
 
 func TestTool_SetHooks(t *testing.T) {
 	// Create a tool
-	tool := core.NewTool(
-		"test-tool",
-		"A test tool",
-		"Advanced test tool",
-		"Troubleshooting info",
-		[]core.Parameter{},
-		func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+	tool := &core.Tool{
+		Name:                "test-tool",
+		Description:         "A test tool",
+		AdvanceDesc:         "Advanced test tool",
+		TroubleshootingInfo: "Troubleshooting info",
+		Parameters:          []core.Parameter{},
+		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 			return core.NewSuccessResponse("success")
 		},
-	)
-
-	// Cast to *Tool to access GetHooks
-	concreteTool, ok := tool.(*core.Tool)
-	if !ok {
-		t.Fatal("Expected tool to be *core.Tool")
 	}
+
+	// tool is already *core.Tool, no cast needed
+	concreteTool := tool
 
 	// Initially hooks should be nil
 	if concreteTool.GetHooks() != nil {
@@ -87,20 +84,18 @@ func TestTool_SetHooks(t *testing.T) {
 }
 
 func TestTool_HooksNilByDefault(t *testing.T) {
-	tool := core.NewTool(
-		"test-tool",
-		"A test tool",
-		"Advanced test tool",
-		"Troubleshooting info",
-		[]core.Parameter{},
-		func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+	tool := &core.Tool{
+		Name:                "test-tool",
+		Description:         "A test tool",
+		AdvanceDesc:         "Advanced test tool",
+		TroubleshootingInfo: "Troubleshooting info",
+		Parameters:          []core.Parameter{},
+		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 			return core.NewSuccessResponse("success")
 		},
-	)
+	}
 
-	concreteTool := tool.(*core.Tool)
-
-	if concreteTool.GetHooks() != nil {
+	if tool.GetHooks() != nil {
 		t.Error("Hooks should be nil by default")
 	}
 }

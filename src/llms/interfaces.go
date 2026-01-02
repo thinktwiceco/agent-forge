@@ -57,6 +57,8 @@ type LLMEngine interface {
 	// Returns:
 	//   - *responseCh: responseCh instance with channels for streaming
 	ChatStream(messages []UnifiedMessage, tools []Tool) *responseCh
+	Model() string
+	Provider() string
 }
 
 // Tool is an interface for tools that can be used by agents.
@@ -80,6 +82,7 @@ type ToolReturn interface {
 	Success() bool
 	Error() string
 	Data() string
+	Ephemeral() bool
 }
 
 // toolReturn is an alias for ToolReturn to maintain backward compatibility.

@@ -97,16 +97,25 @@ func InitLogger(config *Config) {
 
 // GetLogger returns the global logger instance.
 //
-// If the logger has not been initialized with InitLogger, it returns
-// a default logger with INFO level.
+// If the logger has not been initialized, it automatically loads configuration
+// from environment variables (.env file and system environment) and initializes
+// the logger with the AF_LOG_LEVEL setting. If configuration loading fails,
+// it falls back to a default logger with INFO level.
 //
 // Returns:
 //   - *Logger: The global logger instance
 func GetLogger() *Logger {
-	if defaultLogger == nil {
-		// Create a default logger if not initialized
-		defaultLogger = NewLogger(InfoLevel, os.Stdout)
-	}
+	loggerOnce.Do(func() {
+		// Try to load configuration automatically
+		config, err := NewConfig()
+		if err == nil {
+			// Successfully loaded config, initialize logger with it
+			defaultLogger = NewLoggerFromConfig(config)
+		} else {
+			// Config loading failed, fall back to default INFO level
+			defaultLogger = NewLogger(InfoLevel, os.Stdout)
+		}
+	})
 	return defaultLogger
 }
 

@@ -1,10 +1,14 @@
 package agents
 
+import (
+	"github.com/thinktwice/agentForge/src/core"
+	"github.com/thinktwice/agentForge/src/llms"
+)
+
 // ReasoningAgentTemplate defines the system agent template for reasoning and problem decomposition.
 //
 // This agent analyzes questions and breaks them down into logical steps.
 // It focuses on "how to" questions and rejects direct solution requests.
-var ReasoningAgentTemplate = createReasoningAgentTemplate()
 
 func createReasoningAgentTemplate() *SystemAgentTemplate {
 	template, err := NewSystemAgentTemplate("system-reasoning", "reasoning")
@@ -120,4 +124,11 @@ Troubleshooting:
   * Don't expect final answers - expect roadmaps`)
 
 	return template
+}
+
+func ReasoningAgent(llmEngine llms.LLMEngine) *core.SubAgent {
+	raTemplate := createReasoningAgentTemplate()
+	raConfig := raTemplate.ToAgentConfig(llmEngine)
+	ra := NewAgent(&raConfig)
+	return ra.AgentAsSubAgent()
 }

@@ -7,20 +7,21 @@ import (
 	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwice/agentForge/src/tools/expand"
 )
 
 // mockDiscoverableTool creates a mock tool for testing
 func newMockDiscoverableTool() llms.Tool {
-	return core.NewTool(
-		"mock-tool",
-		"A mock tool for testing",
-		"Advanced mock tool with detailed capabilities",
-		"Troubleshooting: Check parameters carefully",
-		[]core.Parameter{},
-		func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+	return &core.Tool{
+		Name:                "mock-tool",
+		Description:         "A mock tool for testing",
+		AdvanceDesc:         "Advanced mock tool with detailed capabilities",
+		TroubleshootingInfo: "Troubleshooting: Check parameters carefully",
+		Parameters:          []core.Parameter{},
+		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 			return core.NewSuccessResponse("mock result")
 		},
-	)
+	}
 }
 
 // mockDiscoverableAgent is a mock agent that implements SubAgent and Discoverable
@@ -52,7 +53,7 @@ func (m *mockDiscoverableAgent) Troubleshooting() string {
 }
 
 func TestExpandTool_ExpandTool(t *testing.T) {
-	expandTool := NewExpandTool()
+	expandTool := expand.NewExpandTool()
 
 	// Verify tool name
 	if expandTool.GetName() != "expand" {
@@ -71,7 +72,7 @@ func TestExpandTool_ExpandTool(t *testing.T) {
 }
 
 func TestExpandTool_ExpandToolInfo(t *testing.T) {
-	expandTool := NewExpandTool()
+	expandTool := expand.NewExpandTool()
 
 	// Create mock tools
 	mockTool := newMockDiscoverableTool()
@@ -120,7 +121,7 @@ func TestExpandTool_ExpandToolInfo(t *testing.T) {
 }
 
 func TestExpandTool_ExpandToolWithTroubleshooting(t *testing.T) {
-	expandTool := NewExpandTool()
+	expandTool := expand.NewExpandTool()
 
 	// Create mock tool
 	mockTool := newMockDiscoverableTool()
@@ -155,7 +156,7 @@ func TestExpandTool_ExpandToolWithTroubleshooting(t *testing.T) {
 }
 
 func TestExpandTool_ExpandAgent(t *testing.T) {
-	expandTool := NewExpandTool()
+	expandTool := expand.NewExpandTool()
 
 	// Create mock agent
 	mockAgent := &mockDiscoverableAgent{
@@ -202,7 +203,7 @@ func TestExpandTool_ExpandAgent(t *testing.T) {
 }
 
 func TestExpandTool_ToolNotFound(t *testing.T) {
-	expandTool := NewExpandTool()
+	expandTool := expand.NewExpandTool()
 
 	// Create agent context with empty tools
 	agentContext := map[string]any{
@@ -227,7 +228,7 @@ func TestExpandTool_ToolNotFound(t *testing.T) {
 }
 
 func TestExpandTool_AgentNotFound(t *testing.T) {
-	expandTool := NewExpandTool()
+	expandTool := expand.NewExpandTool()
 
 	// Create agent context with empty sub-agents
 	agentContext := map[string]any{
@@ -252,7 +253,7 @@ func TestExpandTool_AgentNotFound(t *testing.T) {
 }
 
 func TestExpandTool_InvalidSubjectType(t *testing.T) {
-	expandTool := NewExpandTool()
+	expandTool := expand.NewExpandTool()
 
 	agentContext := map[string]any{}
 
@@ -274,7 +275,7 @@ func TestExpandTool_InvalidSubjectType(t *testing.T) {
 }
 
 func TestExpandTool_DefaultTroubleshootFalse(t *testing.T) {
-	expandTool := NewExpandTool()
+	expandTool := expand.NewExpandTool()
 
 	mockTool := newMockDiscoverableTool()
 

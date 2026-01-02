@@ -7,6 +7,8 @@ import (
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
+const DEFAULT_MAX_TOOL_ITERATIONS = 10
+
 // AgentConfig holds configuration parameters for creating a new Agent.
 //
 // This struct encapsulates all parameters needed to create an Agent instance,
@@ -35,6 +37,12 @@ type AgentConfig struct {
 	// Reasoning indicates whether reasoning mode is enabled.
 	// This parameter is reserved for future use.
 	Reasoning bool
+
+	// Can Expand indicates whether the agent can exapnd description of tools
+	// or other agents. Each agent and tool has some more detailed descriptions
+	// that are not included in the basic description.
+	// This parameter will default to true
+	CanExpand bool
 
 	// SystemPrompt is the system prompt to use for the agent.
 	SystemPrompt string
@@ -80,5 +88,22 @@ func (c *AgentConfig) validate() error {
 	if c.AgentName == "" {
 		return fmt.Errorf("AgentName is required but was empty")
 	}
+
+	if c.Trace == "" {
+		c.Trace = fmt.Sprintf("%s-trace", c.AgentName)
+	}
+
+	if c.Tools == nil {
+		c.Tools = []llms.Tool{}
+	}
+
+	if c.MaxToolIterations <= 0 {
+		c.MaxToolIterations = DEFAULT_MAX_TOOL_ITERATIONS
+	}
+
+	if c.SubAgents == nil {
+		c.SubAgents = []*core.SubAgent{}
+	}
+
 	return nil
 }

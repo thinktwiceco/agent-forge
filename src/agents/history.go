@@ -35,8 +35,12 @@ func (h *History) addAssistantMessageWithToolCalls(content string, toolCalls []l
 	h.history = append(h.history, llms.AssistantMessageWithToolCalls(content, toolCalls, promptTokens, completionTokens, totalTokens))
 }
 
-func (h *History) addToolMessage(toolCallID, result string) {
-	h.history = append(h.history, llms.ToolMessage(toolCallID, result))
+func (h *History) addToolMessage(toolCallID, result string, ephemeral bool) {
+	if !ephemeral {
+		h.history = append(h.history, llms.ToolMessage(toolCallID, result))
+	} else {
+		h.history = append(h.history, llms.ToolMessage(toolCallID, "[Tool Call Executed]"))
+	}
 }
 
 func (h *History) save() {

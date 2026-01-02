@@ -11,6 +11,8 @@ type AgentContext struct {
 	AgentName string
 	// Trace is optional trace information (e.g., "thinking", "response")
 	Trace string
+	// Model is the name of the LLM model being used
+	Model string
 	// Tools is the list of tools available to the agent
 	Tools []llms.Tool
 	// SubAgents is the list of sub-agents available for delegation
@@ -29,6 +31,7 @@ func (ac *AgentContext) BuildContext(responseCh *ResponseCh) map[string]any {
 	context := make(map[string]any)
 	context["agentName"] = ac.AgentName
 	context["trace"] = ac.Trace
+	context["model"] = ac.Model
 	context["responseCh"] = responseCh
 	context["tools"] = ac.Tools
 	context["subAgents"] = ac.SubAgents

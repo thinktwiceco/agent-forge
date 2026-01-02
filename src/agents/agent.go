@@ -1,14 +1,8 @@
 package agents
 
 import (
-	"encoding/json"
-	"fmt"
-
-	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/persistence"
-	"github.com/thinktwice/agentForge/src/tools"
 )
 
 // Agent represents an advanced agent with an LLM engine.
@@ -31,15 +25,15 @@ type Agent struct {
 	// Subsystem of agents
 	subAgents []*core.SubAgent
 	// If this is a main agent of a team of agents.
-	mainAgent bool
 	// Extra engine configurations for subsystems of agents.
 	extraEngines map[string]llms.LLMEngine
-	// What kind of persistence to use for the agent.
-	persistence string
 	// System Prompt as a final system prompt
-	systemPrompt string
 	// Agent context built once at initialization
 	agentContext *core.AgentContext
+	// System Prompt as a final system prompt
+	systemPrompt string
+	// Hooks for the agent
+	hooks *AgentHooks
 }
 
 // ===== Constructor =====
@@ -67,10 +61,14 @@ func NewAgent(config *AgentConfig) *Agent {
 	}
 
 	a.ensureConfig()
+	a.ensureHooks()
 	a.addSystemAgents()
 	a.initSystemTools()
+	a.loadDelegateTool()
 	a.setResponseCh()
 	a.initAgentContext()
+	a.registerSystemCallbacks()
+	a.ensureSystemPrompt()
 
 	return a
 }
@@ -92,16 +90,8 @@ func NewAgent(config *AgentConfig) *Agent {
 // Returns:
 //   - *core.ResponseCh: Response channel that can be used to receive streaming chunks
 func (a *Agent) ChatStream(message string) *core.ResponseCh {
-	// Retrieve history
-	a.ensureHistory()
-	a.history.get()
-
-	// Get the underlying LLM's response channel
-	var messages = a.handleSystemPromptInjection()
-	messages = a.handleNewUserMessage(message)
-
-	agentforge.Debug("messages-> %+v", messages)
-	a.initResponseCh()
+	errs := a.hooks.newUserMessageEvent(a, message)
+	logHookErrors(errs)
 
 	// Start the tool execution loop in a goroutine
 	go func() {
@@ -169,426 +159,33 @@ func (a *Agent) Troubleshooting() string {
 	return a.config.Troubleshooting
 }
 
-// ===== Core Chat Execution =====
+// AddSystemAgent adds a system agent (sub-agent) to this agent's list of sub-agents.
+//
+// This method allows dynamic addition of sub-agents after agent initialization.
+// It updates the delegate tool and agent context to include the new sub-agent.
+// The system prompt will be automatically updated on the next message to include
+// the new sub-agent in the list of available sub-agents.
+//
+// Parameters:
+//   - subAgent: The sub-agent to add (must implement core.SubAgent interface)
+//
+// Example:
+//
+//	evalAgent := agents.EvalAgent(llmEngine, "/path/to/root")
+//	mainAgent.AddSystemAgent(evalAgent)
+func (a *Agent) AddSystemAgent(subAgent *core.SubAgent) {
+	errs := a.hooks.addSystemAgentEvent(a, subAgent)
+	logHookErrors(errs)
 
-// executeChatWithTools executes the chat loop with automatic tool execution.
-// It handles streaming responses, tool call detection, execution, and iteration.
-func (a *Agent) executeChatWithTools() error {
-	iteration := 0
+	// Add sub-agent to the list
+	a.subAgents = append(a.subAgents, subAgent)
 
-	for iteration < a.config.MaxToolIterations {
-		iteration++
-
-		// Get current history
-		a.ensureHistory()
-		// Load history from persistence
-		a.history.get()
-		messages := a.history.History()
-
-		// Call LLM with current history and tools
-		llmResponseCh := (*a.llmEngine).ChatStream(messages, a.tools)
-
-		var fullContent string
-		var toolCalls []llms.ToolCall
-		var hasToolCalls bool
-		var completedChunkBytes []byte // Store completed chunk to forward later if needed
-		var promptTokens, completionTokens, totalTokens int
-
-		// Process streaming response
-		for {
-			select {
-			case chunkBytes, ok := <-llmResponseCh.Response:
-				if !ok {
-					// LLM response channel closed, streaming complete
-					goto processToolCalls
-				}
-
-				// Deserialize chunk
-				var chunk llms.ChunkResponse
-				if err := json.Unmarshal(chunkBytes, &chunk); err != nil {
-					return fmt.Errorf("failed to deserialize chunk: %w", err)
-				}
-
-				// Accumulate content (check both Content and Delta)
-				if chunk.Content != "" {
-					fullContent += chunk.Content
-				} else if chunk.Delta != "" {
-					fullContent += chunk.Delta
-				}
-
-				// Check for tool calls
-				if chunk.Status == llms.StatusToolCall && len(chunk.ToolCalls) > 0 {
-					toolCalls = chunk.ToolCalls
-					hasToolCalls = true
-				}
-
-				// If this is a completed chunk, store it but don't forward yet
-				// We need to check if there are tool calls to execute first
-				if chunk.Status == llms.StatusCompleted {
-					completedChunkBytes = chunkBytes
-					// Extract token usage from completed chunk
-					promptTokens = chunk.PromptTokens
-					completionTokens = chunk.CompletionTokens
-					totalTokens = chunk.TotalTokens
-					goto processToolCalls
-				}
-
-				// Forward all other chunks to consumer
-				a.responseCh.Response <- chunkBytes
-
-			case err := <-llmResponseCh.Error:
-				if err != nil {
-					return fmt.Errorf("llm stream error: %w", err)
-				}
-				goto processToolCalls
-			}
-		}
-
-	processToolCalls:
-		// If no tool calls, forward the completed chunk (if any) and we're done
-		if !hasToolCalls {
-			if completedChunkBytes != nil {
-				a.responseCh.Response <- completedChunkBytes
-			} else if fullContent != "" {
-				// Stream ended without StatusCompleted chunk, but we have content
-				// Send a completion chunk with accumulated content
-				completionChunk := llms.ChunkResponse{
-					Content:          "",
-					Delta:            "",
-					FullContent:      fullContent,
-					Status:           llms.StatusCompleted,
-					Type:             llms.TypeCompletion,
-					PromptTokens:     promptTokens,
-					CompletionTokens: completionTokens,
-					TotalTokens:      totalTokens,
-				}
-				completionBytes, err := json.Marshal(completionChunk)
-				if err == nil {
-					a.responseCh.Response <- completionBytes
-				}
-			}
-			// Save the message to history with token usage
-			if fullContent != "" {
-				a.history.addAssistantMessage(fullContent, promptTokens, completionTokens, totalTokens)
-				a.history.save()
-			}
-			return nil
-		}
-
-		// Store assistant message with tool calls in history with token usage
-		a.history.addAssistantMessageWithToolCalls(fullContent, toolCalls, promptTokens, completionTokens, totalTokens)
-		a.history.save()
-
-		// Execute each tool
-		for _, toolCall := range toolCalls {
-			// Emit tool-executing chunk
-			executingChunk := llms.ChunkResponse{
-				Status:        llms.StatusToolExecuting,
-				Type:          llms.TypeToolExecuting,
-				ToolExecuting: &toolCall,
-			}
-			executingBytes, err := json.Marshal(executingChunk)
-			if err != nil {
-				return fmt.Errorf("failed to serialize tool-executing chunk: %w", err)
-			}
-			a.responseCh.Response <- executingBytes
-
-			// Find and execute the tool
-			toolResult := a.executeTool(toolCall)
-
-			// Emit tool-result chunk
-			resultChunk := llms.ChunkResponse{
-				Status:      llms.StatusToolResult,
-				Type:        llms.TypeToolResult,
-				ToolResults: []llms.ToolResult{toolResult},
-			}
-			resultBytes, err := json.Marshal(resultChunk)
-			if err != nil {
-				return fmt.Errorf("failed to serialize tool-result chunk: %w", err)
-			}
-			a.responseCh.Response <- resultBytes
-
-			// Add tool result to history
-			a.history.addToolMessage(toolCall.ID, toolResult.Result)
-			a.history.save()
-		}
-
-		// Continue to next iteration (will call LLM again with tool results)
-	}
-
-	// If we reached max iterations, return error
-	return fmt.Errorf("reached maximum tool iterations (%d)", a.config.MaxToolIterations)
-}
-
-// executeTool finds and executes a tool by name.
-func (a *Agent) executeTool(toolCall llms.ToolCall) llms.ToolResult {
-	// Build agent context from pre-built context struct
-	agentContext := a.agentContext.BuildContext(a.responseCh)
-
-	// Find the tool
-	var tool llms.Tool
-	for _, t := range a.tools {
-		if t.GetName() == toolCall.Name {
-			tool = t
-			break
-		}
-	}
-
-	if tool == nil {
-		return llms.ToolResult{
-			ToolCallID: toolCall.ID,
-			ToolName:   toolCall.Name,
-			Success:    false,
-			Result:     "",
-			Error:      fmt.Sprintf("tool not found: %s", toolCall.Name),
-		}
-	}
-
-	// Execute the tool
-	result := tool.Call(agentContext, toolCall.Arguments)
-
-	// Convert to ToolResult
-	return llms.ToolResult{
-		ToolCallID: toolCall.ID,
-		ToolName:   toolCall.Name,
-		Success:    result.Success(),
-		Result:     result.Data(),
-		Error:      result.Error(),
-	}
-}
-
-// ==============================
-// ===== History Management =====
-// ==============================W
-
-func (a *Agent) ensureHistory() {
-	if a.history == nil {
-		a.history = &History{}
-
-		// Set up persistence if configured using the factory
-		if a.persistence != "" {
-			a.history.persistence = persistence.NewPersistence(a.Name(), a.persistence)
-			if a.history.persistence != nil {
-				agentforge.Debug("Initialized %s persistence for agent '%s'", a.persistence, a.Name())
-			}
-		}
-	}
-}
-
-func (a *Agent) handleNewUserMessage(message string) []llms.UnifiedMessage {
-	a.ensureHistory()
-	a.history.addUserMessage(message)
-	a.history.save()
-	return a.history.History()
-}
-
-func (a *Agent) handleNewAssistantMessage(message string) {
-	a.ensureHistory()
-	a.history.addAssistantMessage(message, 0, 0, 0)
-	a.history.save()
-}
-
-func (a *Agent) handleSystemPromptInjection() []llms.UnifiedMessage {
-	a.ensureHistory()
-	a.ensureSystemPrompt()
-	a.history.addSystemMessage(a.systemPrompt)
-	a.history.save()
-	return a.history.History()
-}
-
-// ==============================
-// ===== System Prompt Management
-// ==============================
-
-func (a *Agent) ensureSystemPrompt() {
-	a.systemPrompt = a.config.SystemPrompt
-
-	if a.systemPrompt == "" {
-		a.systemPrompt = `You are an helpful assistant`
-	}
-
-	if a.mainAgent {
-		a.systemPrompt += `
-[SYSTEM] This are information in addition to any system prompt that the user provided.
-You are part of a multi-agent system designed to solve complex problems.
-You are the MAIN agent of the team.
-You coordinate the team, asking very precise questions to the sub agents
-and read and understand the responses.
-
-IMPORTANT - TOOL CALLS ARE OPTIONAL:
-- Tool calls (function calls) are ONLY used when delegating tasks to sub-agents
-- Most interactions DO NOT require any tool calls
-- Greetings, casual conversation, simple Q&A, and direct answers should NEVER trigger tool calls
-- Respond naturally and directly without tool calls unless you specifically need to delegate to a sub-agent
-- You are NOT required to make a tool call for every message
-
-You can ask questions to sub agents in order to keep your context clean and focused.
-You might have some default sub agents that you can rely on. 
-If the user asks you "what are the agents of your team?", or 
-"what are your sub agents?", it very likely refers to your [SUB AGENTS].
-DO NOT REPORT any other sub agents that might be part of your llm implementation.
-DO NOT REPORT any agent that is not part of your [SUB AGENTS].
-
-AT ANY MOMENT KEEP IN MIND WHAT IS YOUR GOAL AND WHAT IS THE QUESTION THAT THE USER ASKED YOU.
-
-WHEN TO DELEGATE (USE TOOL CALLS):
-Tool calls are ONLY used for delegating to sub-agents. Before making a tool call to delegate, analyze the question carefully:
-- Is this a COMPLEX problem that requires breaking down into multiple steps?
-- Does the problem require systematic logical reasoning and analysis?
-- Is the information NOT already available in your system prompt or context?
-- Would the problem benefit significantly from specialized analysis?
-
-If the answer to ALL these questions is YES, then make a tool call to delegate to the appropriate sub agent.
-
-WHEN NOT TO DELEGATE (NO TOOL CALLS NEEDED):
-DO NOT make tool calls in these cases - just respond directly:
-- Greetings and casual conversation (e.g., "Hi!", "How are you?", "Thanks!")
-- Simple informational questions (e.g., "How many sub agents do you have?")
-- Questions about your own capabilities or configuration (the answers are in your system prompt)
-- Straightforward tasks that don't require step-by-step breakdown
-- Questions where you already have the answer in your context
-- Simple Q&A, calculations, or explanations you can provide directly
-
-BE MINDFUL
-- Respond naturally without tool calls for most interactions
-- Only use the "delegate" tool when truly delegating a complex task to a sub-agent
-- Read carefully the task and your sub agents descriptions
-- Only delegate COMPLEX tasks that truly benefit from specialized analysis
-- Answer simple questions and have normal conversations directly yourself
-`
-	}
-	a.buildSubAgentsSystemPrompt()
-	a.ensureHistory()
-	a.history.addSystemMessage(a.systemPrompt)
-}
-
-func (a *Agent) buildSubAgentsSystemPrompt() {
-	if len(a.subAgents) == 0 || a.subAgents == nil {
-		return
-	}
-
-	var saPrompt = `
-=== SUB AGENTS ===
-You have sub agents that have specific responsibilities.
-You can delegate COMPLEX tasks to them by using the "delegate" tool (this is the ONLY time you use tool calls).
-Only delegate when the task matches the sub agent's specialization and truly requires it.
-Make sure to provide all the important information and details to the sub agent
-necessary to perform the task.
-
-Remember: Tool calls are OPTIONAL and ONLY for delegation. Most conversations don't need any tool calls.
-
-[SUB AGENTS]:
-	`
-
-	for _, sa := range a.subAgents {
-		// Use BasicDescription() to ensure only basic info is injected into system prompt
-		saPrompt += fmt.Sprintf("📌 %s: %s\n\n", (*sa).Name(), (*sa).BasicDescription())
-	}
-
-	a.systemPrompt += saPrompt
-}
-
-// ===== Sub Agent Management =====
-
-// getSubAgentsAsInterfaces converts internal sub-agents to core.SubAgent interfaces
-// for use in tool execution context (e.g., for the expand tool)
-func (a *Agent) getSubAgentsAsInterfaces() []*core.SubAgent {
-	var subAgentInterfaces []*core.SubAgent
-	for _, sa := range a.subAgents {
-		subAgentInterfaces = append(subAgentInterfaces, sa)
-	}
-	return subAgentInterfaces
-}
-
-// Add System Agents based on configs
-func (a *Agent) addSystemAgents() {
-	var systemAgents []*core.SubAgent
-
-	if a.config.Reasoning {
-		// Create reasoning agent from template
-		// Check if a specific engine is configured for this sub agent
-		var engineForReasoning llms.LLMEngine
-		if a.config.ExtraEngines != nil {
-			if engine, ok := a.config.ExtraEngines["system-reasoning"]; ok && engine != nil {
-				engineForReasoning = engine
-			} else {
-				engineForReasoning = a.config.LLMEngine
-			}
-		} else {
-			engineForReasoning = a.config.LLMEngine
-		}
-		raConfig := ReasoningAgentTemplate.ToAgentConfig(engineForReasoning)
-		ra := NewAgent(&raConfig)
-		raAsSubAgent := ra.AgentAsSubAgent()
-		systemAgents = append(systemAgents, raAsSubAgent)
-	}
-
-	// Append system agents to subagents
-	a.subAgents = append(a.subAgents, systemAgents...)
-
-	// if len(systemAgents) > 0 {
-	// 	subAgentsInterfaces := a.getSubAgentsAsInterfaces()
-	// 	delegateTool := tools.NewDelegateTool(subAgentsInterfaces)
-	// 	a.tools = append(a.tools, delegateTool)
-	// }
-}
-
-// ==============================
-// ===== Initialization Methods
-// ==============================
-
-// ensureConfig validates and sets default configuration values
-func (a *Agent) ensureConfig() {
-	if err := a.config.validate(); err != nil {
-		panic(fmt.Errorf("invalid AgentConfig: %w", err))
-	}
-
-	if a.config.MaxToolIterations <= 0 {
-		a.config.MaxToolIterations = 10
-	}
-
-	a.llmEngine = &a.config.LLMEngine
-	a.subAgents = a.config.SubAgents
-}
-
-func (a *Agent) setResponseCh() {
-	a.responseCh = core.NewResponseCh(a.config.AgentName, a.config.Trace)
-}
-
-func (a *Agent) initSystemTools() {
-	// Ensure tools
-	if a.tools == nil {
-		a.tools = []llms.Tool{}
-	}
-	// Foo Tool
-	ft := tools.NewFooTool()
-	a.tools = append(a.tools, ft)
-
-	// Delegate Tool
-	if len(a.subAgents) > 0 {
-		dt := tools.NewDelegateTool(a.subAgents)
-		a.tools = append(a.tools, dt)
-	}
-}
-
-func (a *Agent) initResponseCh() {
-	a.responseCh = core.NewResponseCh(a.Name(), a.Trace())
-	a.responseCh.Start()
-}
-
-// initAgentContext builds the agent context struct with static fields
-// that don't change during the agent's lifetime.
-func (a *Agent) initAgentContext() {
-	a.agentContext = &core.AgentContext{
-		AgentName: a.Name(),
-		Trace:     a.Trace(),
-		Tools:     a.tools,
-		SubAgents: a.subAgents,
-	}
+	errs = a.hooks.addedSystemAgentEvent(a, subAgent)
+	logHookErrors(errs)
 }
 
 func (a *Agent) AgentAsSubAgent() *core.SubAgent {
-	a.mainAgent = false
+	a.config.MainAgent = false
 	sa := core.SubAgent(a)
 	return &sa
 }
