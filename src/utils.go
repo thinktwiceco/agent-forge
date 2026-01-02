@@ -52,8 +52,8 @@ func loadEnvFile(filePath string) (map[string]string, error) {
 }
 
 // GetEnvVar retrieves an environment variable with fallback priority:
-// 1. .env file (in current directory or parent directories up to project root)
-// 2. os.Getenv()
+// 1. os.Getenv() (environment variables take precedence)
+// 2. .env file (in current directory or parent directories up to project root)
 // 3. Returns error if not found
 //
 // Parameters:
@@ -63,6 +63,11 @@ func loadEnvFile(filePath string) (map[string]string, error) {
 //   - string: The environment variable value
 //   - error: Error if the variable is not found in .env file or os environment
 func GetEnvVar(key string) (string, error) {
+	// Check os.Getenv() first (environment variables take precedence)
+	if value := os.Getenv(key); value != "" {
+		return value, nil
+	}
+
 	// Try to find .env file starting from current directory
 	// Search up directories until we find .env file or reach filesystem root
 	dir, err := os.Getwd()
@@ -84,11 +89,6 @@ func GetEnvVar(key string) (string, error) {
 			break // Reached root
 		}
 		dir = parent
-	}
-
-	// Fallback to os.Getenv()
-	if value := os.Getenv(key); value != "" {
-		return value, nil
 	}
 
 	// Not found anywhere
