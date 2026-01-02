@@ -41,7 +41,7 @@ type Agent struct {
 // NewAgent creates a new Agent instance with the provided configuration.
 //
 // Tools can be set on the LLM engine before or after creating the Agent.
-// Use GetTools() and SetTools() methods to manage tools via the Agent interface.
+// Use GetTools() and AddTools() methods to manage tools via the Agent interface.
 //
 // This function validates that all required fields are set before creating the Agent.
 // It panics if validation fails to ensure invalid agents are never created.
@@ -116,14 +116,30 @@ func (a *Agent) GetTools() []llms.Tool {
 	return a.tools
 }
 
-// SetTools sets the tools available to this agent.
+// AddTools adds tools to the existing tools available to this agent.
 //
-// Tools can be set at any time and will be used in subsequent ChatStream calls.
+// Tools can be added at any time and will be used in subsequent ChatStream calls.
+// This method appends the provided tools to the existing tools slice, triggering
+// a refresh of the system prompt and agent context.
 //
 // Parameters:
-//   - tools: Slice of tools to configure (can be nil or empty)
-func (a *Agent) SetTools(tools []llms.Tool) {
-	a.tools = tools
+//   - tools: Slice of tools to add (can be nil or empty)
+func (a *Agent) AddTools(tools []llms.Tool) {
+	if len(tools) == 0 {
+		return
+	}
+
+	// Ensure tools slice exists
+	if a.tools == nil {
+		a.tools = []llms.Tool{}
+	}
+
+	// Append new tools to existing tools
+	a.tools = append(a.tools, tools...)
+
+	// Trigger the addedToolsEvent hook
+	errs := a.hooks.addedToolsEvent(a, tools)
+	logHookErrors(errs)
 }
 
 // ===== Sub Agent Interface =====

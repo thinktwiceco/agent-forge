@@ -21,7 +21,7 @@ type OnContextBuildHook func(a *Agent, agentContext *core.AgentContext) error
 
 type BeforeToolExecutionHook func(a *Agent, toolCall *llms.ToolCall) error
 
-type OnToolExecutionHook func(a *Agent, toolReturn *llms.ToolReturn) error
+type OnToolExecutionHook func(a *Agent, toolResult *llms.ToolResult) error
 
 type OnNewUserMessageHook func(a *Agent, message string) error
 
@@ -29,13 +29,22 @@ type OnAddSystemAgentHook func(a *Agent, subAgent *core.SubAgent) error
 
 type OnAddedSystemAgentHook func(a *Agent, subAgent *core.SubAgent) error
 
+type OnNewAssistantMessageHook func(a *Agent, message string, promptTokens, completionTokens, totalTokens int) error
+
+type OnNewAssistantMessageWithToolCallsHook func(a *Agent, message string, toolCalls []llms.ToolCall, promptTokens, completionTokens, totalTokens int) error
+
+type OnAddedToolsHook func(a *Agent, tools []llms.Tool) error
+
 type AgentHooks struct {
-	onContextBuild      []OnContextBuildHook
-	beforeToolExecution []BeforeToolExecutionHook
-	onToolExecution     []OnToolExecutionHook
-	onNewUserMessage    []OnNewUserMessageHook
-	onAddSystemAgent    []OnAddSystemAgentHook
-	onAddedSystemAgent  []OnAddedSystemAgentHook
+	onContextBuild                     []OnContextBuildHook
+	beforeToolExecution                []BeforeToolExecutionHook
+	onToolExecution                    []OnToolExecutionHook
+	onNewUserMessage                   []OnNewUserMessageHook
+	onAddSystemAgent                   []OnAddSystemAgentHook
+	onAddedSystemAgent                 []OnAddedSystemAgentHook
+	onNewAssistantMessage              []OnNewAssistantMessageHook
+	onNewAssistantMessageWithToolCalls []OnNewAssistantMessageWithToolCallsHook
+	onAddedTools                       []OnAddedToolsHook
 }
 
 type HookExecutionError struct {
@@ -67,11 +76,11 @@ func (ah *AgentHooks) beforeToolExecutionEvent(a *Agent, toolCall *llms.ToolCall
 	return errors
 }
 
-func (ah *AgentHooks) toolExecutionEvent(a *Agent, toolReturn *llms.ToolReturn) []error {
+func (ah *AgentHooks) toolExecutionEvent(a *Agent, toolResult *llms.ToolResult) []error {
 	agentforge.Debug("Triggering toolExecutionEvent for agent %s", a.Name())
 	var errors []error
 	for _, hook := range ah.onToolExecution {
-		if err := hook(a, toolReturn); err != nil {
+		if err := hook(a, toolResult); err != nil {
 			errors = append(errors, err)
 		}
 	}
@@ -111,6 +120,39 @@ func (ah *AgentHooks) newUserMessageEvent(a *Agent, message string) []error {
 	return errors
 }
 
+func (ah *AgentHooks) newAssistantMessageEvent(a *Agent, message string, promptTokens, completionTokens, totalTokens int) []error {
+	agentforge.Debug("Triggering newAssistantMessageEvent for agent %s", a.Name())
+	var errors []error
+	for _, hook := range ah.onNewAssistantMessage {
+		if err := hook(a, message, promptTokens, completionTokens, totalTokens); err != nil {
+			errors = append(errors, err)
+		}
+	}
+	return errors
+}
+
+func (ah *AgentHooks) newAssistantMessageWithToolCallsEvent(a *Agent, message string, toolCalls []llms.ToolCall, promptTokens, completionTokens, totalTokens int) []error {
+	agentforge.Debug("Triggering newAssistantMessageWithToolCallsEvent for agent %s", a.Name())
+	var errors []error
+	for _, hook := range ah.onNewAssistantMessageWithToolCalls {
+		if err := hook(a, message, toolCalls, promptTokens, completionTokens, totalTokens); err != nil {
+			errors = append(errors, err)
+		}
+	}
+	return errors
+}
+
+func (ah *AgentHooks) addedToolsEvent(a *Agent, tools []llms.Tool) []error {
+	agentforge.Debug("Triggering addedToolsEvent for agent %s", a.Name())
+	var errors []error
+	for _, hook := range ah.onAddedTools {
+		if err := hook(a, tools); err != nil {
+			errors = append(errors, err)
+		}
+	}
+	return errors
+}
+
 // Utility function to log all the hooks errors
 
 func logHookErrors(errors []error) {
@@ -128,12 +170,15 @@ func logHookErrors(errors []error) {
 type Event string
 
 const (
-	EventContextBuild        Event = "contextBuild"
-	EventBeforeToolExecution Event = "beforeToolExecution"
-	EventToolExecution       Event = "toolExecution"
-	EventNewUserMessage      Event = "newUserMessage"
-	EventAddSystemAgent      Event = "addSystemAgent"
-	EventAddedSystemAgent    Event = "addedSystemAgent"
+	EventContextBuild                     Event = "contextBuild"
+	EventBeforeToolExecution              Event = "beforeToolExecution"
+	EventToolExecution                    Event = "toolExecution"
+	EventNewUserMessage                   Event = "newUserMessage"
+	EventAddSystemAgent                   Event = "addSystemAgent"
+	EventAddedSystemAgent                 Event = "addedSystemAgent"
+	EventNewAssistantMessage              Event = "newAssistantMessage"
+	EventNewAssistantMessageWithToolCalls Event = "newAssistantMessageWithToolCalls"
+	EventAddedTools                       Event = "addedTools"
 )
 
 func (a *Agent) on(event Event, hook any) {
@@ -158,6 +203,9 @@ func (a *Agent) on(event Event, hook any) {
 	case EventAddedSystemAgent:
 		typedHook := hook.(OnAddedSystemAgentHook)
 		a.hooks.onAddedSystemAgent = append(a.hooks.onAddedSystemAgent, typedHook)
+	case EventAddedTools:
+		typedHook := hook.(OnAddedToolsHook)
+		a.hooks.onAddedTools = append(a.hooks.onAddedTools, typedHook)
 	default:
 		panic(fmt.Sprintf("unknown event: %s", event))
 	}
@@ -171,5 +219,6 @@ func NewAgentHooks() *AgentHooks {
 		onNewUserMessage:    []OnNewUserMessageHook{},
 		onAddSystemAgent:    []OnAddSystemAgentHook{},
 		onAddedSystemAgent:  []OnAddedSystemAgentHook{},
+		onAddedTools:        []OnAddedToolsHook{},
 	}
 }

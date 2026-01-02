@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/thinktwice/agentForge/src/core"
+	"github.com/thinktwice/agentForge/src/llms"
 )
 
 var handleNewSystemAgentAdded = OnAddedSystemAgentHook(func(a *Agent, subAgent *core.SubAgent) error {
@@ -14,6 +15,19 @@ var handleNewSystemAgentAdded = OnAddedSystemAgentHook(func(a *Agent, subAgent *
 	// A new system agent will trigger a reload of the delegate tool
 	a.loadDelegateTool()
 	// A rebuild of the system prompt
+	a.ensureSystemPrompt()
+	// A rebuild of the agent context
+	a.initAgentContext()
+
+	return nil
+})
+
+var handleNewToolsAdded = OnAddedToolsHook(func(a *Agent, tools []llms.Tool) error {
+	if tools == nil {
+		return errors.New("tools slice is nil")
+	}
+
+	// New tools will trigger a rebuild of the system prompt
 	a.ensureSystemPrompt()
 	// A rebuild of the agent context
 	a.initAgentContext()
@@ -34,5 +48,21 @@ var handleNewUserMessage = OnNewUserMessageHook(func(a *Agent, message string) e
 	a.history.save()
 	// Get the history
 	a.history.get()
+	return nil
+})
+
+var handleNewAssistantMessage = OnNewAssistantMessageHook(func(a *Agent, message string, promptTokens, completionTokens, totalTokens int) error {
+	// Add the assistant message to the history
+	a.history.addAssistantMessage(message, promptTokens, completionTokens, totalTokens)
+	// Save the history
+	a.history.save()
+	return nil
+})
+
+var handleNewAssistantMessageWithToolCalls = OnNewAssistantMessageWithToolCallsHook(func(a *Agent, message string, toolCalls []llms.ToolCall, promptTokens, completionTokens, totalTokens int) error {
+	// Add the assistant message with tool calls to the history
+	a.history.addAssistantMessageWithToolCalls(message, toolCalls, promptTokens, completionTokens, totalTokens)
+	// Save the history
+	a.history.save()
 	return nil
 })
