@@ -23,63 +23,43 @@ type Parameter struct {
 
 // Tool is a universal tool implementation that satisfies both llms.Tool and agentforge.Discoverable interfaces
 type Tool struct {
-	name               string
-	description        string
-	advanceDescription string
-	troubleshooting    string
-	parameters         []Parameter
-	handler            func(agentContext map[string]any, args map[string]any) llms.ToolReturn
-	hooks              Hooks // Optional external validation hooks
-}
-
-// NewTool creates a new universal tool
-func NewTool(
-	name string,
-	description string,
-	advanceDescription string,
-	troubleshooting string,
-	params []Parameter,
-	handler func(agentContext map[string]any, args map[string]any) llms.ToolReturn,
-) llms.Tool {
-	return &Tool{
-		name:               name,
-		description:        description,
-		advanceDescription: advanceDescription,
-		troubleshooting:    troubleshooting,
-		parameters:         params,
-		handler:            handler,
-		hooks:              nil,
-	}
+	Name                string
+	Description         string
+	AdvanceDesc         string // Public field - use AdvanceDescription() method to access via interface
+	TroubleshootingInfo string // Public field - use Troubleshooting() method to access via interface
+	Parameters          []Parameter
+	Handler             func(agentContext map[string]any, args map[string]any) llms.ToolReturn
+	Hooks               Hooks // Optional external validation hooks
 }
 
 // GetName returns the name of the tool (implements llms.Tool)
 func (t *Tool) GetName() string {
-	return t.name
+	return t.Name
 }
 
 // BasicDescription returns a short one-line description of the tool (implements agentforge.Discoverable)
 func (t *Tool) BasicDescription() string {
-	return t.description
+	return t.Description
 }
 
 // AdvanceDescription returns detailed information about the tool's capabilities (implements agentforge.Discoverable)
 func (t *Tool) AdvanceDescription() string {
-	return t.advanceDescription
+	return t.AdvanceDesc
 }
 
 // Troubleshooting returns information about common issues and debugging tips (implements agentforge.Discoverable)
 func (t *Tool) Troubleshooting() string {
-	return t.troubleshooting
+	return t.TroubleshootingInfo
 }
 
 // GetHooks returns the hooks interface for external validation (can be nil)
 func (t *Tool) GetHooks() Hooks {
-	return t.hooks
+	return t.Hooks
 }
 
 // SetHooks sets the hooks interface for external validation
 func (t *Tool) SetHooks(hooks Hooks) {
-	t.hooks = hooks
+	t.Hooks = hooks
 }
 
 // GetFunctionDefinition returns the function definition for LLM API calls (implements llms.Tool)
@@ -87,7 +67,7 @@ func (t *Tool) GetFunctionDefinition() llms.FunctionDefinition {
 	properties := make(map[string]llms.FunctionObjectParameter)
 	var required []string
 
-	for _, param := range t.parameters {
+	for _, param := range t.Parameters {
 		properties[param.Name] = llms.FunctionObjectParameter{
 			Type_:       param.Type,
 			Description: param.Description,
@@ -99,8 +79,8 @@ func (t *Tool) GetFunctionDefinition() llms.FunctionDefinition {
 	}
 
 	return llms.FunctionDefinition{
-		Name:        t.name,
-		Description: t.description,
+		Name:        t.Name,
+		Description: t.Description,
 		Parameters: llms.FunctionParameters{
 			Type_:      "object",
 			Properties: properties,
@@ -118,14 +98,14 @@ func (t *Tool) Call(agentContext map[string]any, args map[string]any) llms.ToolR
 	}
 
 	// Call handler with validated args
-	return t.handler(agentContext, validated)
+	return t.Handler(agentContext, validated)
 }
 
 // validateAndExtractArgs validates arguments and extracts them with proper types
 func (t *Tool) validateAndExtractArgs(args map[string]any) (map[string]any, llms.ToolReturn) {
 	validated := make(map[string]any)
 
-	for _, param := range t.parameters {
+	for _, param := range t.Parameters {
 		value, exists := args[param.Name]
 
 		// Check if required parameter is missing

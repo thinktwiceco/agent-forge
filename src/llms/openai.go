@@ -15,11 +15,12 @@ import (
 // This llm is self-contained and uses channels for streaming responses
 // instead of callback functions. It is a pure API communication layer.
 type openAILLM struct {
-	ctx     context.Context
-	baseURL string
-	model   string
-	apiKey  string
-	client  openai.Client
+	ctx      context.Context
+	baseURL  string
+	model    string
+	apiKey   string
+	client   openai.Client
+	provider string
 }
 
 // newOpenAILLM creates a new openAILLM instance.
@@ -29,7 +30,7 @@ type openAILLM struct {
 //   - baseURL: API base URL (empty string uses default OpenAI URL)
 //   - model: Model name (e.g., "gpt-4", "gpt-3.5-turbo")
 //   - apiKey: OpenAI API key
-func newOpenAILLM(ctx context.Context, baseURL, model, apiKey string) *openAILLM {
+func newOpenAILLM(ctx context.Context, baseURL, model, apiKey, provider string) *openAILLM {
 	opts := []option.RequestOption{option.WithAPIKey(apiKey)}
 	if baseURL != "" {
 		opts = append(opts, option.WithBaseURL(baseURL))
@@ -37,11 +38,12 @@ func newOpenAILLM(ctx context.Context, baseURL, model, apiKey string) *openAILLM
 	client := openai.NewClient(opts...)
 
 	return &openAILLM{
-		ctx:     ctx,
-		baseURL: baseURL,
-		model:   model,
-		apiKey:  apiKey,
-		client:  client,
+		ctx:      ctx,
+		baseURL:  baseURL,
+		model:    model,
+		apiKey:   apiKey,
+		client:   client,
+		provider: provider,
 	}
 }
 
@@ -63,6 +65,14 @@ func (a *openAILLM) ChatStream(messages []UnifiedMessage, tools []Tool) *respons
 	go a.streamResponse(messages, tools, responseCh)
 
 	return responseCh
+}
+
+func (a *openAILLM) Model() string {
+	return a.model
+}
+
+func (a *openAILLM) Provider() string {
+	return a.provider
 }
 
 func toOpenAIMessages(messages []UnifiedMessage) ([]openai.ChatCompletionMessageParamUnion, error) {

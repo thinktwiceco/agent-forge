@@ -108,5 +108,5 @@ func (b *OpenAILLMBuilder) Build() (LLMEngine, error) {
 
 	b.validate()
 
-	return newOpenAILLM(b.Ctx, b.BaseURL, b.Model, b.ApiKey), nil
+	return newOpenAILLM(b.Ctx, b.BaseURL, b.Model, b.ApiKey, b.Provider), nil
 }

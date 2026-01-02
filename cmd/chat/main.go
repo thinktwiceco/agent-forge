@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/thinktwice/agentForge/src/agents"
-	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
@@ -27,7 +26,7 @@ const (
 
 func main() {
 	// Parse command-line flags
-	provider := flag.String("provider", "togetherai", "LLM provider to use: togetherai or openai")
+	provider := flag.String("provider", "togetherai", "LLM provider to use: togetherai, openai, or deepseek")
 	flag.Parse()
 
 	printBanner()
@@ -36,6 +35,8 @@ func main() {
 	providerName := "TogetherAI and Llama"
 	if *provider == "openai" {
 		providerName = "OpenAI"
+	} else if *provider == "deepseek" {
+		providerName = "DeepSeek"
 	}
 	fmt.Printf("Chat with a reasoning agent powered by %s\n", providerName)
 	fmt.Printf("%sType 'exit' or 'quit' to end the conversation%s\n\n", ColorDim, ColorReset)
@@ -91,35 +92,6 @@ func printBanner() {
 	fmt.Print(ColorReset)
 }
 
-func initializeFileSystemAgent() (*agents.Agent, error) {
-	llmEngine, err := llms.NewOpenAILLMBuilder("togetherai").
-		SetModel(llms.TOGETHERAI_Qwen257BInstructTurbo).
-		Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create TogetherAI LLM: %w", err)
-	}
-
-	fsAgent := agents.NewAgent(&agents.AgentConfig{
-		LLMEngine:   llmEngine,
-		AgentName:   "FileSystemAgent",
-		Description: "A helpful assistant that can read and write files to the file system",
-		Trace:       "file-system-agent",
-		Reasoning:   false,
-		SystemPrompt: `You are a helpful assistant that can read and write files to the file system.
-		You can read and write files to the file system using the "read_file" and "write_file" tools.`,
-		MainAgent: false,
-		AdvanceDescription: `
-		=== File System Agent ===
-		Can perform operations on a sandboxed file system.
-		Ask the agent to perform operations on a file.
-		`,
-		Troubleshooting: `
-		=== File System Agent Troubleshooting ===
-		`,
-	})
-	return fsAgent, nil
-}
-
 // initializeAgent creates and configures the agent with the specified provider
 func initializeAgent(provider string) (*agents.Agent, error) {
 
@@ -142,17 +114,16 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TogetherAI LLM: %w", err)
 		}
+	case "deepseek":
+		llmEngine, err = llms.NewOpenAILLMBuilder("deepseek").
+			SetModel(llms.DEEPSEEK_CHAT).
+			Build()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create DeepSeek LLM: %w", err)
+		}
 	default:
-		return nil, fmt.Errorf("unsupported provider: %s (supported: togetherai, openai)", provider)
+		return nil, fmt.Errorf("unsupported provider: %s (supported: togetherai, openai, deepseek)", provider)
 	}
-
-	fsAgent, err := initializeFileSystemAgent()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create FileSystemAgent: %w", err)
-	}
-
-	subAgents := make([]*core.SubAgent, 0)
-	subAgents = append(subAgents)
 
 	// Create agent configuration with reasoning enabled
 	config := agents.AgentConfig{
@@ -161,23 +132,22 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 		Description: "A helpful assistant with reasoning capabilities",
 		Trace:       "response",
 		Reasoning:   true, // Enable reasoning agent
-		SystemPrompt: `You are a helpful and intelligent AI assistant. When asked questions, 
-you think carefully and provide well-reasoned answers naturally and directly.
-
-You can have normal conversations, answer questions, and help users without needing any special tools.
-
-For COMPLEX problems that require systematic step-by-step breakdown and logical analysis, 
-you can optionally delegate to your reasoning agent using the "delegate" tool. 
-For simple questions, greetings, casual conversation, or straightforward tasks, just respond directly yourself.
-
-`,
+		CanExpand:   true,
+		SystemPrompt: `You are a testing agent
+		You will receive requests in order to test your sub agents and tool usage.
+		Report at the best of your ability.
+		`,
 		MainAgent:   true,
 		Persistence: "json",
-		SubAgents:   []*core.SubAgent{fsAgent.AgentAsSubAgent()},
 	}
 
 	// Create the agent
 	agent := agents.NewAgent(&config)
+
+	sandboxPath := "/home/verte/Desktop/thinktwice-agent/"
+
+	agent.AddSystemAgent(agents.OsAgent(llmEngine, sandboxPath))
+
 	return agent, nil
 }
 
@@ -233,15 +203,19 @@ func processResponse(agent *agents.Agent, message string) error {
 			}
 
 		case llms.TypeToolExecuting:
-			// Show tool execution
-			if chunk.ToolExecuting != nil {
+			// Show tool execution (suppress for delegate tool when delegating to sub-agents)
+			if chunk.ToolExecuting != nil && chunk.ToolExecuting.Name != "delegate" {
 				fmt.Printf("\n%s%s⚙️  Executing tool: %s%s\n", ColorMagenta, ColorBold, chunk.ToolExecuting.Name, ColorReset)
 			}
 
 		case llms.TypeToolResult:
-			// Show tool results
+			// Show tool results (suppress for delegate tool when delegating to sub-agents)
 			if len(chunk.ToolResults) > 0 {
 				for _, result := range chunk.ToolResults {
+					if result.ToolName == "delegate" {
+						// Skip verbose delegate tool completion messages for sub-agents
+						continue
+					}
 					if result.Success {
 						fmt.Printf("%s%s✓ Tool completed: %s%s\n", ColorGreen, ColorBold, result.ToolName, ColorReset)
 					} else {
@@ -265,19 +239,40 @@ func getColorForAgent(agentName, trace string) string {
 		return ColorYellow
 	}
 
+	// Check if this is a sub-agent (not the main "Assistant" agent)
+	if agentName != "Assistant" && !strings.Contains(strings.ToLower(agentName), "reasoning") {
+		// Use dim yellow for sub-agents to make them subtle like reasoning traces
+		return ColorDim + ColorYellow
+	}
+
 	// Default to cyan for main agent
 	return ColorCyan
 }
 
 // formatAgentLabel creates a formatted label for the agent
 func formatAgentLabel(agentName, trace string) string {
+	// Check if this is a sub-agent (not the main "Assistant" agent)
+	isSubAgent := agentName != "Assistant" && !strings.Contains(strings.ToLower(agentName), "reasoning")
+
 	// Add emoji based on agent type
 	emoji := "💬"
 	if strings.Contains(strings.ToLower(agentName), "reasoning") ||
 		strings.Contains(strings.ToLower(trace), "thinking") {
 		emoji = "🧠"
+	} else if isSubAgent {
+		// Use a subtle emoji for sub-agents
+		emoji = "→"
 	}
 
+	// For sub-agents, use a more subtle format
+	if isSubAgent {
+		if trace != "" {
+			return fmt.Sprintf("%s %s", emoji, trace)
+		}
+		return fmt.Sprintf("%s %s", emoji, agentName)
+	}
+
+	// Main agent format
 	if trace != "" {
 		return fmt.Sprintf("%s %s - %s", emoji, agentName, trace)
 	}

@@ -44,7 +44,7 @@ func main() {
     }
     
     // Create an agent
-    agent := agents.NewAgent(agents.AgentConfig{
+    agent := agents.NewAgent(&agents.AgentConfig{
         LLMEngine:    llm,
         AgentName:    "Assistant",
         Description:  "A helpful AI assistant",
@@ -71,7 +71,7 @@ func main() {
 Create an agent using the `AgentConfig` struct:
 
 ```go
-agent := agents.NewAgent(agents.AgentConfig{
+agent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine:         llm,                    // Required: LLM engine
     AgentName:         "my-agent",             // Required: Agent name
     Description:       "Basic description",    // Optional: Short description
@@ -80,6 +80,9 @@ agent := agents.NewAgent(agents.AgentConfig{
     MaxToolIterations: 10,                     // Optional: Max tool execution loops (default: 10)
     MainAgent:         true,                   // Optional: Is this the main agent?
     Persistence:       "json",                 // Optional: Enable conversation history
+    CanExpand:         true,                   // Optional: Enable expand tool (default: false)
+    Reasoning:         false,                 // Optional: Enable reasoning sub-agent
+    SubAgents:         []*core.SubAgent{},      // Optional: Custom sub-agents
 })
 ```
 
@@ -90,11 +93,13 @@ All agent responses are streamed in real-time:
 ```go
 responseCh := agent.ChatStream("What is the capital of France?")
 
+// Use Start() to get ExtendedChunkResponse with agent metadata
 for chunk := range responseCh.Start() {
     switch chunk.Type {
     case llms.TypeContent:
         // Content being streamed
-        fmt.Print(chunk.Content)
+        // chunk is ExtendedChunkResponse with AgentName and Trace
+        fmt.Printf("[%s] %s", chunk.AgentName, chunk.Content)
         
     case llms.TypeCompletion:
         // Final completion with token usage
@@ -148,21 +153,21 @@ Tools extend agent capabilities using a universal tool system where all tools re
 
 ### Creating Tools
 
-All tools are created with `core.NewTool` and receive both agent context and arguments:
+All tools are created using the `core.Tool` struct and receive both agent context and arguments:
 
 ```go
 import "github.com/thinktwice/agentForge/src/core"
 
-calculatorTool := core.NewTool(
-    "calculate",                                    // Tool name
-    "Performs mathematical calculations",           // Basic description
-    `Advanced Details:                              // Advanced description
+calculatorTool := &core.Tool{
+    Name:        "calculate",
+    Description: "Performs mathematical calculations",
+    AdvanceDesc: `Advanced Details:
 - Supports: +, -, *, /
 - Returns numeric result`,
-    `Troubleshooting:                               // Troubleshooting info
+    TroubleshootingInfo: `Troubleshooting:
 - Division by zero returns error
 - Use proper syntax: "2 + 2"`,
-    []core.Parameter{                               // Parameters
+    Parameters: []core.Parameter{
         {
             Name:        "expression",
             Type:        "string",
@@ -170,7 +175,7 @@ calculatorTool := core.NewTool(
             Required:    true,
         },
     },
-    func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+    Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
         // Tools that don't need context can ignore it
         expression := args["expression"].(string)
         
@@ -179,24 +184,31 @@ calculatorTool := core.NewTool(
         
         return core.NewSuccessResponse(result)
     },
-)
+}
 ```
 
 ### Using Agent Context
 
-Tools can access agent context for advanced functionality:
+Tools can access agent context for advanced functionality. The agent context is automatically built once at agent initialization and includes:
+
+- `agentName` - The name of the agent executing the tool
+- `trace` - Trace information for the agent
+- `model` - The LLM model being used
+- `tools` - List of available tools
+- `subAgents` - List of available sub-agents
+- `responseCh` - The response channel for streaming responses
 
 ```go
-loggerTool := core.NewTool(
-    "log_message",
-    "Logs a message with agent context",
-    "Logs messages with agent name and trace information",
-    "Check file permissions if logging fails",
-    []core.Parameter{
+loggerTool := &core.Tool{
+    Name:        "log_message",
+    Description: "Logs a message with agent context",
+    AdvanceDesc: "Logs messages with agent name and trace information",
+    TroubleshootingInfo: "Check file permissions if logging fails",
+    Parameters: []core.Parameter{
         {Name: "message", Type: "string", Required: true},
         {Name: "level", Type: "string", Required: false},
     },
-    func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+    Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
         // Access agent context
         agentName := agentContext["agentName"].(string)
         message := args["message"].(string)
@@ -206,7 +218,7 @@ loggerTool := core.NewTool(
         
         return core.NewSuccessResponse("Logged successfully")
     },
-)
+}
 ```
 
 ### Parameter Types
@@ -259,7 +271,7 @@ return core.NewFailureResponse("Timeout occurred", "Partial result: 42")
 ### Adding Tools to Agents
 
 ```go
-agent := agents.NewAgent(agents.AgentConfig{
+agent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine: llm,
     AgentName: "tool-user",
     Tools: []llms.Tool{
@@ -281,8 +293,10 @@ Multi-agent systems allow specialization and delegation:
 ### Basic Team Structure
 
 ```go
+import "github.com/thinktwice/agentForge/src/core"
+
 // Create specialized sub-agents
-reasoningAgent := agents.NewAgent(agents.AgentConfig{
+reasoningAgent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine:   llm,
     AgentName:   "reasoning-agent",
     Description: "Breaks down complex problems into logical steps",
@@ -290,7 +304,7 @@ reasoningAgent := agents.NewAgent(agents.AgentConfig{
 Break down complex problems systematically.`,
 })
 
-dataAgent := agents.NewAgent(agents.AgentConfig{
+dataAgent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine:   llm,
     AgentName:   "data-agent",
     Description: "Analyzes and processes data",
@@ -301,17 +315,25 @@ dataAgent := agents.NewAgent(agents.AgentConfig{
     },
 })
 
+// Convert agents to sub-agents for delegation
+reasoningSubAgent := reasoningAgent.AgentAsSubAgent()
+dataSubAgent := dataAgent.AgentAsSubAgent()
+
 // Create main agent that coordinates the team
-mainAgent := agents.NewAgent(agents.AgentConfig{
+mainAgent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine:   llm,
     AgentName:   "coordinator",
     Description: "Main coordinator agent",
     SystemPrompt: "You coordinate a team of specialized agents.",
     MainAgent:   true,
+    SubAgents: []*core.SubAgent{
+        reasoningSubAgent,
+        dataSubAgent,
+    },
 })
 
-// Add sub-agents using the delegate tool
-// Sub-agents are automatically available through the "delegate" tool
+// The delegate tool is automatically added when sub-agents are present
+// Sub-agents are available through the "delegate" tool
 ```
 
 ### Built-in Team Features
@@ -321,7 +343,7 @@ mainAgent := agents.NewAgent(agents.AgentConfig{
 Enable automatic reasoning capabilities:
 
 ```go
-agent := agents.NewAgent(agents.AgentConfig{
+agent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine:   llm,
     AgentName:   "smart-agent",
     Reasoning:   true,  // Automatically adds a reasoning sub-agent
@@ -341,7 +363,7 @@ When agents have sub-agents, they automatically get a `delegate` tool:
 The delegation is transparent:
 
 ```go
-mainAgent := agents.NewAgent(agents.AgentConfig{
+mainAgent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine: llm,
     AgentName: "main",
     Reasoning: true,
@@ -354,7 +376,10 @@ responseCh := mainAgent.ChatStream("Analyze the implications of quantum computin
 // The agent may automatically delegate to the reasoning agent
 for chunk := range responseCh.Start() {
     // Chunks include AgentName and Trace to identify the source
-    fmt.Printf("[%s] %s", chunk.AgentName, chunk.Content)
+    // ExtendedChunkResponse provides full context
+    if chunk.Content != "" {
+        fmt.Printf("[%s] %s", chunk.AgentName, chunk.Content)
+    }
 }
 ```
 
@@ -366,7 +391,7 @@ Use different LLM engines for different sub-agents:
 fastLLM, _ := llms.GetTogetherAILLM(ctx, llms.Llama323BInstructTurbo)
 powerfulLLM, _ := llms.GetTogetherAILLM(ctx, llms.Llama3170BInstructTurbo)
 
-agent := agents.NewAgent(agents.AgentConfig{
+agent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine: powerfulLLM,
     AgentName: "main",
     Reasoning: true,
@@ -382,14 +407,16 @@ agent := agents.NewAgent(agents.AgentConfig{
 Agents can discover information about other agents at runtime using the `expand` tool:
 
 ```go
-import "github.com/thinktwice/agentForge/src/tools"
+import "github.com/thinktwice/agentForge/src/tools/expand"
 
-agent := agents.NewAgent(agents.AgentConfig{
+agent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine: llm,
     AgentName: "explorer",
-    Tools: []llms.Tool{
-        tools.NewExpandTool(),  // Enables progressive discovery
-    },
+    CanExpand: true,  // Enables the expand tool automatically
+    // Or manually add it:
+    // Tools: []llms.Tool{
+    //     expand.NewExpandTool(),
+    // },
 })
 
 // The agent can now query detailed information about tools and sub-agents
@@ -403,12 +430,58 @@ The Expand tool provides three levels of information:
 
 ## Advanced Features
 
+### Hook System
+
+The agent framework provides a comprehensive hook system for lifecycle events, allowing you to inject custom logic at key points in the agent's execution.
+
+#### Available Hooks
+
+- `contextBuild` - Triggered when agent context is being built
+- `beforeToolExecution` - Triggered before a tool is executed
+- `toolExecution` - Triggered after a tool execution completes
+- `newUserMessage` - Triggered when a new user message is received
+- `addSystemAgent` - Triggered before a system agent is added
+- `addedSystemAgent` - Triggered after a system agent is added
+
+#### Using Hooks
+
+Hooks are registered using the `on()` method on the agent:
+
+```go
+agent := agents.NewAgent(&agents.AgentConfig{
+    LLMEngine: llm,
+    AgentName: "monitored-agent",
+    // ... other config
+})
+
+// Register a hook for tool execution
+agent.on(agents.EventBeforeToolExecution, func(a *agents.Agent, toolCall *llms.ToolCall) error {
+    fmt.Printf("About to execute tool: %s\n", toolCall.Name)
+    return nil // Return error to abort (errors are logged but don't abort by default)
+})
+
+// Register a hook for new user messages
+agent.on(agents.EventNewUserMessage, func(a *agents.Agent, message string) error {
+    fmt.Printf("New message received: %s\n", message)
+    return nil
+})
+```
+
+#### System Hooks
+
+The framework automatically registers system hooks for essential functionality:
+- History management on new user messages
+- System prompt injection
+- Delegate tool reloading when sub-agents are added
+
+These hooks ensure the agent functions correctly without requiring manual hook registration.
+
 ### Conversation Persistence
 
 Store and retrieve conversation history:
 
 ```go
-agent := agents.NewAgent(agents.AgentConfig{
+agent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine:   llm,
     AgentName:   "persistent-agent",
     Persistence: "json",  // Stores history as JSON files
@@ -418,46 +491,55 @@ agent := agents.NewAgent(agents.AgentConfig{
 // Each agent gets its own history file based on AgentName
 ```
 
-### Tool Execution Context
+### Agent Context System
 
-Pass custom context to all tools:
+The agent context system provides structured access to agent information. The context is built once at agent initialization and reused for all tool calls, improving performance.
+
+The `core.AgentContext` struct contains:
+- `AgentName` - The agent's name
+- `Trace` - Trace identifier
+- `Model` - LLM model identifier
+- `Tools` - Available tools
+- `SubAgents` - Available sub-agents
+
+The context is automatically merged with session-specific data (like `responseCh`) when tools are executed. Tools receive the complete context map with all agent information.
 
 ```go
-agent := agents.NewAgent(agents.AgentConfig{
-    LLMEngine: llm,
-    AgentName: "contextual-agent",
-    ToolExecutionContext: map[string]any{
-        "database": dbConnection,
-        "user_id":  userID,
-        "config":   appConfig,
+// The agent context is automatically built and provided to tools
+customTool := &core.Tool{
+    Name:        "query_db",
+    Description: "Queries the database",
+    AdvanceDesc: "Advanced database query capabilities",
+    TroubleshootingInfo: "Check database connection if queries fail",
+    Parameters: []core.Parameter{
+        {Name: "query", Type: "string", Required: true},
     },
-})
-
-// Tools can access this context
-customTool := core.NewTool(
-    "query_db",
-    "Queries the database",
-    "...",
-    "...",
-    []core.Parameter{{Name: "query", Type: "string", Required: true}},
-    func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
-        db := agentContext["database"].(*sql.DB)
-        userID := agentContext["user_id"].(string)
+    Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+        // Access agent context
+        agentName := agentContext["agentName"].(string)
+        model := agentContext["model"].(string)
+        
+        // Access response channel for streaming
+        responseCh := agentContext["responseCh"].(*core.ResponseCh)
+        
         // Use context in tool execution
+        query := args["query"].(string)
+        result := executeQuery(query)
+        
         return core.NewSuccessResponse(result)
     },
-)
+}
 ```
 
 ### Discoverable Interface
 
-All tools created with `core.NewTool` automatically implement the Discoverable interface:
+All tools created with `core.Tool` automatically implement the Discoverable interface:
 
 ```go
 // Tools automatically provide:
-// - BasicDescription() - returns the description parameter
-// - AdvanceDescription() - returns the advanceDescription parameter
-// - Troubleshooting() - returns the troubleshooting parameter
+// - BasicDescription() - returns the Description field
+// - AdvanceDescription() - returns the AdvanceDesc field
+// - Troubleshooting() - returns the TroubleshootingInfo field
 
 // For custom tool implementations, implement the interface:
 type MyCustomTool struct {
@@ -486,8 +568,9 @@ import (
     "context"
     "fmt"
     "github.com/thinktwice/agentForge/src/agents"
+    "github.com/thinktwice/agentForge/src/core"
     "github.com/thinktwice/agentForge/src/llms"
-    "github.com/thinktwice/agentForge/src/tools"
+    "github.com/thinktwice/agentForge/src/tools/expand"
 )
 
 func main() {
@@ -500,29 +583,29 @@ func main() {
     }
     
     // Create a calculator tool
-    calcTool := core.NewTool(
-        "calculate",
-        "Performs mathematical calculations",
-        "Supports +, -, *, / operations",
-        "Use proper syntax: '2 + 2'",
-        []core.Parameter{
+    calcTool := &core.Tool{
+        Name:        "calculate",
+        Description: "Performs mathematical calculations",
+        AdvanceDesc: "Supports +, -, *, / operations",
+        TroubleshootingInfo: "Use proper syntax: '2 + 2'",
+        Parameters: []core.Parameter{
             {Name: "expression", Type: "string", Required: true},
         },
-        func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+        Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
             expr := args["expression"].(string)
             result := evaluate(expr)
             return core.NewSuccessResponse(fmt.Sprintf("Result: %s", result))
         },
-    )
+    }
     
     // Create main agent with reasoning and tools
-    mainAgent := agents.NewAgent(agents.AgentConfig{
+    mainAgent := agents.NewAgent(&agents.AgentConfig{
         LLMEngine:   llm,
         AgentName:   "MathAssistant",
         Description: "An intelligent math assistant",
         SystemPrompt: `You are a helpful math assistant.
 You can solve mathematical problems using your tools and reasoning capabilities.`,
-        Tools:       []llms.Tool{calcTool, tools.NewExpandTool()},
+        Tools:       []llms.Tool{calcTool, expand.NewExpandTool()},
         Reasoning:   true,  // Enable reasoning sub-agent
         MainAgent:   true,
         Persistence: "json",
@@ -576,10 +659,16 @@ github.com/thinktwice/agentForge/
 │   ├── llms/            # LLM engine implementations
 │   │   ├── factory.go   # LLM factory functions
 │   │   └── openai.go    # OpenAI-compatible client
-│   ├── tools/           # Tool system
-│   │   ├── baseTool.go  # Tool base implementation
-│   │   ├── expandTool.go
-│   │   └── delegateTool.go
+│   ├── core/            # Core interfaces and implementations
+│   │   ├── tool.go      # Universal tool implementation
+│   │   ├── agentContext.go  # Agent context system
+│   │   ├── response.go  # Response channel management
+│   │   └── interfaces.go # Core interfaces (SubAgent, etc.)
+│   ├── tools/           # Tool implementations
+│   │   ├── delegate/     # Delegation tool
+│   │   ├── expand/       # Expand tool for discovery
+│   │   ├── meta/        # Meta tool for introspection
+│   │   └── fs/          # File system tools
 │   ├── persistence/     # Conversation persistence
 │   └── interfaces.go    # Core interfaces
 └── examples/            # Example implementations
@@ -591,9 +680,15 @@ github.com/thinktwice/agentForge/
 
 - `agents.Agent` - Main agent type
 - `agents.AgentConfig` - Configuration for creating agents
+- `agents.AgentHooks` - Hook system for lifecycle events
+- `core.Tool` - Universal tool implementation
+- `core.AgentContext` - Agent context system
+- `core.SubAgent` - Interface for sub-agents
+- `core.ResponseCh` - Response channel for streaming
 - `llms.LLMEngine` - Interface for LLM providers
 - `llms.Tool` - Interface for tools
-- `llms.ChunkResponse` - Streaming response chunk
+- `llms.ChunkResponse` - Base streaming response chunk
+- `core.ExtendedChunkResponse` - Extended chunk with agent metadata
 
 ### Key Interfaces
 

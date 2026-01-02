@@ -20,6 +20,7 @@ type ToolResult struct {
 	Success    bool   `json:"success"`    // Whether the tool executed successfully
 	Result     string `json:"result"`     // Result data from the tool
 	Error      string `json:"error"`      // Error message if tool failed
+	Ephemeral  bool   `json:"ephemeral"`  // Whether the result is ephemeral
 }
 
 // ChunkResponse represents a streaming response chunk.
