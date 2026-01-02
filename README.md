@@ -281,8 +281,8 @@ agent := agents.NewAgent(&agents.AgentConfig{
     },
 })
 
-// Or add/modify tools after creation
-agent.SetTools([]llms.Tool{newTool1, newTool2})
+// Or add tools after creation
+agent.AddTools([]llms.Tool{newTool1, newTool2})
 existingTools := agent.GetTools()
 ```
 

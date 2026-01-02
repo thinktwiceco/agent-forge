@@ -126,4 +126,7 @@ func (a *Agent) addSystemAgents() {
 func (a *Agent) registerSystemCallbacks() {
 	a.on(EventNewUserMessage, handleNewUserMessage)
 	a.on(EventAddedSystemAgent, handleNewSystemAgentAdded)
+	a.on(EventAddedTools, handleNewToolsAdded)
+	a.on(EventNewAssistantMessage, handleNewAssistantMessage)
+	a.on(EventNewAssistantMessageWithToolCalls, handleNewAssistantMessageWithToolCalls)
 }
