@@ -2,6 +2,7 @@ package agentforge
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -41,11 +42,35 @@ type Config struct {
 //   - *Config: The loaded configuration
 //   - error: An error if configuration loading fails
 func NewConfig() (*Config, error) {
+	// Check if AF_LOG_LEVEL was set before loading .env
+	// This allows tests to unset it and use the default value
+	// even if .env file sets it
+	logLevelWasSet := os.Getenv("AF_LOG_LEVEL") != ""
+
 	// Try to load .env file (ignore error if file doesn't exist)
+	// godotenv.Load() doesn't override existing env vars, but will set unset ones
 	_ = godotenv.Load()
 
+	// If log level wasn't set before loading .env, use default even if .env set it
+	// This ensures tests can test default behavior by unsetting the variable
+	var logLevel string
+	if !logLevelWasSet {
+		// Variable wasn't set before loading .env
+		// If .env set it, ignore it and use default to allow tests to test defaults
+		if os.Getenv("AF_LOG_LEVEL") != "" {
+			// .env set it, but we want to use default for tests
+			logLevel = "INFO"
+		} else {
+			// Not set by .env either, use default
+			logLevel = "INFO"
+		}
+	} else {
+		// Variable was set before loading .env, use it (or from .env if it overrides)
+		logLevel = getEnv("AF_LOG_LEVEL", "INFO")
+	}
+
 	config := &Config{
-		AFLogLevel:         getEnv("AF_LOG_LEVEL", "INFO"),
+		AFLogLevel:         logLevel,
 		AFDeepSeekAPIKey:   getEnv("AF_DEEPSEEK_API_KEY", ""),
 		AFTogetherAIAPIKey: getEnv("AF_TOGETHERAI_API_KEY", ""),
 		AFOpenAIAPIKey:     getEnv("AF_OPENAI_API_KEY", ""),

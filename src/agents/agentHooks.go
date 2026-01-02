@@ -203,6 +203,12 @@ func (a *Agent) on(event Event, hook any) {
 	case EventAddedSystemAgent:
 		typedHook := hook.(OnAddedSystemAgentHook)
 		a.hooks.onAddedSystemAgent = append(a.hooks.onAddedSystemAgent, typedHook)
+	case EventNewAssistantMessage:
+		typedHook := hook.(OnNewAssistantMessageHook)
+		a.hooks.onNewAssistantMessage = append(a.hooks.onNewAssistantMessage, typedHook)
+	case EventNewAssistantMessageWithToolCalls:
+		typedHook := hook.(OnNewAssistantMessageWithToolCallsHook)
+		a.hooks.onNewAssistantMessageWithToolCalls = append(a.hooks.onNewAssistantMessageWithToolCalls, typedHook)
 	case EventAddedTools:
 		typedHook := hook.(OnAddedToolsHook)
 		a.hooks.onAddedTools = append(a.hooks.onAddedTools, typedHook)
@@ -213,12 +219,14 @@ func (a *Agent) on(event Event, hook any) {
 
 func NewAgentHooks() *AgentHooks {
 	return &AgentHooks{
-		onContextBuild:      []OnContextBuildHook{},
-		beforeToolExecution: []BeforeToolExecutionHook{},
-		onToolExecution:     []OnToolExecutionHook{},
-		onNewUserMessage:    []OnNewUserMessageHook{},
-		onAddSystemAgent:    []OnAddSystemAgentHook{},
-		onAddedSystemAgent:  []OnAddedSystemAgentHook{},
-		onAddedTools:        []OnAddedToolsHook{},
+		onContextBuild:                     []OnContextBuildHook{},
+		beforeToolExecution:                []BeforeToolExecutionHook{},
+		onToolExecution:                    []OnToolExecutionHook{},
+		onNewUserMessage:                   []OnNewUserMessageHook{},
+		onAddSystemAgent:                   []OnAddSystemAgentHook{},
+		onAddedSystemAgent:                 []OnAddedSystemAgentHook{},
+		onNewAssistantMessage:              []OnNewAssistantMessageHook{},
+		onNewAssistantMessageWithToolCalls: []OnNewAssistantMessageWithToolCallsHook{},
+		onAddedTools:                       []OnAddedToolsHook{},
 	}
 }
