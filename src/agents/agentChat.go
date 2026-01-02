@@ -101,15 +101,12 @@ func (a *Agent) executeChatWithTools() error {
 			}
 			// Save the message to history with token usage
 			if fullContent != "" {
-				a.history.addAssistantMessage(fullContent, promptTokens, completionTokens, totalTokens)
-				a.history.save()
+				a.hooks.newAssistantMessageEvent(a, fullContent, promptTokens, completionTokens, totalTokens)
 			}
 			return nil
 		}
 
-		// Store assistant message with tool calls in history with token usage
-		a.history.addAssistantMessageWithToolCalls(fullContent, toolCalls, promptTokens, completionTokens, totalTokens)
-		a.history.save()
+		a.hooks.newAssistantMessageWithToolCallsEvent(a, fullContent, toolCalls, promptTokens, completionTokens, totalTokens)
 
 		// Execute each tool
 		for _, toolCall := range toolCalls {
@@ -125,8 +122,14 @@ func (a *Agent) executeChatWithTools() error {
 			}
 			a.responseCh.Response <- executingBytes
 
+			errs := a.hooks.beforeToolExecutionEvent(a, &toolCall)
+			logHookErrors(errs)
+
 			// Find and execute the tool
 			toolResult := a.executeTool(toolCall)
+
+			errs = a.hooks.toolExecutionEvent(a, &toolResult)
+			logHookErrors(errs)
 
 			// Emit tool-result chunk
 			resultChunk := llms.ChunkResponse{
@@ -140,9 +143,9 @@ func (a *Agent) executeChatWithTools() error {
 			}
 			a.responseCh.Response <- resultBytes
 
-			// Add tool result to history
-			a.history.addToolMessage(toolCall.ID, toolResult.Result, toolResult.Ephemeral)
-			a.history.save()
+			// // Add tool result to history
+			// a.history.addToolMessage(toolCall.ID, toolResult.Result, toolResult.Ephemeral)
+			// a.history.save()
 		}
 
 		// Continue to next iteration (will call LLM again with tool results)
@@ -176,14 +179,8 @@ func (a *Agent) executeTool(toolCall llms.ToolCall) llms.ToolResult {
 		}
 	}
 
-	errs := a.hooks.beforeToolExecutionEvent(a, &toolCall)
-	logHookErrors(errs)
-
 	// Execute the tool
 	result := tool.Call(agentContext, toolCall.Arguments)
-
-	errs = a.hooks.toolExecutionEvent(a, &result)
-	logHookErrors(errs)
 
 	// Convert to ToolResult
 	return llms.ToolResult{
