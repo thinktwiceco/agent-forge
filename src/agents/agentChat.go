@@ -18,7 +18,7 @@ func (a *Agent) executeChatWithTools() error {
 		iteration++
 		messages := a.history.History()
 		// Call LLM with current history and tools
-		llmResponseCh := (*a.llmEngine).ChatStream(messages, a.tools)
+		llmResponseCh := a.llmEngine.ChatStream(messages, a.tools)
 
 		var fullContent string
 		var toolCalls []llms.ToolCall
@@ -66,7 +66,11 @@ func (a *Agent) executeChatWithTools() error {
 				}
 
 				// Forward all other chunks to consumer
-				a.responseCh.Response <- chunkBytes
+				// Hook will be called when chunks are read from the channel
+				if !a.responseCh.TrySend(chunkBytes) {
+					// Channel closed, stop processing
+					return nil
+				}
 
 			case err := <-llmResponseCh.Error:
 				if err != nil {
@@ -80,7 +84,12 @@ func (a *Agent) executeChatWithTools() error {
 		// If no tool calls, forward the completed chunk (if any) and we're done
 		if !hasToolCalls {
 			if completedChunkBytes != nil {
-				a.responseCh.Response <- completedChunkBytes
+				// Forward completed chunk to consumer
+				// Hook will be called when chunks are read from the channel
+				if !a.responseCh.TrySend(completedChunkBytes) {
+					// Channel closed, stop processing
+					return nil
+				}
 			} else if fullContent != "" {
 				// Stream ended without StatusCompleted chunk, but we have content
 				// Send a completion chunk with accumulated content
@@ -96,7 +105,12 @@ func (a *Agent) executeChatWithTools() error {
 				}
 				completionBytes, err := json.Marshal(completionChunk)
 				if err == nil {
-					a.responseCh.Response <- completionBytes
+					// Forward completion chunk to consumer
+					// Hook will be called when chunks are read from the channel
+					if !a.responseCh.TrySend(completionBytes) {
+						// Channel closed, stop processing
+						return nil
+					}
 				}
 			}
 			// Save the message to history with token usage
@@ -120,7 +134,12 @@ func (a *Agent) executeChatWithTools() error {
 			if err != nil {
 				return fmt.Errorf("failed to serialize tool-executing chunk: %w", err)
 			}
-			a.responseCh.Response <- executingBytes
+			// Forward tool-executing chunk to consumer
+			// Hook will be called when chunks are read from the channel
+			if !a.responseCh.TrySend(executingBytes) {
+				// Channel closed, stop processing
+				return nil
+			}
 
 			errs := a.hooks.beforeToolExecutionEvent(a, &toolCall)
 			logHookErrors(errs)
@@ -141,7 +160,12 @@ func (a *Agent) executeChatWithTools() error {
 			if err != nil {
 				return fmt.Errorf("failed to serialize tool-result chunk: %w", err)
 			}
-			a.responseCh.Response <- resultBytes
+			// Forward tool-result chunk to consumer
+			// Hook will be called when chunks are read from the channel
+			if !a.responseCh.TrySend(resultBytes) {
+				// Channel closed, stop processing
+				return nil
+			}
 
 			// // Add tool result to history
 			// a.history.addToolMessage(toolCall.ID, toolResult.Result, toolResult.Ephemeral)

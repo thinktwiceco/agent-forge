@@ -60,7 +60,8 @@ func (d *Delegate) delegate(agentContext map[string]any, subAgentName string, me
 		// Forward chunk to parent if available
 		if parentResponseCh != nil {
 			if chunkBytes, err := json.Marshal(chunk); err == nil {
-				parentResponseCh.GetResponseChan() <- chunkBytes
+				// Use TrySend to safely send to parent channel (may be closed)
+				parentResponseCh.TrySend(chunkBytes)
 			}
 		}
 	}

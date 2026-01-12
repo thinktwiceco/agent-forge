@@ -24,7 +24,7 @@ func (a *Agent) ensureConfig() {
 		a.config.MaxToolIterations = 10
 	}
 
-	a.llmEngine = &a.config.LLMEngine
+	a.llmEngine = a.config.LLMEngine
 	a.subAgents = a.config.SubAgents
 
 	// Initialize tools from config (if provided)
@@ -39,12 +39,45 @@ func (a *Agent) ensureConfig() {
 // prepare the callbacks for the agent
 func (a *Agent) ensureHooks() {
 	if a.hooks == nil {
-		a.hooks = NewAgentHooks()
+		a.hooks = newAgentHooks()
 	}
 }
 
 func (a *Agent) setResponseCh() {
-	a.responseCh = core.NewResponseCh(a.config.AgentName, a.config.Trace)
+	// Create hook callback that triggers agent hooks when chunks are read
+	onChunkRead := func(extendedChunk *core.ExtendedChunkResponse) error {
+		// Convert ExtendedChunkResponse to ChunkResponse for hooks
+		chunk := &llms.ChunkResponse{
+			Content:          extendedChunk.Content,
+			Delta:            extendedChunk.Delta,
+			FullContent:      extendedChunk.FullContent,
+			Status:           extendedChunk.Status,
+			Type:             extendedChunk.Type,
+			ToolCalls:        extendedChunk.ToolCalls,
+			ToolExecuting:    extendedChunk.ToolExecuting,
+			ToolResults:      extendedChunk.ToolResults,
+			PromptTokens:     extendedChunk.PromptTokens,
+			CompletionTokens: extendedChunk.CompletionTokens,
+			TotalTokens:      extendedChunk.TotalTokens,
+		}
+		// Store agent name/trace in logger plugin if available
+		// We need to find the logger plugin from config
+		for _, plugin := range a.config.Plugins {
+			if lp, ok := plugin.(interface{ SetCurrentChunkInfo(string, string) }); ok {
+				lp.SetCurrentChunkInfo(extendedChunk.AgentName, extendedChunk.Trace)
+				break
+			}
+		}
+		// Trigger hooks
+		errs := a.hooks.newChunkEvent(a, chunk)
+		for _, err := range errs {
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	a.responseCh = core.NewResponseCh(a.config.AgentName, a.config.Trace, onChunkRead)
 }
 
 func (a *Agent) initSystemTools() {
@@ -65,7 +98,9 @@ func (a *Agent) initSystemTools() {
 }
 
 func (a *Agent) initResponseCh() {
-	a.responseCh = core.NewResponseCh(a.Name(), a.Trace())
+	// This method is not used - setResponseCh() is used instead
+	// Keeping for backward compatibility if needed
+	a.responseCh = core.NewResponseCh(a.Name(), a.Trace(), nil)
 	a.responseCh.Start()
 }
 
@@ -106,7 +141,7 @@ func (a *Agent) addSystemAgents() {
 		// Check if a specific engine is configured for this sub agent
 		var engineForReasoning llms.LLMEngine
 		if a.config.ExtraEngines != nil {
-			if engine, ok := a.config.ExtraEngines["system-reasoning"]; ok && engine != nil {
+			if engine, ok := a.config.ExtraEngines[AgentNameSystemReasoning]; ok && engine != nil {
 				engineForReasoning = engine
 			} else {
 				engineForReasoning = a.config.LLMEngine
@@ -124,9 +159,15 @@ func (a *Agent) addSystemAgents() {
 
 // / ========= SYSTEM HOOKS ========= ///
 func (a *Agent) registerSystemCallbacks() {
-	a.on(EventNewUserMessage, handleNewUserMessage)
-	a.on(EventAddedSystemAgent, handleNewSystemAgentAdded)
-	a.on(EventAddedTools, handleNewToolsAdded)
-	a.on(EventNewAssistantMessage, handleNewAssistantMessage)
-	a.on(EventNewAssistantMessageWithToolCalls, handleNewAssistantMessageWithToolCalls)
+	a.hooks.on(core.EventNewUserMessage, handleNewUserMessage)
+	a.hooks.on(core.EventAddedSystemAgent, handleNewSystemAgentAdded)
+	a.hooks.on(core.EventAddedTools, handleNewToolsAdded)
+	a.hooks.on(core.EventNewAssistantMessage, handleNewAssistantMessage)
+	a.hooks.on(core.EventNewAssistantMessageWithToolCalls, handleNewAssistantMessageWithToolCalls)
+	a.hooks.on(core.EventAgentInitialization, handlePluginInitialization)
+}
+
+// / ========= PLUGIN HOOKS ========= ///
+func (a *Agent) registerPluginCallbacks() {
+	a.hooks.registerPlugins(a.config.Plugins)
 }

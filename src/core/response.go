@@ -28,6 +28,10 @@ type ExtendedChunkResponse struct {
 	Trace            string            `json:"trace"`                      // Trace information (e.g., "thinking", "response")
 }
 
+// ChunkReadHook is a callback function called when a chunk is read from the channel
+// It receives the ExtendedChunkResponse and can be used to trigger hooks
+type ChunkReadHook func(extendedChunk *ExtendedChunkResponse) error
+
 // ResponseCh manages channels for streaming responses and errors at the Agent level.
 //
 // This struct provides a channel-based API for receiving streaming responses
@@ -38,6 +42,7 @@ type ResponseCh struct {
 
 	agentName string // Name of the agent associated with this response channel
 	trace     string // Trace information for this response channel
+	onChunkRead ChunkReadHook // Hook called when chunks are read from the channel
 
 	started bool
 	closed  bool
@@ -49,16 +54,18 @@ type ResponseCh struct {
 // Parameters:
 //   - agentName: Name of the agent associated with this response channel
 //   - trace: Optional trace information (e.g., "thinking", "response")
+//   - onChunkRead: Optional hook function called when chunks are read from the channel
 //
 // Returns:
 //   - *ResponseCh: A new ResponseCh instance
-func NewResponseCh(agentName string, trace string) *ResponseCh {
+func NewResponseCh(agentName string, trace string, onChunkRead ChunkReadHook) *ResponseCh {
 	return &ResponseCh{
-		Response:  make(chan []byte, 10), // Buffered channel
-		Error:     make(chan error, 1),   // Buffered channel for errors
-		agentName: agentName,
-		trace:     trace,
-		started:   false,
+		Response:    make(chan []byte, 10), // Buffered channel
+		Error:       make(chan error, 1),   // Buffered channel for errors
+		agentName:   agentName,
+		trace:       trace,
+		onChunkRead: onChunkRead,
+		started:     false,
 	}
 }
 
@@ -97,6 +104,7 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 					// Send error as extended chunk
 					chunkChan <- ExtendedChunkResponse{
 						Status:    llms.StatusError,
+						Type:      llms.TypeContent, // Error chunks use TypeContent
 						Content:   fmt.Sprintf("Error deserializing chunk: %v", err),
 						AgentName: arc.agentName,
 						Trace:     arc.trace,
@@ -113,6 +121,14 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 					extendedChunk.Trace = arc.trace
 				}
 
+				// Trigger hook when chunk is read from channel
+				if arc.onChunkRead != nil {
+					if err := arc.onChunkRead(&extendedChunk); err != nil {
+						// Log hook error but continue processing
+						// Hook errors shouldn't stop chunk processing
+					}
+				}
+
 				// Send chunk
 				chunkChan <- extendedChunk
 
@@ -122,6 +138,7 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 					chunkChan <- ExtendedChunkResponse{
 						Content:   err.Error(),
 						Status:    llms.StatusError,
+						Type:      llms.TypeContent, // Error chunks use TypeContent
 						AgentName: arc.agentName,
 						Trace:     arc.trace,
 					}
@@ -163,4 +180,32 @@ func (arc *ResponseCh) GetResponseChan() chan<- []byte {
 // This implements IParentResponseCh.
 func (arc *ResponseCh) GetErrorChan() chan<- error {
 	return arc.Error
+}
+
+// TrySend safely sends a chunk to the response channel.
+// Returns false if the channel is closed, true if the send succeeded.
+// This prevents panics when trying to send to a closed channel.
+func (arc *ResponseCh) TrySend(chunkBytes []byte) bool {
+	arc.mu.Lock()
+	closed := arc.closed
+	arc.mu.Unlock()
+
+	if closed {
+		return false
+	}
+
+	// Use recover to catch panic if channel closes between check and send
+	sent := false
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Panic occurred, channel was closed
+				sent = false
+			}
+		}()
+		arc.Response <- chunkBytes
+		sent = true
+	}()
+
+	return sent
 }

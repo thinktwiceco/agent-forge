@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	"github.com/thinktwice/agentForge/src/agents"
+	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwice/agentForge/src/plugins/logger"
 )
 
 const (
@@ -125,12 +127,17 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 		return nil, fmt.Errorf("unsupported provider: %s (supported: togetherai, openai, deepseek)", provider)
 	}
 
+	codebasePath := "/home/verte/Desktop/thinktwice-agent/cmd/chat"
+
+	// Create logger plugin with default rules and stdout output
+	loggerPlugin := logger.NewPlugin(logger.DefaultColorRules(), logger.DefaultLabelRules(), os.Stdout)
+
 	// Create agent configuration with reasoning enabled
 	config := agents.AgentConfig{
 		LLMEngine:   llmEngine,
 		AgentName:   "Assistant",
 		Description: "A helpful assistant with reasoning capabilities",
-		Trace:       "response",
+		Trace:       agents.TraceResponse,
 		Reasoning:   true, // Enable reasoning agent
 		CanExpand:   true,
 		SystemPrompt: `You are a testing agent
@@ -139,142 +146,34 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 		`,
 		MainAgent:   true,
 		Persistence: "json",
+		Plugins:     []core.Plugin{loggerPlugin},
 	}
 
 	// Create the agent
 	agent := agents.NewAgent(&config)
 
-	sandboxPath := "/home/verte/Desktop/thinktwice-agent/"
-
-	agent.AddSystemAgent(agents.OsAgent(llmEngine, sandboxPath))
+	agent.AddSystemAgent(agents.OsAgent(llmEngine, codebasePath))
 
 	return agent, nil
 }
 
-// processResponse sends a message to the agent and displays the response with colored output
+// processResponse sends a message to the agent and processes the response
+// All chunks are formatted by the logger plugin hook when read from the channel
 func processResponse(agent *agents.Agent, message string) error {
 	// Get response channel
 	responseCh := agent.ChatStream(message)
 
-	// Track which agents we've seen
-	currentAgent := ""
-	currentTrace := ""
-
 	// Process streaming response
-	// No casting needed - Start() returns the concrete channel type
 	for chunk := range responseCh.Start() {
 		// Check for errors
 		if chunk.Status == llms.StatusError {
 			return fmt.Errorf("agent error: %s", chunk.Content)
 		}
 
-		// Determine color based on agent name/trace
-		color := getColorForAgent(chunk.AgentName, chunk.Trace)
-
-		// Print agent header if agent changed
-		if chunk.AgentName != currentAgent || chunk.Trace != currentTrace {
-			currentAgent = chunk.AgentName
-			currentTrace = chunk.Trace
-
-			// Print agent name header
-			agentLabel := formatAgentLabel(chunk.AgentName, chunk.Trace)
-			fmt.Printf("\n%s%s%s%s\n", ColorBold, color, agentLabel, ColorReset)
-		}
-
-		// Handle different chunk types
-		switch chunk.Type {
-		case llms.TypeContent:
-			// Stream content as it arrives
-			if chunk.Content != "" || chunk.Delta != "" {
-				content := chunk.Content
-				if content == "" {
-					content = chunk.Delta
-				}
-				fmt.Printf("%s%s%s", color, content, ColorReset)
-			}
-
-		case llms.TypeCompletion:
-			// Final completion - display token usage if available
-			if chunk.TotalTokens > 0 {
-				fmt.Printf("\n%s%s📊 Tokens: %d prompt + %d completion = %d total%s\n",
-					ColorBlue, ColorDim,
-					chunk.PromptTokens, chunk.CompletionTokens, chunk.TotalTokens,
-					ColorReset)
-			}
-
-		case llms.TypeToolExecuting:
-			// Show tool execution (suppress for delegate tool when delegating to sub-agents)
-			if chunk.ToolExecuting != nil && chunk.ToolExecuting.Name != "delegate" {
-				fmt.Printf("\n%s%s⚙️  Executing tool: %s%s\n", ColorMagenta, ColorBold, chunk.ToolExecuting.Name, ColorReset)
-			}
-
-		case llms.TypeToolResult:
-			// Show tool results (suppress for delegate tool when delegating to sub-agents)
-			if len(chunk.ToolResults) > 0 {
-				for _, result := range chunk.ToolResults {
-					if result.ToolName == "delegate" {
-						// Skip verbose delegate tool completion messages for sub-agents
-						continue
-					}
-					if result.Success {
-						fmt.Printf("%s%s✓ Tool completed: %s%s\n", ColorGreen, ColorBold, result.ToolName, ColorReset)
-					} else {
-						fmt.Printf("%s%s✗ Tool failed: %s - %s%s\n", ColorRed, ColorBold, result.ToolName, result.Error, ColorReset)
-					}
-				}
-			}
-		}
+		// Hook is triggered automatically when chunks are read from the channel
+		// All formatting is handled by the logger plugin hook
 	}
 
 	fmt.Println() // Final newline
 	return nil
-}
-
-// getColorForAgent returns the appropriate color code based on agent name and trace
-func getColorForAgent(agentName, trace string) string {
-	// Check if this is the reasoning agent
-	if strings.Contains(strings.ToLower(agentName), "reasoning") ||
-		strings.Contains(strings.ToLower(trace), "thinking") ||
-		strings.Contains(strings.ToLower(trace), "reasoning") {
-		return ColorYellow
-	}
-
-	// Check if this is a sub-agent (not the main "Assistant" agent)
-	if agentName != "Assistant" && !strings.Contains(strings.ToLower(agentName), "reasoning") {
-		// Use dim yellow for sub-agents to make them subtle like reasoning traces
-		return ColorDim + ColorYellow
-	}
-
-	// Default to cyan for main agent
-	return ColorCyan
-}
-
-// formatAgentLabel creates a formatted label for the agent
-func formatAgentLabel(agentName, trace string) string {
-	// Check if this is a sub-agent (not the main "Assistant" agent)
-	isSubAgent := agentName != "Assistant" && !strings.Contains(strings.ToLower(agentName), "reasoning")
-
-	// Add emoji based on agent type
-	emoji := "💬"
-	if strings.Contains(strings.ToLower(agentName), "reasoning") ||
-		strings.Contains(strings.ToLower(trace), "thinking") {
-		emoji = "🧠"
-	} else if isSubAgent {
-		// Use a subtle emoji for sub-agents
-		emoji = "→"
-	}
-
-	// For sub-agents, use a more subtle format
-	if isSubAgent {
-		if trace != "" {
-			return fmt.Sprintf("%s %s", emoji, trace)
-		}
-		return fmt.Sprintf("%s %s", emoji, agentName)
-	}
-
-	// Main agent format
-	if trace != "" {
-		return fmt.Sprintf("%s %s - %s", emoji, agentName, trace)
-	}
-	return fmt.Sprintf("%s %s", emoji, agentName)
 }

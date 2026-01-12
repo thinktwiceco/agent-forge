@@ -12,7 +12,7 @@ import (
 // It specializes in reading files, writing files, executing commands, and managing file system resources.
 
 func createOsAgentTemplate() *SystemAgentTemplate {
-	template, err := NewSystemAgentTemplate("system-os", "os")
+	template, err := NewSystemAgentTemplate(AgentNameSystemOS, TraceOS)
 	if err != nil {
 		panic(err)
 	}

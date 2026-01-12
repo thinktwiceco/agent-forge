@@ -7,7 +7,7 @@ import (
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
-const DEFAULT_MAX_TOOL_ITERATIONS = 10
+const defaultMaxToolIterations = 10
 
 // AgentConfig holds configuration parameters for creating a new Agent.
 //
@@ -71,6 +71,9 @@ type AgentConfig struct {
 
 	// SubAgents is the list of sub-agents available for delegation
 	SubAgents []*core.SubAgent
+
+	// Plugins is the list of plugins to use for the agent
+	Plugins []core.Plugin
 }
 
 // validate validates that all required fields in AgentConfig are set.
@@ -98,7 +101,7 @@ func (c *AgentConfig) validate() error {
 	}
 
 	if c.MaxToolIterations <= 0 {
-		c.MaxToolIterations = DEFAULT_MAX_TOOL_ITERATIONS
+		c.MaxToolIterations = defaultMaxToolIterations
 	}
 
 	if c.SubAgents == nil {
