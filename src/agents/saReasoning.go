@@ -11,7 +11,7 @@ import (
 // It focuses on "how to" questions and rejects direct solution requests.
 
 func createReasoningAgentTemplate() *SystemAgentTemplate {
-	template, err := NewSystemAgentTemplate("system-reasoning", "reasoning")
+	template, err := NewSystemAgentTemplate(AgentNameSystemReasoning, TraceReasoning)
 	if err != nil {
 		panic(err)
 	}

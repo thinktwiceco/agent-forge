@@ -36,8 +36,8 @@ var handleNewToolsAdded = OnAddedToolsHook(func(a *Agent, tools []llms.Tool) err
 })
 
 var handleNewUserMessage = OnNewUserMessageHook(func(a *Agent, message string) error {
-	// Make sure the response channel is started
-	a.initResponseCh()
+	// ResponseCh is already set up in setResponseCh() with hook callback
+	// Don't recreate it here as that would lose the hook callback
 	// Ensure the history is loaded
 	a.ensureHistory()
 	// Add the user message to the history if not already present
@@ -64,5 +64,18 @@ var handleNewAssistantMessageWithToolCalls = OnNewAssistantMessageWithToolCallsH
 	a.history.addAssistantMessageWithToolCalls(message, toolCalls, promptTokens, completionTokens, totalTokens)
 	// Save the history
 	a.history.save()
+	return nil
+})
+
+var handlePluginInitialization = OnAgentInitializationHook(func(a *Agent, config *AgentConfig) error {
+	// Register all the plugins
+	for _, plugin := range a.config.Plugins {
+		for _, event := range core.Events {
+			hook := plugin.On(event)
+			if hook != nil {
+				a.hooks.on(event, hook)
+			}
+		}
+	}
 	return nil
 })

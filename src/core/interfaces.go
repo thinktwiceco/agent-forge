@@ -1,5 +1,7 @@
 package core
 
+import "github.com/thinktwice/agentForge/src/llms"
+
 // SubAgent represents an agent that can be used as a sub-agent
 // for delegation. This interface defines the minimal contract
 // that any agent must satisfy to participate in delegation.
@@ -21,4 +23,45 @@ type SubAgent interface {
 	// Troubleshooting returns information about common issues, debugging tips,
 	// and configuration guidance for this agent
 	Troubleshooting() string
+}
+
+type AgentHookFn any
+
+type Plugin interface {
+	Name() string
+	On(event Event) AgentHookFn
+	Tools() []llms.Tool
+}
+
+// Event represents an agent lifecycle event
+type Event string
+
+const (
+	EventAgentInitialization              Event = "agentInitialization"
+	EventAgentInitialized                 Event = "agentInitialized"
+	EventContextBuild                     Event = "contextBuild"
+	EventBeforeToolExecution              Event = "beforeToolExecution"
+	EventToolExecution                    Event = "toolExecution"
+	EventNewUserMessage                   Event = "newUserMessage"
+	EventAddSystemAgent                   Event = "addSystemAgent"
+	EventAddedSystemAgent                 Event = "addedSystemAgent"
+	EventNewAssistantMessage              Event = "newAssistantMessage"
+	EventNewAssistantMessageWithToolCalls Event = "newAssistantMessageWithToolCalls"
+	EventAddedTools                       Event = "addedTools"
+	EventNewChunk                         Event = "newChunk"
+)
+
+var Events = []Event{
+	EventAgentInitialization,
+	EventAgentInitialized,
+	EventContextBuild,
+	EventBeforeToolExecution,
+	EventToolExecution,
+	EventNewUserMessage,
+	EventAddSystemAgent,
+	EventAddedSystemAgent,
+	EventNewAssistantMessage,
+	EventNewAssistantMessageWithToolCalls,
+	EventAddedTools,
+	EventNewChunk,
 }

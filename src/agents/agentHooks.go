@@ -35,7 +35,15 @@ type OnNewAssistantMessageWithToolCallsHook func(a *Agent, message string, toolC
 
 type OnAddedToolsHook func(a *Agent, tools []llms.Tool) error
 
+type OnAgentInitializationHook func(a *Agent, config *AgentConfig) error
+
+type OnAgentInitializedHook func(a *Agent) error
+
+type OnNewChunkHook func(a *Agent, chunk *llms.ChunkResponse) error
+
 type AgentHooks struct {
+	onAgentInitialization              []OnAgentInitializationHook
+	onAgentInitialized                 []OnAgentInitializedHook
 	onContextBuild                     []OnContextBuildHook
 	beforeToolExecution                []BeforeToolExecutionHook
 	onToolExecution                    []OnToolExecutionHook
@@ -45,11 +53,37 @@ type AgentHooks struct {
 	onNewAssistantMessage              []OnNewAssistantMessageHook
 	onNewAssistantMessageWithToolCalls []OnNewAssistantMessageWithToolCallsHook
 	onAddedTools                       []OnAddedToolsHook
+	onNewChunk                         []OnNewChunkHook
 }
 
-type HookExecutionError struct {
-	message string
-	hookId  string
+// Hook Handle plugins
+func (ah *AgentHooks) registerPlugins(plugins []core.Plugin) {
+	agentforge.Info("🔌 Starting Plugin Registration")
+	for _, plugin := range plugins {
+		agentforge.Info("♻️ Registering plugin: %s....", plugin.Name())
+		for _, event := range core.Events {
+			hook := plugin.On(event)
+			if hook != nil {
+				ah.on(event, hook)
+				agentforge.Info("\t ✅ Hook registered for event: %s", event)
+			}
+		}
+
+		tools := plugin.Tools()
+
+		if len(tools) > 0 {
+			agentforge.Info("\t 🧰 Registering %d tools for plugin: %s", len(tools), plugin.Name())
+			// Will add a hook to add the tools to the agent
+			// Before agent initialization. Init this way the tools
+			// will be included in the agent context and system prompt.
+			toolRegistrationHook := OnAgentInitializationHook(func(sa *Agent, config *AgentConfig) error {
+				sa.tools = append(sa.tools, tools...)
+				return nil
+			})
+			ah.on(core.EventAgentInitialization, toolRegistrationHook)
+		}
+		agentforge.Info("🎉 Plugin registration completed\n")
+	}
 }
 
 // HOOK TRIGGERS //
@@ -153,6 +187,39 @@ func (ah *AgentHooks) addedToolsEvent(a *Agent, tools []llms.Tool) []error {
 	return errors
 }
 
+func (ah *AgentHooks) agentInitializationEvent(a *Agent, config *AgentConfig) []error {
+	agentforge.Debug("Triggering agentInitializationEvent for agent %s", a.Name())
+	var errors []error
+	for _, hook := range ah.onAgentInitialization {
+		if err := hook(a, config); err != nil {
+			errors = append(errors, err)
+		}
+	}
+	return errors
+}
+
+func (ah *AgentHooks) agentInitializedEvent(a *Agent) []error {
+	agentforge.Debug("Triggering agentInitializedEvent for agent %s", a.Name())
+	var errors []error
+	for _, hook := range ah.onAgentInitialized {
+		if err := hook(a); err != nil {
+			errors = append(errors, err)
+		}
+	}
+	return errors
+}
+
+func (ah *AgentHooks) newChunkEvent(a *Agent, chunk *llms.ChunkResponse) []error {
+	agentforge.Debug("Triggering newChunkEvent for agent %s", a.Name())
+	var errors []error
+	for _, hook := range ah.onNewChunk {
+		if err := hook(a, chunk); err != nil {
+			errors = append(errors, err)
+		}
+	}
+	return errors
+}
+
 // Utility function to log all the hooks errors
 
 func logHookErrors(errors []error) {
@@ -167,57 +234,52 @@ func logHookErrors(errors []error) {
 
 // HOOK REGISTRATION METHODS //
 
-type Event string
-
-const (
-	EventContextBuild                     Event = "contextBuild"
-	EventBeforeToolExecution              Event = "beforeToolExecution"
-	EventToolExecution                    Event = "toolExecution"
-	EventNewUserMessage                   Event = "newUserMessage"
-	EventAddSystemAgent                   Event = "addSystemAgent"
-	EventAddedSystemAgent                 Event = "addedSystemAgent"
-	EventNewAssistantMessage              Event = "newAssistantMessage"
-	EventNewAssistantMessageWithToolCalls Event = "newAssistantMessageWithToolCalls"
-	EventAddedTools                       Event = "addedTools"
-)
-
-func (a *Agent) on(event Event, hook any) {
+func (ah *AgentHooks) on(event core.Event, hook any) {
 	agentforge.Debug("Registering hook for event %s", event)
 	agentforge.Debug("Hook: %+v", hook)
 	switch event {
-	case EventContextBuild:
+	case core.EventAgentInitialization:
+		typedHook := hook.(OnAgentInitializationHook)
+		ah.onAgentInitialization = append(ah.onAgentInitialization, typedHook)
+	case core.EventAgentInitialized:
+		typedHook := hook.(OnAgentInitializedHook)
+		ah.onAgentInitialized = append(ah.onAgentInitialized, typedHook)
+	case core.EventContextBuild:
 		typedHook := hook.(OnContextBuildHook)
-		a.hooks.onContextBuild = append(a.hooks.onContextBuild, typedHook)
-	case EventBeforeToolExecution:
+		ah.onContextBuild = append(ah.onContextBuild, typedHook)
+	case core.EventBeforeToolExecution:
 		typedHook := hook.(BeforeToolExecutionHook)
-		a.hooks.beforeToolExecution = append(a.hooks.beforeToolExecution, typedHook)
-	case EventToolExecution:
+		ah.beforeToolExecution = append(ah.beforeToolExecution, typedHook)
+	case core.EventToolExecution:
 		typedHook := hook.(OnToolExecutionHook)
-		a.hooks.onToolExecution = append(a.hooks.onToolExecution, typedHook)
-	case EventNewUserMessage:
+		ah.onToolExecution = append(ah.onToolExecution, typedHook)
+	case core.EventNewUserMessage:
 		typedHook := hook.(OnNewUserMessageHook)
-		a.hooks.onNewUserMessage = append(a.hooks.onNewUserMessage, typedHook)
-	case EventAddSystemAgent:
+		ah.onNewUserMessage = append(ah.onNewUserMessage, typedHook)
+	case core.EventAddSystemAgent:
 		typedHook := hook.(OnAddSystemAgentHook)
-		a.hooks.onAddSystemAgent = append(a.hooks.onAddSystemAgent, typedHook)
-	case EventAddedSystemAgent:
+		ah.onAddSystemAgent = append(ah.onAddSystemAgent, typedHook)
+	case core.EventAddedSystemAgent:
 		typedHook := hook.(OnAddedSystemAgentHook)
-		a.hooks.onAddedSystemAgent = append(a.hooks.onAddedSystemAgent, typedHook)
-	case EventNewAssistantMessage:
+		ah.onAddedSystemAgent = append(ah.onAddedSystemAgent, typedHook)
+	case core.EventNewAssistantMessage:
 		typedHook := hook.(OnNewAssistantMessageHook)
-		a.hooks.onNewAssistantMessage = append(a.hooks.onNewAssistantMessage, typedHook)
-	case EventNewAssistantMessageWithToolCalls:
+		ah.onNewAssistantMessage = append(ah.onNewAssistantMessage, typedHook)
+	case core.EventNewAssistantMessageWithToolCalls:
 		typedHook := hook.(OnNewAssistantMessageWithToolCallsHook)
-		a.hooks.onNewAssistantMessageWithToolCalls = append(a.hooks.onNewAssistantMessageWithToolCalls, typedHook)
-	case EventAddedTools:
+		ah.onNewAssistantMessageWithToolCalls = append(ah.onNewAssistantMessageWithToolCalls, typedHook)
+	case core.EventAddedTools:
 		typedHook := hook.(OnAddedToolsHook)
-		a.hooks.onAddedTools = append(a.hooks.onAddedTools, typedHook)
+		ah.onAddedTools = append(ah.onAddedTools, typedHook)
+	case core.EventNewChunk:
+		typedHook := hook.(OnNewChunkHook)
+		ah.onNewChunk = append(ah.onNewChunk, typedHook)
 	default:
 		panic(fmt.Sprintf("unknown event: %s", event))
 	}
 }
 
-func NewAgentHooks() *AgentHooks {
+func newAgentHooks() *AgentHooks {
 	return &AgentHooks{
 		onContextBuild:                     []OnContextBuildHook{},
 		beforeToolExecution:                []BeforeToolExecutionHook{},
@@ -228,5 +290,6 @@ func NewAgentHooks() *AgentHooks {
 		onNewAssistantMessage:              []OnNewAssistantMessageHook{},
 		onNewAssistantMessageWithToolCalls: []OnNewAssistantMessageWithToolCallsHook{},
 		onAddedTools:                       []OnAddedToolsHook{},
+		onNewChunk:                         []OnNewChunkHook{},
 	}
 }

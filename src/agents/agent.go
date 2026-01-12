@@ -15,7 +15,7 @@ type Agent struct {
 	config *AgentConfig
 	// llmEngine is the underlying LLM engine that handles streaming responses.
 	// It implements the llms.Agent interface which provides ChatStream method.
-	llmEngine *llms.LLMEngine
+	llmEngine llms.LLMEngine
 	// Response channel for the agent.
 	responseCh *core.ResponseCh
 	// Tools available to the agent.
@@ -60,8 +60,13 @@ func NewAgent(config *AgentConfig) *Agent {
 		config: config,
 	}
 
-	a.ensureConfig()
 	a.ensureHooks()
+	a.registerPluginCallbacks()
+
+	errs := a.hooks.agentInitializationEvent(a, config)
+	logHookErrors(errs)
+
+	a.ensureConfig()
 	a.addSystemAgents()
 	a.initSystemTools()
 	a.loadDelegateTool()
@@ -69,6 +74,9 @@ func NewAgent(config *AgentConfig) *Agent {
 	a.initAgentContext()
 	a.registerSystemCallbacks()
 	a.ensureSystemPrompt()
+
+	errs = a.hooks.agentInitializedEvent(a)
+	logHookErrors(errs)
 
 	return a
 }

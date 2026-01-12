@@ -1,4 +1,3 @@
-
 package agents
 
 import (
@@ -70,8 +69,8 @@ func TestAgent_Reasoning_TwoTraces(t *testing.T) {
 		t.Error("Expected to see main agent trace 'main-trace'")
 	}
 
-	if !observedTraces["reasoning"] {
-		t.Error("Expected to see reasoning agent trace 'reasoning'")
+	if !observedTraces[TraceReasoning] {
+		t.Errorf("Expected to see reasoning agent trace '%s'", TraceReasoning)
 		fmt.Println("\nℹ️  This is expected to fail until the delegate tool is implemented.")
 		fmt.Println("   The main agent needs a delegate tool to forward tasks to the reasoning agent.")
 	}
@@ -79,6 +78,6 @@ func TestAgent_Reasoning_TwoTraces(t *testing.T) {
 	// Log summary
 	fmt.Println("\n=== Test Summary ===")
 	fmt.Printf("✓ Saw main-trace: %v\n", observedTraces["main-trace"])
-	fmt.Printf("✓ Saw reasoning trace: %v\n", observedTraces["reasoning"])
+	fmt.Printf("✓ Saw reasoning trace: %v\n", observedTraces[TraceReasoning])
 	fmt.Printf("Total unique traces observed: %d\n", len(observedTraces))
 }
