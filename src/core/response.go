@@ -40,8 +40,8 @@ type ResponseCh struct {
 	Response chan []byte // Channel for JSON-serialized ChunkResponse
 	Error    chan error  // Channel for errors
 
-	agentName string // Name of the agent associated with this response channel
-	trace     string // Trace information for this response channel
+	agentName   string        // Name of the agent associated with this response channel
+	trace       string        // Trace information for this response channel
 	onChunkRead ChunkReadHook // Hook called when chunks are read from the channel
 
 	started bool

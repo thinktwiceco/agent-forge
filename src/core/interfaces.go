@@ -1,11 +1,15 @@
 package core
 
-import "github.com/thinktwice/agentForge/src/llms"
+import (
+	agentforge "github.com/thinktwice/agentForge/src"
+	"github.com/thinktwice/agentForge/src/llms"
+)
 
 // SubAgent represents an agent that can be used as a sub-agent
 // for delegation. This interface defines the minimal contract
 // that any agent must satisfy to participate in delegation.
 type SubAgent interface {
+	agentforge.Discoverable
 	// ChatStream initiates a streaming chat interaction with the agent
 	// Returns a ResponseCh that can be used to consume streaming responses
 	ChatStream(message string) *ResponseCh

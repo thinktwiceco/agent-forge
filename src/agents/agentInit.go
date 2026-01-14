@@ -46,30 +46,8 @@ func (a *Agent) ensureHooks() {
 func (a *Agent) setResponseCh() {
 	// Create hook callback that triggers agent hooks when chunks are read
 	onChunkRead := func(extendedChunk *core.ExtendedChunkResponse) error {
-		// Convert ExtendedChunkResponse to ChunkResponse for hooks
-		chunk := &llms.ChunkResponse{
-			Content:          extendedChunk.Content,
-			Delta:            extendedChunk.Delta,
-			FullContent:      extendedChunk.FullContent,
-			Status:           extendedChunk.Status,
-			Type:             extendedChunk.Type,
-			ToolCalls:        extendedChunk.ToolCalls,
-			ToolExecuting:    extendedChunk.ToolExecuting,
-			ToolResults:      extendedChunk.ToolResults,
-			PromptTokens:     extendedChunk.PromptTokens,
-			CompletionTokens: extendedChunk.CompletionTokens,
-			TotalTokens:      extendedChunk.TotalTokens,
-		}
-		// Store agent name/trace in logger plugin if available
-		// We need to find the logger plugin from config
-		for _, plugin := range a.config.Plugins {
-			if lp, ok := plugin.(interface{ SetCurrentChunkInfo(string, string) }); ok {
-				lp.SetCurrentChunkInfo(extendedChunk.AgentName, extendedChunk.Trace)
-				break
-			}
-		}
-		// Trigger hooks
-		errs := a.hooks.newChunkEvent(a, chunk)
+		// Trigger hooks with extended chunk (includes AgentName and Trace)
+		errs := a.hooks.newChunkEvent(a, extendedChunk)
 		for _, err := range errs {
 			if err != nil {
 				return err

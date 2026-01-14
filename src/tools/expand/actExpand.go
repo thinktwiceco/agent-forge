@@ -12,6 +12,15 @@ import (
 // expand retrieves detailed information about a tool or sub-agent.
 func (e *Expand) expand(agentContext map[string]any, subjectType string, subjectName string, troubleshoot bool) llms.ToolReturn {
 	// Validate subject_type
+
+	ctx, err := core.RehydrateContext(agentContext)
+	if err != nil {
+		return core.NewErrorResponse(fmt.Sprintf("Error rehydrating context: %v", err))
+	}
+
+	tools := ctx.Tools
+	subAgents := ctx.SubAgents
+
 	if errResp := validateSubjectTypeAndReturnError(subjectType); errResp != nil {
 		return errResp
 	}
@@ -21,20 +30,28 @@ func (e *Expand) expand(agentContext map[string]any, subjectType string, subject
 
 	// Search based on subject type
 	if subjectType == "tool" {
-		discoverable, found = findTool(agentContext, subjectName)
+		for _, tool := range tools {
+			if tool.GetName() == subjectName {
+				discoverable = tool.(agentforge.Discoverable)
+				found = true
+				break
+			}
+		}
 		if !found {
 			return core.NewErrorResponse(fmt.Sprintf(
 				"Tool '%s' not found in context. Available tools can be seen in your system prompt or by listing your tools.",
 				subjectName,
 			))
 		}
-	} else { // subjectType == "agent"
-		discoverable, found = findAgent(agentContext, subjectName)
-		if !found {
-			return core.NewErrorResponse(fmt.Sprintf(
-				"Agent '%s' not found in context. Available agents are listed in your system prompt under [SUB AGENTS].",
-				subjectName,
-			))
+	}
+
+	if subjectType == "agent" {
+		for _, subAgent := range subAgents {
+			if (*subAgent).Name() == subjectName {
+				discoverable = *subAgent
+				found = true
+				break
+			}
 		}
 	}
 

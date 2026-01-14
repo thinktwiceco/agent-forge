@@ -8,6 +8,7 @@ import (
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/openai/openai-go/v3/shared"
+	agentforge "github.com/thinktwice/agentForge/src"
 )
 
 // openAILLM implements an OpenAI llm with channel-based streaming.
@@ -135,12 +136,16 @@ func toOpenAIMessages(messages []UnifiedMessage) ([]openai.ChatCompletionMessage
 func (a *openAILLM) streamResponse(messages []UnifiedMessage, tools []Tool, responseCh *responseCh) {
 	defer responseCh.Close()
 
+	agentforge.Debug("streamResponse: Starting stream for %d messages, %d tools", len(messages), len(tools))
+
 	// Build messages
 	openaiMessages, err := toOpenAIMessages(messages)
 	if err != nil {
+		agentforge.Debug("streamResponse: Error converting messages: %v", err)
 		responseCh.Error <- fmt.Errorf("failed to convert messages to OpenAI messages: %w", err)
 		return
 	}
+	agentforge.Debug("streamResponse: Converted %d messages to OpenAI format", len(openaiMessages))
 
 	// Build parameters
 	params := openai.ChatCompletionNewParams{
@@ -163,9 +168,11 @@ func (a *openAILLM) streamResponse(messages []UnifiedMessage, tools []Tool, resp
 	}
 
 	// Create streaming request
+	agentforge.Debug("streamResponse: Creating streaming request to API")
 	stream := a.client.Chat.Completions.NewStreaming(a.ctx, params)
 	defer stream.Close()
 
+	agentforge.Debug("streamResponse: Starting to read stream chunks")
 	var fullContent string
 	var promptTokens, completionTokens, totalTokens int
 	// Track tool calls - map of tool call index to accumulated data
@@ -176,7 +183,10 @@ func (a *openAILLM) streamResponse(messages []UnifiedMessage, tools []Tool, resp
 	})
 
 	// Process stream chunks
+	chunkCount := 0
 	for stream.Next() {
+		chunkCount++
+		agentforge.Debug("streamResponse: Received chunk %d", chunkCount)
 		chunk := stream.Current()
 
 		// Capture usage information if available
@@ -245,11 +255,15 @@ func (a *openAILLM) streamResponse(messages []UnifiedMessage, tools []Tool, resp
 		}
 	}
 
+	agentforge.Debug("streamResponse: Finished reading stream, processed %d chunks", chunkCount)
+
 	// Check for stream errors
 	if err := stream.Err(); err != nil {
+		agentforge.Debug("streamResponse: Stream error: %v", err)
 		responseCh.Error <- fmt.Errorf("openai stream error: %w", err)
 		return
 	}
+	agentforge.Debug("streamResponse: No stream errors, fullContent length: %d", len(fullContent))
 
 	// If we have tool calls, parse and send them
 	if len(toolCallsMap) > 0 {
@@ -295,12 +309,14 @@ func (a *openAILLM) streamResponse(messages []UnifiedMessage, tools []Tool, resp
 
 		select {
 		case responseCh.Response <- jsonBytes:
+			agentforge.Debug("streamResponse: Sent tool-call chunk with %d tool calls", len(toolCalls))
 		case <-a.ctx.Done():
 			return
 		}
 	}
 
 	// Send final completed chunk with token usage
+	agentforge.Debug("streamResponse: Sending completed chunk (promptTokens=%d, completionTokens=%d, totalTokens=%d)", promptTokens, completionTokens, totalTokens)
 	finalChunk := ChunkResponse{
 		Content:          "",
 		Delta:            "",
@@ -320,7 +336,10 @@ func (a *openAILLM) streamResponse(messages []UnifiedMessage, tools []Tool, resp
 
 	select {
 	case responseCh.Response <- jsonBytes:
+		agentforge.Debug("streamResponse: Sent completed chunk")
 	case <-a.ctx.Done():
+		agentforge.Debug("streamResponse: Context cancelled while sending completed chunk")
 		return
 	}
+	agentforge.Debug("streamResponse: Finished, closing response channel")
 }
