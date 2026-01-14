@@ -101,16 +101,38 @@ func (a *Agent) ChatStream(message string) *core.ResponseCh {
 	errs := a.hooks.newUserMessageEvent(a, message)
 	logHookErrors(errs)
 
+	// Create a new response channel for this ChatStream call
+	// The hook callback triggers agent hooks when chunks are read
+	onChunkRead := func(extendedChunk *core.ExtendedChunkResponse) error {
+		// Trigger hooks with extended chunk (includes AgentName and Trace)
+		errs := a.hooks.newChunkEvent(a, extendedChunk)
+		for _, err := range errs {
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	responseCh := core.NewResponseCh(a.config.AgentName, a.config.Trace, onChunkRead)
+
+	// Store the response channel temporarily for use in executeChatWithTools
+	oldResponseCh := a.responseCh
+	a.responseCh = responseCh
+
 	// Start the tool execution loop in a goroutine
 	go func() {
-		defer a.responseCh.Close()
+		defer responseCh.Close()
+		// Restore the old responseCh after this call completes
+		defer func() {
+			a.responseCh = oldResponseCh
+		}()
 
 		if err := a.executeChatWithTools(); err != nil {
-			a.responseCh.Error <- err
+			responseCh.Error <- err
 		}
 	}()
 
-	return a.responseCh
+	return responseCh
 }
 
 // GetTools returns the list of tools currently configured for this agent.

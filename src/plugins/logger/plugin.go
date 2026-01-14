@@ -26,14 +26,12 @@ const (
 
 // LoggerPlugin provides configurable formatting for chunks based on agent name and trace patterns
 type LoggerPlugin struct {
-	colorRules            []ColorRule
-	labelRules            []LabelRule
-	output                io.Writer
-	currentAgent          string
-	currentTrace          string
-	currentChunkAgentName string     // Agent name from current chunk being processed
-	currentChunkTrace     string     // Trace from current chunk being processed
-	mu                    sync.Mutex // Protects all fields
+	colorRules   []ColorRule
+	labelRules   []LabelRule
+	output       io.Writer
+	currentAgent string
+	currentTrace string
+	mu           sync.Mutex // Protects all fields
 }
 
 // NewPlugin creates a new logger plugin with the specified color and label rules
@@ -69,7 +67,7 @@ func (p *LoggerPlugin) Tools() []llms.Tool {
 
 // handleNewChunk is called when a new chunk is created
 // This hook formats and prints chunks based on the plugin's rules
-func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, chunk *llms.ChunkResponse) error {
+func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.ExtendedChunkResponse) error {
 	if p.output == nil {
 		return nil // No output writer configured, skip formatting
 	}
@@ -77,9 +75,9 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, chunk *llms.ChunkResponse
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Use stored agent name/trace from current chunk if available, otherwise use agent's name/trace
-	agentName := p.currentChunkAgentName
-	trace := p.currentChunkTrace
+	// Use agent name/trace from extended chunk if available, otherwise use agent's name/trace
+	agentName := extendedChunk.AgentName
+	trace := extendedChunk.Trace
 	if agentName == "" {
 		agentName = a.Name()
 	}
@@ -101,36 +99,36 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, chunk *llms.ChunkResponse
 	}
 
 	// Handle different chunk types
-	switch chunk.Type {
+	switch extendedChunk.Type {
 	case llms.TypeContent:
 		// Stream content as it arrives
-		if chunk.Content != "" || chunk.Delta != "" {
-			content := chunk.Content
+		if extendedChunk.Content != "" || extendedChunk.Delta != "" {
+			content := extendedChunk.Content
 			if content == "" {
-				content = chunk.Delta
+				content = extendedChunk.Delta
 			}
 			fmt.Fprintf(p.output, "%s%s%s", color, content, ColorReset)
 		}
 
 	case llms.TypeCompletion:
 		// Final completion - display token usage if available
-		if chunk.TotalTokens > 0 {
+		if extendedChunk.TotalTokens > 0 {
 			fmt.Fprintf(p.output, "\n%s%s📊 Tokens: %d prompt + %d completion = %d total%s\n",
 				ColorBlue, ColorDim,
-				chunk.PromptTokens, chunk.CompletionTokens, chunk.TotalTokens,
+				extendedChunk.PromptTokens, extendedChunk.CompletionTokens, extendedChunk.TotalTokens,
 				ColorReset)
 		}
 
 	case llms.TypeToolExecuting:
 		// Show tool execution (suppress for delegate tool when delegating to sub-agents)
-		if chunk.ToolExecuting != nil && chunk.ToolExecuting.Name != "delegate" {
-			fmt.Fprintf(p.output, "\n%s%s⚙️  Executing tool: %s%s\n", ColorMagenta, ColorBold, chunk.ToolExecuting.Name, ColorReset)
+		if extendedChunk.ToolExecuting != nil && extendedChunk.ToolExecuting.Name != "delegate" {
+			fmt.Fprintf(p.output, "\n%s%s⚙️  Executing tool: %s%s\n", ColorMagenta, ColorBold, extendedChunk.ToolExecuting.Name, ColorReset)
 		}
 
 	case llms.TypeToolResult:
 		// Show tool results (suppress for delegate tool when delegating to sub-agents)
-		if len(chunk.ToolResults) > 0 {
-			for _, result := range chunk.ToolResults {
+		if len(extendedChunk.ToolResults) > 0 {
+			for _, result := range extendedChunk.ToolResults {
 				if result.ToolName == "delegate" {
 					// Skip verbose delegate tool completion messages for sub-agents
 					continue
@@ -154,10 +152,6 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, chunk *llms.ChunkResponse
 		file.Sync()
 	}
 
-	// Clear chunk-specific state after processing to prevent stale data
-	p.currentChunkAgentName = ""
-	p.currentChunkTrace = ""
-
 	return nil
 }
 
@@ -167,17 +161,6 @@ func (p *LoggerPlugin) ResetState() {
 	defer p.mu.Unlock()
 	p.currentAgent = ""
 	p.currentTrace = ""
-	p.currentChunkAgentName = ""
-	p.currentChunkTrace = ""
-}
-
-// SetCurrentChunkInfo stores the agent name and trace for the current chunk being processed
-// This is called before the hook processes the chunk
-func (p *LoggerPlugin) SetCurrentChunkInfo(agentName, trace string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.currentChunkAgentName = agentName
-	p.currentChunkTrace = trace
 }
 
 // GetColorForAgent returns the color code for the given agent name and trace

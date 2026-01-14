@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
@@ -17,6 +18,7 @@ func (a *Agent) executeChatWithTools() error {
 	for iteration < a.config.MaxToolIterations {
 		iteration++
 		messages := a.history.History()
+		agentforge.Debug("Starting iteration %d with %d messages in history", iteration, len(messages))
 		// Call LLM with current history and tools
 		llmResponseCh := a.llmEngine.ChatStream(messages, a.tools)
 
@@ -27,19 +29,24 @@ func (a *Agent) executeChatWithTools() error {
 		var promptTokens, completionTokens, totalTokens int
 
 		// Process streaming response
+		agentforge.Debug("Waiting for LLM response chunks...")
 		for {
 			select {
 			case chunkBytes, ok := <-llmResponseCh.Response:
 				if !ok {
 					// LLM response channel closed, streaming complete
+					agentforge.Debug("LLM response channel closed, processing tool calls")
 					goto processToolCalls
 				}
 
+				agentforge.Debug("Received chunk from LLM (size: %d bytes)", len(chunkBytes))
 				// Deserialize chunk
 				var chunk llms.ChunkResponse
 				if err := json.Unmarshal(chunkBytes, &chunk); err != nil {
+					agentforge.Debug("Error deserializing chunk: %v", err)
 					return fmt.Errorf("failed to deserialize chunk: %w", err)
 				}
+				agentforge.Debug("Chunk deserialized: Status=%s, Type=%s", chunk.Status, chunk.Type)
 
 				// Accumulate content (check both Content and Delta)
 				if chunk.Content != "" {
@@ -52,16 +59,29 @@ func (a *Agent) executeChatWithTools() error {
 				if chunk.Status == llms.StatusToolCall && len(chunk.ToolCalls) > 0 {
 					toolCalls = chunk.ToolCalls
 					hasToolCalls = true
+					agentforge.Debug("Tool calls detected: %d tool calls", len(toolCalls))
+					// Forward tool-call chunk to consumer
+					if !a.responseCh.TrySend(chunkBytes) {
+						// Channel closed, stop processing
+						return nil
+					}
+					// Don't continue here - let the loop continue naturally
+					// The completed chunk should arrive next, or the channel will close
 				}
 
 				// If this is a completed chunk, store it but don't forward yet
 				// We need to check if there are tool calls to execute first
 				if chunk.Status == llms.StatusCompleted {
 					completedChunkBytes = chunkBytes
-					// Extract token usage from completed chunk
+					// Extract token usage and full content from completed chunk
 					promptTokens = chunk.PromptTokens
 					completionTokens = chunk.CompletionTokens
 					totalTokens = chunk.TotalTokens
+					// Use FullContent from the completed chunk if available, otherwise use accumulated content
+					if chunk.FullContent != "" {
+						fullContent = chunk.FullContent
+					}
+					agentforge.Debug("Received completed chunk, going to processToolCalls")
 					goto processToolCalls
 				}
 
@@ -74,25 +94,26 @@ func (a *Agent) executeChatWithTools() error {
 
 			case err := <-llmResponseCh.Error:
 				if err != nil {
+					agentforge.Debug("LLM stream error received: %v", err)
 					return fmt.Errorf("llm stream error: %w", err)
 				}
+				agentforge.Debug("LLM stream error channel closed (no error), going to processToolCalls")
 				goto processToolCalls
 			}
 		}
 
 	processToolCalls:
+		agentforge.Debug("Processing tool calls: hasToolCalls=%v, toolCalls count=%d", hasToolCalls, len(toolCalls))
 		// If no tool calls, forward the completed chunk (if any) and we're done
 		if !hasToolCalls {
-			if completedChunkBytes != nil {
-				// Forward completed chunk to consumer
-				// Hook will be called when chunks are read from the channel
-				if !a.responseCh.TrySend(completedChunkBytes) {
-					// Channel closed, stop processing
-					return nil
+			// Ensure we have a completion chunk to forward
+			if completedChunkBytes == nil {
+				// Stream ended without StatusCompleted chunk - this should never happen
+				// Create a completion chunk with accumulated content
+				if fullContent == "" {
+					panic("LLM stream ended without content and without StatusCompleted chunk")
 				}
-			} else if fullContent != "" {
-				// Stream ended without StatusCompleted chunk, but we have content
-				// Send a completion chunk with accumulated content
+				agentforge.Debug("WARNING: Stream ended without StatusCompleted chunk, creating one")
 				completionChunk := llms.ChunkResponse{
 					Content:          "",
 					Delta:            "",
@@ -103,27 +124,43 @@ func (a *Agent) executeChatWithTools() error {
 					CompletionTokens: completionTokens,
 					TotalTokens:      totalTokens,
 				}
-				completionBytes, err := json.Marshal(completionChunk)
-				if err == nil {
-					// Forward completion chunk to consumer
-					// Hook will be called when chunks are read from the channel
-					if !a.responseCh.TrySend(completionBytes) {
-						// Channel closed, stop processing
-						return nil
-					}
+				var err error
+				completedChunkBytes, err = json.Marshal(completionChunk)
+				if err != nil {
+					panic(fmt.Sprintf("Failed to marshal completion chunk: %v", err))
 				}
 			}
-			// Save the message to history with token usage
-			if fullContent != "" {
-				a.hooks.newAssistantMessageEvent(a, fullContent, promptTokens, completionTokens, totalTokens)
+
+			// Forward completed chunk to consumer
+			// Hook will be called when chunks are read from the channel
+			if !a.responseCh.TrySend(completedChunkBytes) {
+				// Channel closed, stop processing
+				return nil
 			}
+
+			// Save the message to history with token usage
+			if fullContent == "" {
+				panic("Attempting to save empty message to history")
+			}
+			a.hooks.newAssistantMessageEvent(a, fullContent, promptTokens, completionTokens, totalTokens)
 			return nil
 		}
 
+		// Extract FullContent from completed chunk if available
+		if completedChunkBytes != nil {
+			var completedChunk llms.ChunkResponse
+			if err := json.Unmarshal(completedChunkBytes, &completedChunk); err == nil {
+				if completedChunk.FullContent != "" {
+					fullContent = completedChunk.FullContent
+				}
+			}
+		}
 		a.hooks.newAssistantMessageWithToolCallsEvent(a, fullContent, toolCalls, promptTokens, completionTokens, totalTokens)
 
+		agentforge.Debug("Detected %d tool calls, executing tools", len(toolCalls))
 		// Execute each tool
 		for _, toolCall := range toolCalls {
+			agentforge.Debug("Executing tool: %s (ID: %s)", toolCall.Name, toolCall.ID)
 			// Emit tool-executing chunk
 			executingChunk := llms.ChunkResponse{
 				Status:        llms.StatusToolExecuting,
@@ -164,18 +201,21 @@ func (a *Agent) executeChatWithTools() error {
 			// Hook will be called when chunks are read from the channel
 			if !a.responseCh.TrySend(resultBytes) {
 				// Channel closed, stop processing
+				agentforge.Debug("Channel closed when trying to send tool-result chunk for tool %s", toolCall.Name)
 				return nil
 			}
 
-			// // Add tool result to history
-			// a.history.addToolMessage(toolCall.ID, toolResult.Result, toolResult.Ephemeral)
-			// a.history.save()
+			// Add tool result to history
+			a.history.addToolMessage(toolCall.ID, toolResult.Result, toolResult.Ephemeral)
+			a.history.save()
 		}
 
 		// Continue to next iteration (will call LLM again with tool results)
+		agentforge.Debug("Completed iteration %d, continuing to next iteration with tool results in history", iteration)
 	}
 
 	// If we reached max iterations, return error
+	agentforge.Debug("Reached maximum tool iterations (%d)", a.config.MaxToolIterations)
 	return fmt.Errorf("reached maximum tool iterations (%d)", a.config.MaxToolIterations)
 }
 

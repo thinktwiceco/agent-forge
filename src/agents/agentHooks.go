@@ -39,7 +39,7 @@ type OnAgentInitializationHook func(a *Agent, config *AgentConfig) error
 
 type OnAgentInitializedHook func(a *Agent) error
 
-type OnNewChunkHook func(a *Agent, chunk *llms.ChunkResponse) error
+type OnNewChunkHook func(a *Agent, chunk *core.ExtendedChunkResponse) error
 
 type AgentHooks struct {
 	onAgentInitialization              []OnAgentInitializationHook
@@ -209,7 +209,7 @@ func (ah *AgentHooks) agentInitializedEvent(a *Agent) []error {
 	return errors
 }
 
-func (ah *AgentHooks) newChunkEvent(a *Agent, chunk *llms.ChunkResponse) []error {
+func (ah *AgentHooks) newChunkEvent(a *Agent, chunk *core.ExtendedChunkResponse) []error {
 	agentforge.Debug("Triggering newChunkEvent for agent %s", a.Name())
 	var errors []error
 	for _, hook := range ah.onNewChunk {
