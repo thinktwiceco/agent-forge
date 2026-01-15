@@ -26,6 +26,15 @@ func (t *ToolResponse) Ephemeral() bool {
 	return t.ephemeral
 }
 
+func NewEphemeralResponse(data string) llms.ToolReturn {
+	return &ToolResponse{
+		success:   true,
+		error:     "",
+		data:      data,
+		ephemeral: true,
+	}
+}
+
 // NewSuccessResponse creates a successful tool response
 func NewSuccessResponse(data string) llms.ToolReturn {
 	return &ToolResponse{

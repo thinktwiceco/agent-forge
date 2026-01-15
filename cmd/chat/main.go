@@ -11,6 +11,7 @@ import (
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 	"github.com/thinktwice/agentForge/src/plugins/logger"
+	"github.com/thinktwice/agentForge/src/plugins/todo"
 )
 
 const (
@@ -94,6 +95,18 @@ func printBanner() {
 	fmt.Print(ColorReset)
 }
 
+func onTodoUpdate(todos []*todo.TodoItem) {
+	fmt.Println("======== TODO =========")
+	for _, item := range todos {
+		completed := "✅"
+		if !item.Completed {
+			completed = "⬜"
+		}
+		fmt.Printf("%s %s: %s\n", completed, item.Title, item.Description)
+	}
+	fmt.Println("======== END TODO =========")
+}
+
 // initializeAgent creates and configures the agent with the specified provider
 func initializeAgent(provider string) (*agents.Agent, error) {
 
@@ -131,6 +144,7 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 
 	// Create logger plugin with default rules and stdout output
 	loggerPlugin := logger.NewPlugin(logger.DefaultColorRules(), logger.DefaultLabelRules(), os.Stdout)
+	todoPlugin := todo.NewTodoPlugin(onTodoUpdate)
 
 	// Create agent configuration with reasoning enabled
 	config := agents.AgentConfig{
@@ -146,7 +160,7 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 		`,
 		MainAgent:   true,
 		Persistence: "json",
-		Plugins:     []core.Plugin{loggerPlugin},
+		Plugins:     []core.Plugin{loggerPlugin, todoPlugin},
 	}
 
 	// Create the agent

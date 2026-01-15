@@ -9,9 +9,13 @@ import (
 	"github.com/thinktwice/agentForge/src/agents"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwice/agentForge/src/tools/delegate"
 )
 
 const (
+	// Plugin name
+	PLUGIN_NAME = "logger"
+
 	// ANSI color codes
 	ColorReset   = "\033[0m"
 	ColorCyan    = "\033[36m"
@@ -47,7 +51,11 @@ func NewPlugin(colorRules []ColorRule, labelRules []LabelRule, output io.Writer)
 
 // Name implements the core.Plugin interface
 func (p *LoggerPlugin) Name() string {
-	return "logger"
+	return PLUGIN_NAME
+}
+
+func (p *LoggerPlugin) SystemPrompt() string {
+	return ""
 }
 
 // On implements the core.Plugin interface
@@ -121,7 +129,7 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 
 	case llms.TypeToolExecuting:
 		// Show tool execution (suppress for delegate tool when delegating to sub-agents)
-		if extendedChunk.ToolExecuting != nil && extendedChunk.ToolExecuting.Name != "delegate" {
+		if extendedChunk.ToolExecuting != nil && extendedChunk.ToolExecuting.Name != delegate.DELEGATE_TOOL {
 			fmt.Fprintf(p.output, "\n%s%s⚙️  Executing tool: %s%s\n", ColorMagenta, ColorBold, extendedChunk.ToolExecuting.Name, ColorReset)
 		}
 
@@ -129,7 +137,7 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 		// Show tool results (suppress for delegate tool when delegating to sub-agents)
 		if len(extendedChunk.ToolResults) > 0 {
 			for _, result := range extendedChunk.ToolResults {
-				if result.ToolName == "delegate" {
+				if result.ToolName == delegate.DELEGATE_TOOL {
 					// Skip verbose delegate tool completion messages for sub-agents
 					continue
 				}
