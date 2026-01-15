@@ -28,7 +28,7 @@ func NewOpenAILLMBuilder(provider string) *OpenAILLMBuilder {
 func (b *OpenAILLMBuilder) validate() {
 	c, err := agentforge.NewConfig()
 	if err != nil {
-		agentforge.Error(fmt.Sprintf("Failed to load config: %v", err))
+		agentforge.Error("Failed to load config: %v", err)
 	}
 
 	if b.Provider == "" {
