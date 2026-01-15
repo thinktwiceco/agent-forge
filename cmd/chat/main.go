@@ -146,13 +146,12 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 	loggerPlugin := logger.NewPlugin(logger.DefaultColorRules(), logger.DefaultLabelRules(), os.Stdout)
 	todoPlugin := todo.NewTodoPlugin(onTodoUpdate)
 
-	// Create agent configuration with reasoning enabled
+	// Create agent configuration
 	config := agents.AgentConfig{
 		LLMEngine:   llmEngine,
 		AgentName:   "Assistant",
 		Description: "A helpful assistant with reasoning capabilities",
 		Trace:       agents.TraceResponse,
-		Reasoning:   true, // Enable reasoning agent
 		CanExpand:   true,
 		SystemPrompt: `You are a testing agent
 		You will receive requests in order to test your sub agents and tool usage.
@@ -166,6 +165,8 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 	// Create the agent
 	agent := agents.NewAgent(&config)
 
+	// Add system agents
+	agent.AddSystemAgent(agents.ReasoningAgent(llmEngine))
 	agent.AddSystemAgent(agents.OsAgent(llmEngine, codebasePath))
 
 	return agent, nil

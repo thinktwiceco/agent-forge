@@ -53,6 +53,12 @@ func (e *Expand) expand(agentContext map[string]any, subjectType string, subject
 				break
 			}
 		}
+		if !found {
+			return core.NewErrorResponse(fmt.Sprintf(
+				"Agent '%s' not found in context. Available agents can be seen in your system prompt or by listing your agents.",
+				subjectName,
+			))
+		}
 	}
 
 	// Build the response

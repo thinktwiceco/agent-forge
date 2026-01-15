@@ -40,15 +40,18 @@ type Plugin interface {
     Name() string
     On(event Event) AgentHookFn
     Tools() []llms.Tool
+    SystemPrompt() string
 }
 ```
 
 - **Name()**: Returns unique plugin identifier
 - **On()**: Returns hook function for event, or `nil` if not handled
 - **Tools()**: Returns list of tools provided to agents
+- **SystemPrompt()**: Returns system prompt instructions that are automatically appended to the agent's system prompt (empty string if no prompt needed)
 
 ## Available Plugins
 
 - [Logger](./logger/README.md) - Configurable output formatting for agent responses
+- [Todo](./todo/README.md) - Task management and todo list functionality for agents
 
 
