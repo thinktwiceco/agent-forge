@@ -15,6 +15,10 @@ import (
 // This test will fail until the delegate tool is implemented, because
 // the main agent won't be able to delegate to the reasoning agent.
 func TestAgent_Reasoning_TwoTraces(t *testing.T) {
+	// Skip if API key is not available
+	if !hasAPIKey("togetherai") {
+		t.Skip("Skipping test - TogetherAI API key not available")
+	}
 
 	llm, err := llms.NewOpenAILLMBuilder("togetherai").
 		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).

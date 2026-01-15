@@ -6,9 +6,30 @@ import (
 	"strings"
 	"testing"
 
+	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/llms"
 	"github.com/thinktwice/agentForge/src/tools"
 )
+
+// hasAPIKey checks if an API key is available for the given provider.
+// Returns true if the API key exists, false otherwise.
+func hasAPIKey(provider string) bool {
+	config, err := agentforge.NewConfig()
+	if err != nil {
+		return false
+	}
+
+	switch provider {
+	case "togetherai":
+		return config.AFTogetherAIAPIKey != ""
+	case "deepseek":
+		return config.AFDeepSeekAPIKey != ""
+	case "openai":
+		return config.AFOpenAIAPIKey != ""
+	default:
+		return false
+	}
+}
 
 // TestAgent_fooTool_WithRealLLM tests the agent with automatic tool execution using TogetherAI.
 // This test uses TogetherAI's GPT-OSS-120B model.
@@ -22,6 +43,11 @@ import (
 //
 // Set TOGETHERAI_API_KEY environment variable to run this test.
 func TestAgent_fooTool_WithRealLLM(t *testing.T) {
+	// Skip if API key is not available
+	if !hasAPIKey("togetherai") {
+		t.Skip("Skipping test - TogetherAI API key not available")
+	}
+
 	// Use TogetherAI's model
 	llm, err := llms.NewOpenAILLMBuilder("togetherai").
 		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
