@@ -3,6 +3,7 @@ package agents
 import (
 	"fmt"
 
+	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 	"github.com/thinktwice/agentForge/src/tools/delegate"
@@ -135,6 +136,23 @@ func (a *Agent) addSystemAgents() {
 	a.subAgents = append(a.subAgents, systemAgents...)
 }
 
+func (a *Agent) registerPlugins() {
+	agentforge.Debug("🔌 [registerPlugins] START 🔌")
+
+	if a.config == nil {
+		agentforge.Debug("⚠️ WARNING: config is nil in registerPlugins")
+		return
+	}
+	if a.hooks == nil {
+		agentforge.Debug("⚠️ WARNING: hooks is nil in registerPlugins")
+		return
+	}
+	agentforge.Debug("🔌 ADDING PLUGIN REGISTRATION HOOK FOR AGENT %s 🔌", a.config.AgentName)
+	agentforge.Debug("🔌 Plugins count: %d 🔌", len(a.config.Plugins))
+	a.hooks.on(core.EventAgentInitialization, handlePluginInitialization)
+	agentforge.Debug("🔌 Plugin registration hook added successfully 🔌")
+}
+
 // / ========= SYSTEM HOOKS ========= ///
 func (a *Agent) registerSystemCallbacks() {
 	a.hooks.on(core.EventNewUserMessage, handleNewUserMessage)
@@ -142,10 +160,4 @@ func (a *Agent) registerSystemCallbacks() {
 	a.hooks.on(core.EventAddedTools, handleNewToolsAdded)
 	a.hooks.on(core.EventNewAssistantMessage, handleNewAssistantMessage)
 	a.hooks.on(core.EventNewAssistantMessageWithToolCalls, handleNewAssistantMessageWithToolCalls)
-	a.hooks.on(core.EventAgentInitialization, handlePluginInitialization)
-}
-
-// / ========= PLUGIN HOOKS ========= ///
-func (a *Agent) registerPluginCallbacks() {
-	a.hooks.registerPlugins(a.config.Plugins)
 }

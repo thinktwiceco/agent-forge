@@ -57,34 +57,48 @@ type AgentHooks struct {
 }
 
 // Hook Handle plugins
-func (ah *AgentHooks) registerPlugins(plugins []core.Plugin) {
-	agentforge.Info("🔌 Starting Plugin Registration")
-	for _, plugin := range plugins {
-		agentforge.Info("♻️ Registering plugin: %s....", plugin.Name())
-		for _, event := range core.Events {
-			hook := plugin.On(event)
-			if hook != nil {
-				ah.on(event, hook)
-				agentforge.Info("\t ✅ Hook registered for event: %s", event)
-			}
-		}
+// func (ah *AgentHooks) registerPlugins(plugins []core.Plugin) {
+// 	agentforge.Info("🔌 Starting Plugin Registration")
+// 	for _, plugin := range plugins {
+// 		agentforge.Info("♻️ Registering plugin: %s....", plugin.Name())
+// 		for _, event := range core.Events {
+// 			hook := plugin.On(event)
+// 			if hook != nil {
+// 				ah.on(event, hook)
+// 				agentforge.Info("\t ✅ Hook registered for event: %s", event)
+// 			}
+// 		}
 
-		tools := plugin.Tools()
+// 		tools := plugin.Tools()
 
-		if len(tools) > 0 {
-			agentforge.Info("\t 🧰 Registering %d tools for plugin: %s", len(tools), plugin.Name())
-			// Will add a hook to add the tools to the agent
-			// Before agent initialization. Init this way the tools
-			// will be included in the agent context and system prompt.
-			toolRegistrationHook := OnAgentInitializationHook(func(sa *Agent, config *AgentConfig) error {
-				sa.tools = append(sa.tools, tools...)
-				return nil
-			})
-			ah.on(core.EventAgentInitialization, toolRegistrationHook)
-		}
-		agentforge.Info("🎉 Plugin registration completed\n")
-	}
-}
+// 		if len(tools) > 0 {
+// 			agentforge.Info("\t 🧰 Registering %d tools for plugin: %s", len(tools), plugin.Name())
+// 			// Will add a hook to add the tools to the agent
+// 			// Before agent initialization. Init this way the tools
+// 			// will be included in the agent context and system prompt.
+// 			toolRegistrationHook := OnAgentInitializationHook(func(sa *Agent, config *AgentConfig) error {
+// 				sa.tools = append(sa.tools, tools...)
+// 				return nil
+// 			})
+
+// 			ah.on(core.EventAgentInitialization, toolRegistrationHook)
+// 		}
+
+// 		// Check if the plugin has a system prompt
+// 		sp := plugin.SystemPrompt()
+
+// 		if sp != "" {
+// 			agentforge.Info("\t 📝 Registering system prompt for plugin: %s", plugin.Name())
+// 			systemPromptRegistrationHook := OnAgentInitializedHook(func(sa *Agent) error {
+// 				sa.systemPrompt += sp
+// 				return nil
+// 			})
+
+// 			ah.on(core.EventAgentInitialized, systemPromptRegistrationHook)
+// 		}
+// 		agentforge.Info("🎉 Plugin registration completed\n")
+// 	}
+// }
 
 // HOOK TRIGGERS //
 
@@ -188,13 +202,15 @@ func (ah *AgentHooks) addedToolsEvent(a *Agent, tools []llms.Tool) []error {
 }
 
 func (ah *AgentHooks) agentInitializationEvent(a *Agent, config *AgentConfig) []error {
-	agentforge.Debug("Triggering agentInitializationEvent for agent %s", a.Name())
+	agentforge.Debug("🪄 AGENT INITIALIZATION PHASE %s 🪄", a.Name())
 	var errors []error
 	for _, hook := range ah.onAgentInitialization {
 		if err := hook(a, config); err != nil {
 			errors = append(errors, err)
 		}
+		agentforge.Debug("\t✅ Hook executed successfully")
 	}
+	agentforge.Debug("🪄 AGENT INITIALIZATION PHASE COMPLETED 🪄")
 	return errors
 }
 
@@ -202,6 +218,7 @@ func (ah *AgentHooks) agentInitializedEvent(a *Agent) []error {
 	agentforge.Debug("Triggering agentInitializedEvent for agent %s", a.Name())
 	var errors []error
 	for _, hook := range ah.onAgentInitialized {
+		agentforge.Debug("Triggering agentInitializedEvent hook: %+v", hook)
 		if err := hook(a); err != nil {
 			errors = append(errors, err)
 		}
@@ -210,7 +227,6 @@ func (ah *AgentHooks) agentInitializedEvent(a *Agent) []error {
 }
 
 func (ah *AgentHooks) newChunkEvent(a *Agent, chunk *core.ExtendedChunkResponse) []error {
-	agentforge.Debug("Triggering newChunkEvent for agent %s", a.Name())
 	var errors []error
 	for _, hook := range ah.onNewChunk {
 		if err := hook(a, chunk); err != nil {

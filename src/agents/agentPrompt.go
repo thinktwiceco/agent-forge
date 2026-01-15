@@ -2,8 +2,7 @@ package agents
 
 import (
 	"fmt"
-
-	agentforge "github.com/thinktwice/agentForge/src"
+	"strings"
 )
 
 // ==============================
@@ -89,12 +88,79 @@ Tools available to the agent. Use "tool" tool to access them.
 	a.systemPrompt += toolsPrompt
 }
 
+// normalizePromptIndentation normalizes the indentation of a prompt string.
+// It converts tabs to spaces, removes trailing whitespace, and normalizes indentation
+// by detecting the minimum indentation level and preserving relative indentation.
+// It also handles cases where indentation is inconsistent by normalizing to the most common base level.
+func normalizePromptIndentation(prompt string) string {
+	if prompt == "" {
+		return prompt
+	}
+
+	lines := strings.Split(prompt, "\n")
+	if len(lines) == 0 {
+		return prompt
+	}
+
+	// First pass: convert tabs to spaces and trim trailing whitespace
+	normalized := make([]string, 0, len(lines))
+	for _, line := range lines {
+		// Convert tabs to spaces (assuming 4 spaces per tab)
+		line = strings.ReplaceAll(line, "\t", "    ")
+		// Remove trailing whitespace
+		line = strings.TrimRight(line, " ")
+		normalized = append(normalized, line)
+	}
+
+	// Find minimum indentation (excluding empty lines)
+	minIndent := -1
+	hasIndentedLines := false
+	for _, line := range normalized {
+		if line == "" {
+			continue
+		}
+		indent := len(line) - len(strings.TrimLeft(line, " "))
+		if indent > 0 {
+			hasIndentedLines = true
+		}
+		if minIndent == -1 || indent < minIndent {
+			minIndent = indent
+		}
+	}
+
+	// If minimum indent is 0 but we have indented lines, those are likely
+	// accidental indentation from source code formatting - remove all indentation
+	if minIndent == 0 && hasIndentedLines {
+		for i := range normalized {
+			if normalized[i] != "" {
+				normalized[i] = strings.TrimLeft(normalized[i], " ")
+			}
+		}
+		return strings.Join(normalized, "\n")
+	}
+
+	// Normalize all lines by removing the minimum indent (preserves relative indentation)
+	result := make([]string, 0, len(normalized))
+	for _, line := range normalized {
+		if line == "" {
+			result = append(result, "")
+			continue
+		}
+		// Remove the minimum indent from each line
+		currentIndent := len(line) - len(strings.TrimLeft(line, " "))
+		if currentIndent >= minIndent && len(line) >= minIndent {
+			line = line[minIndent:]
+		}
+		result = append(result, line)
+	}
+
+	return strings.Join(result, "\n")
+}
+
 func (a *Agent) ensureSystemPrompt() {
 	a.addSystemPrompt()
 	a.buildSubAgentsSystemPrompt()
 	a.buildToolsDescrptions()
-
-	agentforge.Debug("========================================================")
-	agentforge.Debug("System prompt for agent %s: %s", a.Name(), a.systemPrompt)
-	agentforge.Debug("========================================================")
+	// Normalize indentation before finalizing
+	a.systemPrompt = normalizePromptIndentation(a.systemPrompt)
 }

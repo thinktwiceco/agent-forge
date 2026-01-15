@@ -1,6 +1,7 @@
 package agents
 
 import (
+	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 )
@@ -61,22 +62,36 @@ func NewAgent(config *AgentConfig) *Agent {
 	}
 
 	a.ensureHooks()
-	a.registerPluginCallbacks()
+	a.registerPlugins()
 
 	errs := a.hooks.agentInitializationEvent(a, config)
 	logHookErrors(errs)
 
+	// Data consistency step.
+	// Loads the configuration, setup the system agents,
+	// And initializes the system tools.
 	a.ensureConfig()
 	a.addSystemAgents()
 	a.initSystemTools()
 	a.loadDelegateTool()
 	a.setResponseCh()
 	a.initAgentContext()
+
+	// System Callbacks are defined in systemHandlers.go
+	// Are common handlers for system events
 	a.registerSystemCallbacks()
 	a.ensureSystemPrompt()
 
 	errs = a.hooks.agentInitializedEvent(a)
+
 	logHookErrors(errs)
+
+	// Log the system prompt if it's the main agent
+	if a.config.MainAgent {
+		agentforge.Debug("========================================================")
+		agentforge.Debug("System prompt for agent %s: %s", a.config.AgentName, a.systemPrompt)
+		agentforge.Debug("========================================================")
+	}
 
 	return a
 }
@@ -196,6 +211,14 @@ func (a *Agent) Trace() string {
 
 func (a *Agent) SystemPrompt() string {
 	return a.config.SystemPrompt
+}
+
+func (a *Agent) Context() *core.AgentContext {
+	return a.agentContext
+}
+
+func (a *Agent) ResponseCh() *core.ResponseCh {
+	return a.responseCh
 }
 
 // Troubleshooting returns information about common issues, debugging tips,

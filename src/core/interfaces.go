@@ -35,6 +35,7 @@ type Plugin interface {
 	Name() string
 	On(event Event) AgentHookFn
 	Tools() []llms.Tool
+	SystemPrompt() string
 }
 
 // Event represents an agent lifecycle event

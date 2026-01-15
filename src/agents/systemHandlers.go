@@ -2,7 +2,9 @@ package agents
 
 import (
 	"errors"
+	"fmt"
 
+	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 )
@@ -68,14 +70,47 @@ var handleNewAssistantMessageWithToolCalls = OnNewAssistantMessageWithToolCallsH
 })
 
 var handlePluginInitialization = OnAgentInitializationHook(func(a *Agent, config *AgentConfig) error {
+	agentforge.Debug("🔌 [handlePluginInitialization] START for agent %s", a.config.AgentName)
+	agentforge.Debug("🔌 [handlePluginInitialization] Plugins count: %d", len(a.config.Plugins))
+
+	if len(a.config.Plugins) == 0 {
+		agentforge.Debug("🔌 [handlePluginInitialization] No plugins to register")
+		return nil
+	}
+
+	systemPromptAdded := false
+
 	// Register all the plugins
-	for _, plugin := range a.config.Plugins {
+	for i, plugin := range a.config.Plugins {
+		agentforge.Debug("🔌 [handlePluginInitialization] Processing plugin %d: %s", i+1, plugin.Name())
+		// Register the events
 		for _, event := range core.Events {
 			hook := plugin.On(event)
 			if hook != nil {
+				agentforge.Debug("🔌 [handlePluginInitialization] Registering hook for event: %s", event)
 				a.hooks.on(event, hook)
 			}
 		}
+		// Register the tools
+		tools := plugin.Tools()
+		for _, tool := range tools {
+			agentforge.Debug("🔌 [handlePluginInitialization] Registering tool: %s", tool.GetName())
+			a.config.Tools = append(a.config.Tools, tool)
+		}
+
+		// Update the system prompt
+		sp := plugin.SystemPrompt()
+		if sp != "" {
+			if !systemPromptAdded {
+				a.config.SystemPrompt += "[PLUGIN TOOLS INSTRUCTIONS]"
+			}
+			agentforge.Debug("🔌 [handlePluginInitialization] Adding system prompt from plugin")
+			a.config.SystemPrompt += fmt.Sprintf("\n [%s plugin]:\n%s\n\n", plugin.Name(), sp)
+			a.ensureSystemPrompt()
+			systemPromptAdded = true
+		}
 	}
+
+	agentforge.Debug("🔌 [handlePluginInitialization] COMPLETED")
 	return nil
 })
