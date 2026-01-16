@@ -80,6 +80,20 @@ of the todo items.
 				Type:        "array",
 				Description: "Array of todo items to add. Each item should be an object with 'title' (string) and 'description' (string) fields",
 				Required:    false,
+				Items: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"title": map[string]interface{}{
+							"type":        "string",
+							"description": "The title of the todo item",
+						},
+						"description": map[string]interface{}{
+							"type":        "string",
+							"description": "The description of the todo item",
+						},
+					},
+					"required": []string{"title"},
+				},
 			},
 		},
 		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {

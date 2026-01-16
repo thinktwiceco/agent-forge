@@ -59,6 +59,11 @@ type AgentConfig struct {
 	// This parameter is reserved for future use.
 	MainAgent bool
 
+	// Tone specifies the response tone for the main agent.
+	// Supported values: "" (default), "keep-it-short"
+	// When set to "keep-it-short", the agent will be instructed to remain concise and to the point.
+	Tone string
+
 	// ExtraEngines allows specifying different LLM engines for team agents.
 	// Key is the agent name (e.g., "system-reasoning"), value is the LLM engine to use.
 	// If nil or if a team agent's name is not found, the default LLMEngine is used.

@@ -7,9 +7,10 @@ import (
 )
 
 type FunctionObjectParameter struct {
-	Type_       string `json:"type"`
-	Description string `json:"description,omitempty"`
-	Name        string `json:"name"`
+	Type_       string                 `json:"type"`
+	Description string                 `json:"description,omitempty"`
+	Name        string                 `json:"name"`
+	Items       map[string]interface{} `json:"items,omitempty"`
 }
 
 type FunctionParameters struct {

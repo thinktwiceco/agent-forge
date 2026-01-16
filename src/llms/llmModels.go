@@ -16,6 +16,7 @@ const TOGETHERAI_Llama323BInstructTurbo = "meta-llama/Llama-3.2-3B-Instruct-Turb
 const TOGETHERAI_OPENAIGPTOSS120B = "openai/gpt-oss-120b"
 const TOGETHERAI_Qwen257BInstructTurbo = "Qwen/Qwen2.5-7B-Instruct-Turbo"
 const TOGETHERAI_Llama3170BInstructTurbo = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
+const TOGETHERAI_Qwen3Coder480B = "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
 
 const OPENAI_GPT5O = "gpt-5"
 const OPENAI_GPT5_1 = "gpt-5.1"

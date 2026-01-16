@@ -53,5 +53,4 @@ type Plugin interface {
 
 - [Logger](./logger/README.md) - Configurable output formatting for agent responses
 - [Todo](./todo/README.md) - Task management and todo list functionality for agents
-
-
+- [Knowledge](./knowledge/README.md) - Knowledge management and persistent information storage
