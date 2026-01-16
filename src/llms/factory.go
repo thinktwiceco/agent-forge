@@ -8,11 +8,14 @@ import (
 )
 
 type OpenAILLMBuilder struct {
-	ApiKey   string
-	Model    string
-	BaseURL  string
-	Provider string
-	Ctx      context.Context
+	apiKey         string
+	model          string
+	cheapModel     string
+	reasoningModel string
+	fastModel      string
+	baseURL        string
+	provider       string
+	ctx            context.Context
 }
 
 func NewOpenAILLMBuilder(provider string) *OpenAILLMBuilder {
@@ -20,8 +23,8 @@ func NewOpenAILLMBuilder(provider string) *OpenAILLMBuilder {
 		panic(fmt.Sprintf("Invalid provider: %s", provider))
 	}
 	return &OpenAILLMBuilder{
-		Provider: provider,
-		Ctx:      context.Background(),
+		provider: provider,
+		ctx:      context.Background(),
 	}
 }
 
@@ -31,82 +34,166 @@ func (b *OpenAILLMBuilder) validate() {
 		agentforge.Error("Failed to load config: %v", err)
 	}
 
-	if b.Provider == "" {
+	if b.provider == "" {
 		agentforge.Error("Provider is required")
 	}
 
-	if b.ApiKey == "" {
-		if b.Provider == "openai" {
-			b.ApiKey = c.AFOpenAIAPIKey
-		} else if b.Provider == "deepseek" {
-			b.ApiKey = c.AFDeepSeekAPIKey
-		} else if b.Provider == "togetherai" {
-			b.ApiKey = c.AFTogetherAIAPIKey
+	if b.apiKey == "" {
+		if b.provider == "openai" {
+			b.apiKey = c.AFOpenAIAPIKey
+		} else if b.provider == "deepseek" {
+			b.apiKey = c.AFDeepSeekAPIKey
+		} else if b.provider == "togetherai" {
+			b.apiKey = c.AFTogetherAIAPIKey
 		}
 	}
 
-	if b.ApiKey == "" {
-		agentforge.Warn("No API key found for provider: %s", b.Provider)
+	if b.apiKey == "" {
+		agentforge.Warn("No API key found for provider: %s", b.provider)
 	}
 
-	if b.Ctx == nil {
-		b.Ctx = context.Background()
+	if b.ctx == nil {
+		b.ctx = context.Background()
 	}
 
-	if b.BaseURL == "" {
-		canidateBaseURL, ok := DefaultBaseURL[b.Provider]
+	if b.baseURL == "" {
+		canidateBaseURL, ok := DefaultBaseURL[b.provider]
 		if ok {
-			b.BaseURL = canidateBaseURL
+			b.baseURL = canidateBaseURL
 		} else {
-			panic(fmt.Sprintf("No default base URL found for provider: %s", b.Provider))
+			panic(fmt.Sprintf("No default base URL found for provider: %s", b.provider))
 		}
 	}
 
-	if b.Model == "" {
-		canidateModel, ok := DefaultModel[b.Provider]
+	if b.model == "" {
+		canidateModel, ok := DefaultModel[b.provider]
 		if ok {
-			b.Model = canidateModel
+			b.model = canidateModel
 		} else {
-			panic(fmt.Sprintf("No default model found for provider: %s", b.Provider))
+			panic(fmt.Sprintf("No default model found for provider: %s", b.provider))
 		}
 	}
 
-	agentforge.Info("LLM builder validated: %+v", b)
-	agentforge.Info("LLM builder validated: %+v", b.Provider)
-	agentforge.Info("LLM builder validated: %+d", len(b.ApiKey))
-	agentforge.Info("LLM builder validated: %+v", b.Model)
-	agentforge.Info("LLM builder validated: %+v", b.BaseURL)
-	agentforge.Info("LLM builder validated: %+v", b.Ctx)
+	if b.cheapModel == "" {
+		canidateModel, ok := DefaultCheapModel[b.provider]
+		if ok {
+			b.cheapModel = canidateModel
+		}
+	}
+
+	if b.reasoningModel == "" {
+		canidateModel, ok := DefaultReasoningModel[b.provider]
+		if ok {
+			b.reasoningModel = canidateModel
+		}
+	}
+
+	if b.fastModel == "" {
+		canidateModel, ok := DefaultFastModel[b.provider]
+		if ok {
+			b.fastModel = canidateModel
+		}
+	}
+
+	agentforge.Info("LLM builder validated: provider=%+v", b.provider)
+	agentforge.Info("LLM builder validated: apiKey length=%+d", len(b.apiKey))
+	agentforge.Info("LLM builder validated: model=%+v", b.model)
+	agentforge.Info("LLM builder validated: cheapModel=%+v", b.cheapModel)
+	agentforge.Info("LLM builder validated: reasoningModel=%+v", b.reasoningModel)
+	agentforge.Info("LLM builder validated: fastModel=%+v", b.fastModel)
+	agentforge.Info("LLM builder validated: baseURL=%+v", b.baseURL)
 }
 
 func (b *OpenAILLMBuilder) SetProvider(p string) *OpenAILLMBuilder {
-	b.Provider = p
+	b.provider = p
 	return b
 }
 
 func (b *OpenAILLMBuilder) SetApiKey(apiKey string) *OpenAILLMBuilder {
-	b.ApiKey = apiKey
+	b.apiKey = apiKey
 	return b
 }
 
 func (b *OpenAILLMBuilder) SetModel(model string) *OpenAILLMBuilder {
-	b.Model = model
+	b.model = model
+	return b
+}
+
+func (b *OpenAILLMBuilder) SetCheapModel(model string) *OpenAILLMBuilder {
+	b.cheapModel = model
+	return b
+}
+
+func (b *OpenAILLMBuilder) SetReasoningModel(model string) *OpenAILLMBuilder {
+	b.reasoningModel = model
+	return b
+}
+
+func (b *OpenAILLMBuilder) SetFastModel(model string) *OpenAILLMBuilder {
+	b.fastModel = model
 	return b
 }
 
 func (b *OpenAILLMBuilder) SetBaseURL(baseURL string) *OpenAILLMBuilder {
-	b.BaseURL = baseURL
+	b.baseURL = baseURL
 	return b
 }
 
 func (b *OpenAILLMBuilder) SetCtx(ctx context.Context) *OpenAILLMBuilder {
-	b.Ctx = ctx
+	b.ctx = ctx
 	return b
 }
 
-func (b *OpenAILLMBuilder) Build() (LLMEngine, error) {
+// MultiModelLLM holds multiple LLM instances for different use cases
+type MultiModelLLM struct {
+	mainModel      *openAILLM
+	cheapModel     *openAILLM
+	reasoningModel *openAILLM
+	fastModel      *openAILLM
+}
 
+// MainModel returns the main model instance
+func (m *MultiModelLLM) MainModel() *openAILLM {
+	return m.mainModel
+}
+
+// CheapModel returns the cheap model instance (may be nil)
+func (m *MultiModelLLM) CheapModel() *openAILLM {
+	return m.cheapModel
+}
+
+// ReasoningModel returns the reasoning model instance (may be nil)
+func (m *MultiModelLLM) ReasoningModel() *openAILLM {
+	return m.reasoningModel
+}
+
+// FastModel returns the fast model instance (may be nil)
+func (m *MultiModelLLM) FastModel() *openAILLM {
+	return m.fastModel
+}
+
+func (b *OpenAILLMBuilder) Build() (*MultiModelLLM, error) {
 	b.validate()
 
-	return newOpenAILLM(b.Ctx, b.BaseURL, b.Model, b.ApiKey, b.Provider), nil
+	multiModel := &MultiModelLLM{}
+
+	// Create main model (always required)
+	multiModel.mainModel = newOpenAILLM(b.ctx, b.baseURL, b.model, b.apiKey, b.provider)
+
+	// Create cheap model if set
+	if b.cheapModel != "" {
+		multiModel.cheapModel = newOpenAILLM(b.ctx, b.baseURL, b.cheapModel, b.apiKey, b.provider)
+	}
+
+	// Create reasoning model if set
+	if b.reasoningModel != "" {
+		multiModel.reasoningModel = newOpenAILLM(b.ctx, b.baseURL, b.reasoningModel, b.apiKey, b.provider)
+	}
+
+	// Create fast model if set
+	if b.fastModel != "" {
+		multiModel.fastModel = newOpenAILLM(b.ctx, b.baseURL, b.fastModel, b.apiKey, b.provider)
+	}
+
+	return multiModel, nil
 }

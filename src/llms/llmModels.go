@@ -33,6 +33,24 @@ var DefaultModel = map[string]string{
 	"togetherai": TOGETHERAI_Llama3170BInstructTurbo,
 }
 
+var DefaultCheapModel = map[string]string{
+	"openai":     OPENAI_GPT5O,
+	"deepseek":   DEEPSEEK_CHAT,
+	"togetherai": TOGETHERAI_Llama323BInstructTurbo,
+}
+
+var DefaultReasoningModel = map[string]string{
+	"openai":     OPENAI_GPT5_2,
+	"deepseek":   DEEPSEEK_REASONING,
+	"togetherai": TOGETHERAI_Llama3170BInstructTurbo,
+}
+
+var DefaultFastModel = map[string]string{
+	"openai":     OPENAI_GPT5O,
+	"deepseek":   DEEPSEEK_CHAT,
+	"togetherai": TOGETHERAI_Llama323BInstructTurbo,
+}
+
 var DefaultBaseURL = map[string]string{
 	"openai":     OPENAI_BASE_URL,
 	"deepseek":   DEEPSEEK_BASE_URL,

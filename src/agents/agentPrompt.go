@@ -55,6 +55,13 @@ RESPONSE TONE:
 - Avoid unnecessary elaboration or verbose explanations
 - Stay focused on the specific question or task at hand
 `
+		} else if a.config.Tone == "system-agent" {
+			a.systemPrompt += `
+RESPONSE TONE:
+- You are a system agent. You need to provide detailed responses
+to the main agent. You don't need to impress anyone.
+only returns what's asked and perform your duty as a good system agent!
+`
 		}
 	}
 }

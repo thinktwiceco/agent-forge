@@ -274,9 +274,10 @@ import (
 
 func main() {
     // Initialize LLM
-    llm, _ := llms.NewOpenAILLMBuilder("togetherai").
+    multiModelLLM, _ := llms.NewOpenAILLMBuilder("togetherai").
         SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
         Build()
+    llm := multiModelLLM.MainModel()
     
     // Todo update callback
     onTodoUpdate := func(todos []*todo.TodoItem) {

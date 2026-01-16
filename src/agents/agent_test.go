@@ -48,12 +48,13 @@ func TestAgent_fooTool_WithRealLLM(t *testing.T) {
 	}
 
 	// Use TogetherAI's model
-	llm, err := llms.NewOpenAILLMBuilder("togetherai").
+	multiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
 		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
 		Build()
 	if err != nil {
 		t.Skipf("Skipping real LLM test - TogetherAI API not available: %v", err)
 	}
+	llm := multiModelLLM.MainModel()
 
 	// Create agent with the LLM and foo tool
 	agent := NewAgent(&AgentConfig{
@@ -170,12 +171,13 @@ func TestAgent_fooTool_WithRealLLM(t *testing.T) {
 // This is a basic streaming test. For comprehensive tool execution testing with
 // all chunk verification, see TestAgent_fooTool_WithRealLLM.
 func TestAgent_fooTool(t *testing.T) {
-	llm, err := llms.NewOpenAILLMBuilder("togetherai").
+	multiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
 		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
 		Build()
 	if err != nil {
 		t.Fatalf("failed to get together llm: %v", err)
 	}
+	llm := multiModelLLM.MainModel()
 	agent := NewAgent(&AgentConfig{
 		LLMEngine: llm,
 		AgentName: "test agent",
@@ -203,12 +205,13 @@ func TestAgent_fooTool(t *testing.T) {
 
 // TestAgentConfig_validate tests the validation of AgentConfig.
 func TestAgentConfig_validate(t *testing.T) {
-	llm, err := llms.NewOpenAILLMBuilder("togetherai").
+	multiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
 		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
 		Build()
 	if err != nil {
 		t.Skipf("skipping validation test: failed to get together llm: %v", err)
 	}
+	llm := multiModelLLM.MainModel()
 
 	tests := []struct {
 		name    string
@@ -275,12 +278,13 @@ func TestAgentConfig_validate(t *testing.T) {
 
 // TestNewAgent_validation tests that NewAgent panics on invalid config.
 func TestNewAgent_validation(t *testing.T) {
-	llm, err := llms.NewOpenAILLMBuilder("togetherai").
+	multiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
 		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
 		Build()
 	if err != nil {
 		t.Skipf("skipping NewAgent validation test: failed to get together llm: %v", err)
 	}
+	llm := multiModelLLM.MainModel()
 
 	tests := []struct {
 		name        string

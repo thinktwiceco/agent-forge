@@ -31,23 +31,15 @@ const (
 
 func main() {
 	// Parse command-line flags
-	provider := flag.String("provider", "togetherai", "LLM provider to use: togetherai, openai, or deepseek")
 	flag.Parse()
 
 	printBanner()
 
 	// Display provider information
-	providerName := "TogetherAI and Llama"
-	if *provider == "openai" {
-		providerName = "OpenAI"
-	} else if *provider == "deepseek" {
-		providerName = "DeepSeek"
-	}
-	fmt.Printf("Chat with a reasoning agent powered by %s\n", providerName)
 	fmt.Printf("%sType 'exit' or 'quit' to end the conversation%s\n\n", ColorDim, ColorReset)
 
 	// Initialize the agent
-	agent, err := initializeAgent(*provider)
+	agent, err := initializeAgent()
 	if err != nil {
 		fmt.Printf("%sError initializing agent: %v%s\n", ColorRed, err, ColorReset)
 		os.Exit(1)
@@ -137,37 +129,46 @@ func initializeVectorComponents() (core.VectorDB, core.EmbeddingGenerator, error
 }
 
 // initializeAgent creates and configures the agent with the specified provider
-func initializeAgent(provider string) (*agents.Agent, error) {
+func initializeAgent() (*agents.Agent, error) {
 
-	var llmEngine llms.LLMEngine
 	var err error
 
 	// Create LLM engine based on provider
-	switch strings.ToLower(provider) {
-	case "openai":
-		llmEngine, err = llms.NewOpenAILLMBuilder("openai").
-			SetModel(llms.OPENAI_GPT5_1).
-			Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create OpenAI LLM: %w", err)
-		}
-	case "togetherai":
-		llmEngine, err = llms.NewOpenAILLMBuilder("togetherai").
-			SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
-			Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create TogetherAI LLM: %w", err)
-		}
-	case "deepseek":
-		llmEngine, err = llms.NewOpenAILLMBuilder("deepseek").
-			SetModel(llms.DEEPSEEK_CHAT).
-			Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create DeepSeek LLM: %w", err)
-		}
-	default:
-		return nil, fmt.Errorf("unsupported provider: %s (supported: togetherai, openai, deepseek)", provider)
+	OpenAImultiModelLLM, err := llms.NewOpenAILLMBuilder("openai").
+		SetModel(llms.OPENAI_GPT5_2).
+		Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OpenAI LLM: %w", err)
 	}
+
+	TogetherAIMultiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
+		SetModel(llms.TOGETHERAI_ZaiGLM47).
+		SetCheapModel(llms.TOGETHERAI_Llama323BInstructTurbo).
+		Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create TogetherAI LLM: %w", err)
+	}
+
+	DeepSeekMultiModelLLM, err := llms.NewOpenAILLMBuilder("deepseek").
+		SetModel(llms.DEEPSEEK_CHAT).
+		SetReasoningModel(llms.DEEPSEEK_REASONING).
+		Build()
+
+	codingMultiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
+		SetModel(llms.TOGETHERAI_Qwen3Coder480B).
+		Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DeepSeek LLM: %w", err)
+	}
+
+	// Define the LLM Engines
+	mainAgentLLM := OpenAImultiModelLLM.MainModel()
+	codingAgentLLM := codingMultiModelLLM.MainModel()
+	reasoningAgentLLM := DeepSeekMultiModelLLM.ReasoningModel()
+	multipurposeAgentLLM := TogetherAIMultiModelLLM.CheapModel()
 
 	codebasePath := "/home/verte/Desktop/thinktwice-agent"
 
@@ -176,6 +177,8 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 	todoPlugin := todo.NewTodoPlugin(onTodoUpdate)
 
 	tools := []llms.Tool{}
+	// Add web browser tool
+
 	// Initialize vector database components
 	var vectorDB core.VectorDB
 	var embeddingGenerator core.EmbeddingGenerator
@@ -188,7 +191,7 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 
 	// Create agent configuration
 	config := agents.AgentConfig{
-		LLMEngine:   llmEngine,
+		LLMEngine:   mainAgentLLM,
 		AgentName:   "Assistant",
 		Description: "A helpful assistant with reasoning capabilities",
 		Tone:        "keep-it-short",
@@ -207,23 +210,20 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 	// Create the agent
 	agent := agents.NewAgent(&config)
 
-	codingLLMEngine, err := llms.NewOpenAILLMBuilder("togetherai").
-		SetModel(llms.TOGETHERAI_Qwen3Coder480B).
-		Build()
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create coding LLM: %w", err)
 	}
 
 	// Add system agents
-	agent.AddSystemAgent(agents.GitAgent(llmEngine, codebasePath))
-	agent.AddSystemAgent(agents.ReasoningAgent(llmEngine))
-	agent.AddSystemAgent(agents.OsAgent(llmEngine, codebasePath))
-	agent.AddSystemAgent(agents.CodingAgent(codingLLMEngine, codebasePath))
+	agent.AddSystemAgent(agents.GitAgent(multipurposeAgentLLM, codebasePath))
+	agent.AddSystemAgent(agents.ReasoningAgent(reasoningAgentLLM))
+	agent.AddSystemAgent(agents.OsAgent(multipurposeAgentLLM, codebasePath))
+	agent.AddSystemAgent(agents.CodingAgent(codingAgentLLM, codebasePath))
+	agent.AddSystemAgent(agents.WebAgent(multipurposeAgentLLM))
 
 	// Add vector agent if vector components were initialized successfully
 	if vectorDB != nil && embeddingGenerator != nil {
-		agent.AddSystemAgent(agents.VectorAgent(llmEngine, vectorDB, embeddingGenerator))
+		agent.AddSystemAgent(agents.VectorAgent(multipurposeAgentLLM, vectorDB, embeddingGenerator))
 		agentforge.Info("Vector agent initialized successfully")
 	}
 

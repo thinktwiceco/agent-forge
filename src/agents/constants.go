@@ -12,6 +12,8 @@ const (
 	AgentNameSystemVector = "system-vector"
 	// AgentNameSystemGit is the name of the system git agent
 	AgentNameSystemGit = "system-git"
+	// AgentNameSystemWeb is the name of the system web agent
+	AgentNameSystemWeb = "system-web"
 	// SystemAgentPrefix is the prefix used for all system-defined agents
 	SystemAgentPrefix = "system-"
 )
@@ -28,6 +30,8 @@ const (
 	TraceVector = "vector"
 	// TraceGit is the trace identifier for git agent operations
 	TraceGit = "git"
+	// TraceWeb is the trace identifier for web agent operations
+	TraceWeb = "web"
 	// TraceResponse is the trace identifier for main agent responses
 	TraceResponse = "response"
 	// TraceThinking is a conceptual trace identifier for thinking/reasoning processes

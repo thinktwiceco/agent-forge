@@ -20,12 +20,13 @@ func TestAgent_Reasoning_TwoTraces(t *testing.T) {
 		t.Skip("Skipping test - TogetherAI API key not available")
 	}
 
-	llm, err := llms.NewOpenAILLMBuilder("togetherai").
+	multiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
 		SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
 		Build()
 	if err != nil {
 		t.Skipf("Skipping reasoning test: %v", err)
 	}
+	llm := multiModelLLM.MainModel()
 
 	// Create agent with reasoning enabled
 	agent := NewAgent(&AgentConfig{

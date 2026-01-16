@@ -63,13 +63,14 @@ func main() {
     ctx := context.Background()
     
     // Create an LLM engine
-    llm, err := llms.NewOpenAILLMBuilder("togetherai").
+    multiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
         SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
         SetCtx(ctx).
         Build()
     if err != nil {
         panic(err)
     }
+    llm := multiModelLLM.MainModel()
     
     // Create an agent
     agent := agents.NewAgent(&agents.AgentConfig{
@@ -351,13 +352,14 @@ func main() {
     ctx := context.Background()
     
     // Initialize LLM
-    llm, err := llms.NewOpenAILLMBuilder("togetherai").
+    multiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
         SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
         SetCtx(ctx).
         Build()
     if err != nil {
         panic(err)
     }
+    llm := multiModelLLM.MainModel()
     
     // Create a calculator tool
     calcTool := &core.Tool{
