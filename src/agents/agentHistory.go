@@ -31,7 +31,7 @@ func (a *Agent) handleNewAssistantMessage(message string) {
 	a.history.save()
 }
 
-func (a *Agent) handleSystemPromptInjection() []llms.UnifiedMessage {
+func (a *Agent) handleSystemPromptInjection() []*llms.UnifiedMessage {
 	a.history.addSystemMessage(a.systemPrompt)
 	a.history.save()
 	return a.history.History()

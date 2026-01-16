@@ -25,6 +25,7 @@ type UnifiedMessage struct {
 	promptTokens     int        // Input tokens consumed
 	completionTokens int        // Output tokens generated
 	totalTokens      int        // Total tokens used
+	ephemeral        bool       // Whether the message is ephemeral. If ephemeral is not useful for the chat history, it should be set to true.
 }
 
 func (m *UnifiedMessage) Role() MessageRole {
@@ -55,15 +56,23 @@ func (m *UnifiedMessage) TotalTokens() int {
 	return m.totalTokens
 }
 
-func UserMessage(content string) UnifiedMessage {
-	return UnifiedMessage{
+func (m *UnifiedMessage) Ephemeral() bool {
+	return m.ephemeral
+}
+
+func (m *UnifiedMessage) SetContent(content string) {
+	m.content = content
+}
+
+func UserMessage(content string) *UnifiedMessage {
+	return &UnifiedMessage{
 		role:    MessageRoleUser,
 		content: content,
 	}
 }
 
-func AssistantMessage(content string, promptTokens, completionTokens, totalTokens int) UnifiedMessage {
-	return UnifiedMessage{
+func AssistantMessage(content string, promptTokens, completionTokens, totalTokens int) *UnifiedMessage {
+	return &UnifiedMessage{
 		role:             MessageRoleAssistant,
 		content:          content,
 		promptTokens:     promptTokens,
@@ -72,23 +81,24 @@ func AssistantMessage(content string, promptTokens, completionTokens, totalToken
 	}
 }
 
-func SystemMessage(content string) UnifiedMessage {
-	return UnifiedMessage{
+func SystemMessage(content string) *UnifiedMessage {
+	return &UnifiedMessage{
 		role:    MessageRoleSystem,
 		content: content,
 	}
 }
 
-func ToolMessage(toolCallID, content string) UnifiedMessage {
-	return UnifiedMessage{
+func ToolMessage(toolCallID, content string, ephemeral bool) *UnifiedMessage {
+	return &UnifiedMessage{
 		role:       MessageRoleTool,
 		content:    content,
 		toolCallID: toolCallID,
+		ephemeral:  ephemeral,
 	}
 }
 
-func AssistantMessageWithToolCalls(content string, toolCalls []ToolCall, promptTokens, completionTokens, totalTokens int) UnifiedMessage {
-	return UnifiedMessage{
+func AssistantMessageWithToolCalls(content string, toolCalls []ToolCall, promptTokens, completionTokens, totalTokens int) *UnifiedMessage {
+	return &UnifiedMessage{
 		role:             MessageRoleAssistant,
 		content:          content,
 		toolCalls:        toolCalls,

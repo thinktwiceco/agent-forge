@@ -12,7 +12,7 @@ import (
 func (m *Meta) getTools(agentContext map[string]any) llms.ToolReturn {
 	tools, ok := agentContext["tools"].([]llms.Tool)
 	if !ok || len(tools) == 0 {
-		return core.NewSuccessResponse("[]")
+		return core.NewEphemeralResponse("[]")
 	}
 
 	toolList := make([]map[string]string, 0, len(tools))
@@ -29,5 +29,5 @@ func (m *Meta) getTools(agentContext map[string]any) llms.ToolReturn {
 		return core.NewErrorResponse(fmt.Sprintf("failed to serialize tools: %v", err))
 	}
 
-	return core.NewSuccessResponse(string(toolsJSON))
+	return core.NewEphemeralResponse(string(toolsJSON))
 }

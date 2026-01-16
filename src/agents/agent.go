@@ -113,6 +113,9 @@ func NewAgent(config *AgentConfig) *Agent {
 // Returns:
 //   - *core.ResponseCh: Response channel that can be used to receive streaming chunks
 func (a *Agent) ChatStream(message string) *core.ResponseCh {
+	a.ensureHistory()
+	a.handleSystemPromptInjection()
+	a.history.addUserMessage(message)
 	errs := a.hooks.newUserMessageEvent(a, message)
 	logHookErrors(errs)
 
@@ -145,6 +148,7 @@ func (a *Agent) ChatStream(message string) *core.ResponseCh {
 		if err := a.executeChatWithTools(); err != nil {
 			responseCh.Error <- err
 		}
+		a.history.save()
 	}()
 
 	return responseCh

@@ -11,12 +11,14 @@ func validateAction(value any) error {
 		return fmt.Errorf("action must be a string")
 	}
 	validActions := map[string]bool{
-		"index":  true,
-		"search": true,
-		"delete": true,
+		"index":         true,
+		"indexFile":     true,
+		"search":        true,
+		"listDocuments": true,
+		"delete":        true,
 	}
 	if !validActions[action] {
-		return fmt.Errorf("invalid action: %s. Must be one of: index, search, delete", action)
+		return fmt.Errorf("invalid action: %s. Must be one of: index, indexFile, search, listDocuments, delete", action)
 	}
 	return nil
 }

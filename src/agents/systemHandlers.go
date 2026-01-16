@@ -37,37 +37,29 @@ var handleNewToolsAdded = OnAddedToolsHook(func(a *Agent, tools []llms.Tool) err
 	return nil
 })
 
-var handleNewUserMessage = OnNewUserMessageHook(func(a *Agent, message string) error {
-	// ResponseCh is already set up in setResponseCh() with hook callback
-	// Don't recreate it here as that would lose the hook callback
-	// Ensure the history is loaded
-	a.ensureHistory()
-	// Add the user message to the history if not already present
-	a.handleSystemPromptInjection()
-	// Add the user message to the history
-	a.history.addUserMessage(message)
-	// Save the history
-	a.history.save()
-	// Get the history
-	a.history.get()
-	return nil
-})
+// var handleNewUserMessage = OnNewUserMessageHook(func(a *Agent, message string) error {
+// 	// ResponseCh is already set up in setResponseCh() with hook callback
+// 	// Don't recreate it here as that would lose the hook callback
+// 	// Ensure the history is loaded
+// 	a.ensureHistory()
+// 	// Add the user message to the history if not already present
+// 	a.handleSystemPromptInjection()
+// 	// Add the user message to the history
+// 	a.history.addUserMessage(message)
+// 	// Save the history
+// 	a.history.save()
+// 	// Get the history
+// 	a.history.get()
+// 	return nil
+// })
 
-var handleNewAssistantMessage = OnNewAssistantMessageHook(func(a *Agent, message string, promptTokens, completionTokens, totalTokens int) error {
-	// Add the assistant message to the history
-	a.history.addAssistantMessage(message, promptTokens, completionTokens, totalTokens)
-	// Save the history
-	a.history.save()
-	return nil
-})
-
-var handleNewAssistantMessageWithToolCalls = OnNewAssistantMessageWithToolCallsHook(func(a *Agent, message string, toolCalls []llms.ToolCall, promptTokens, completionTokens, totalTokens int) error {
-	// Add the assistant message with tool calls to the history
-	a.history.addAssistantMessageWithToolCalls(message, toolCalls, promptTokens, completionTokens, totalTokens)
-	// Save the history
-	a.history.save()
-	return nil
-})
+// var handleNewAssistantMessage = OnNewAssistantMessageHook(func(a *Agent, message string, promptTokens, completionTokens, totalTokens int) error {
+// 	// Add the assistant message to the history
+// 	a.history.addAssistantMessage(message, promptTokens, completionTokens, totalTokens)
+// 	// Save the history
+// 	a.history.save()
+// 	return nil
+// })
 
 var handlePluginInitialization = OnAgentInitializationHook(func(a *Agent, config *AgentConfig) error {
 	agentforge.Debug("🔌 [handlePluginInitialization] START for agent %s", a.config.AgentName)

@@ -15,7 +15,7 @@ type Hooks interface {
 // Parameter defines a tool parameter with validation
 type Parameter struct {
 	Name        string
-	Type        string                 // "string", "number", "boolean", "object", "array"
+	Type        string // "string", "number", "boolean", "object", "array"
 	Description string
 	Required    bool
 	Items       map[string]interface{} // For array types, defines the schema of array items
@@ -116,7 +116,7 @@ func (t *Tool) validateAndExtractArgs(args map[string]any) (map[string]any, llms
 
 		// Check if required parameter is missing
 		if param.Required && !exists {
-			return nil, NewErrorResponse(fmt.Sprintf("missing required parameter: %s", param.Name))
+			return nil, NewErrorResponse(fmt.Sprintf("missing required parameter: %s. Hint: Use the expand tool with subject_name='%s' to get more information about how to use this tool", param.Name, t.Name))
 		}
 
 		if exists {

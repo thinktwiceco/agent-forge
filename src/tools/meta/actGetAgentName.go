@@ -9,7 +9,7 @@ import (
 func (m *Meta) getAgentName(agentContext map[string]any) llms.ToolReturn {
 	agentName, ok := agentContext["agentName"].(string)
 	if !ok || agentName == "" {
-		return core.NewSuccessResponse("Agent name not available")
+		return core.NewEphemeralResponse("Agent name not available")
 	}
-	return core.NewSuccessResponse(agentName)
+	return core.NewEphemeralResponse(agentName)
 }

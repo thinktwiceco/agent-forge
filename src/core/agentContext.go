@@ -19,6 +19,8 @@ type AgentContext struct {
 	Tools []llms.Tool
 	// SubAgents is the list of sub-agents available for delegation
 	SubAgents []*SubAgent
+	// ResponseCh is the response channel for the current chat session
+	ResponseCh *ResponseCh
 }
 
 // BuildContext converts the AgentContext struct to a map[string]any and merges
@@ -66,6 +68,12 @@ func RehydrateContext(contextMap map[string]any) (*AgentContext, error) {
 	}
 	if err := ac.validateSubAgents(contextMap); err != nil {
 		return nil, err
+	}
+
+	if responseCh, ok := contextMap["responseCh"].(*ResponseCh); ok {
+		ac.ResponseCh = responseCh
+	} else if responseCh, exists := contextMap["responseCh"]; exists {
+		return nil, fmt.Errorf("responseCh must be a *ResponseCh, got %T", responseCh)
 	}
 
 	return ac, nil

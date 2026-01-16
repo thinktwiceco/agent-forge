@@ -59,7 +59,7 @@ func newOpenAILLM(ctx context.Context, baseURL, model, apiKey, provider string) 
 //
 // Returns:
 //   - *responseCh: responseCh instance with channels for streaming
-func (a *openAILLM) ChatStream(messages []UnifiedMessage, tools []Tool) *responseCh {
+func (a *openAILLM) ChatStream(messages []*UnifiedMessage, tools []Tool) *responseCh {
 	responseCh := newResponseCh()
 
 	// Start streaming in a goroutine
@@ -76,7 +76,7 @@ func (a *openAILLM) Provider() string {
 	return a.provider
 }
 
-func toOpenAIMessages(messages []UnifiedMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
+func toOpenAIMessages(messages []*UnifiedMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
 	openaiMessages := make([]openai.ChatCompletionMessageParamUnion, len(messages))
 	for i, message := range messages {
 		if message.Role() == "system" {
@@ -133,7 +133,7 @@ func toOpenAIMessages(messages []UnifiedMessage) ([]openai.ChatCompletionMessage
 }
 
 // streamResponse handles the actual streaming from OpenAI API.
-func (a *openAILLM) streamResponse(messages []UnifiedMessage, tools []Tool, responseCh *responseCh) {
+func (a *openAILLM) streamResponse(messages []*UnifiedMessage, tools []Tool, responseCh *responseCh) {
 	defer responseCh.Close()
 
 	// Build messages

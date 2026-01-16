@@ -155,9 +155,8 @@ func (a *Agent) registerPlugins() {
 
 // / ========= SYSTEM HOOKS ========= ///
 func (a *Agent) registerSystemCallbacks() {
-	a.hooks.on(core.EventNewUserMessage, handleNewUserMessage)
+	// a.hooks.on(core.EventNewUserMessage, handleNewUserMessage)
 	a.hooks.on(core.EventAddedSystemAgent, handleNewSystemAgentAdded)
 	a.hooks.on(core.EventAddedTools, handleNewToolsAdded)
-	a.hooks.on(core.EventNewAssistantMessage, handleNewAssistantMessage)
-	a.hooks.on(core.EventNewAssistantMessageWithToolCalls, handleNewAssistantMessageWithToolCalls)
+	// a.hooks.on(core.EventNewAssistantMessage, handleNewAssistantMessage)
 }

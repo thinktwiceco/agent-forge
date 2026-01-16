@@ -142,6 +142,8 @@ func (a *Agent) executeChatWithTools() error {
 			if fullContent == "" {
 				panic("Attempting to save empty message to history")
 			}
+
+			a.history.addAssistantMessage(fullContent, promptTokens, completionTokens, totalTokens)
 			a.hooks.newAssistantMessageEvent(a, fullContent, promptTokens, completionTokens, totalTokens)
 			return nil
 		}
@@ -156,6 +158,8 @@ func (a *Agent) executeChatWithTools() error {
 			}
 		}
 		a.hooks.newAssistantMessageWithToolCallsEvent(a, fullContent, toolCalls, promptTokens, completionTokens, totalTokens)
+
+		a.history.addAssistantMessageWithToolCalls(fullContent, toolCalls, promptTokens, completionTokens, totalTokens)
 
 		agentforge.Debug("Detected %d tool calls, executing tools", len(toolCalls))
 		// Execute each tool
@@ -207,7 +211,6 @@ func (a *Agent) executeChatWithTools() error {
 
 			// Add tool result to history
 			a.history.addToolMessage(toolCall.ID, toolResult.Result, toolResult.Ephemeral)
-			a.history.save()
 		}
 
 		// Continue to next iteration (will call LLM again with tool results)

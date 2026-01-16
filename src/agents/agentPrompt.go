@@ -76,6 +76,8 @@ Specialized tools for complex problems. Use "delegate" tool to access them.
 		saPrompt += fmt.Sprintf("📌 %s: %s\n\n", (*sa).Name(), (*sa).BasicDescription())
 	}
 
+	a.systemPrompt += "Use the 'expand' if you need to use one of the sub-agents."
+
 	a.systemPrompt += saPrompt
 }
 
