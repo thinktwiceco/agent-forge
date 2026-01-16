@@ -101,34 +101,11 @@ FOCUS: Confirm camping and transportation logistics first`,
 	// Build description with structured components
 	template.AddDescription(
 		// Incipit
-		`Use reasoning agent to analyze questions BEFORE responding.
-Provides GUIDANCE ONLY - not the actual answer.
-
-Use for:
-- Ambiguous or unclear questions
-- Questions where assumptions might be made
-- Complex questions where nuances matter
-- Situations where "pleasing" behavior might occur
-
-Helps you:
-- Identify what the question is REALLY asking
-- Spot missing information or ambiguities
-- Determine when clarification is needed
-- Provide direct, objective answers
-
-[HOW TO USE]
-1. Pass the question to the reasoning agent
-2. Read 🔎 analysis and CLARIFY/APPROACH/FOCUS guidance
-3. Formulate the actual response based on guidance
-4. The agent provides framework only - not the answer`,
+		`Analyzes questions before responding. Provides guidance only (not answers) to identify ambiguities, missing information, and recommend approach.`,
 		// Examples
 		[]string{
-			`✅ Good: Question "Can you help me fix this?" - Identify what's missing`,
-			`✅ Good: Question "What's the best way to X?" - Identify what "best" means`,
-			`✅ Good: Ambiguous question - Determine if clarification needed`,
-			`✅ Good: About to say "I'd be happy to help!" - Agent would flag as unnecessary`,
-			`❌ Wrong: Using to validate information you already have`,
-			`✅ Good: Question seems simple but might be unclear - verify with agent`,
+			`✅ Use for: Ambiguous questions, unclear requests, when assumptions might be made`,
+			`❌ Don't use: To validate information you already have`,
 		},
 	)
 

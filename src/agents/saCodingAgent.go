@@ -124,34 +124,11 @@ Advanced Details:
 	// Build description with structured components
 	template.AddDescription(
 		// Incipit
-		`Use Coding agent to handle coding-related tasks and file operations on code files.
-Use the Coding agent when:
-- You need to read or analyze code files
-- You need to write or create code files
-- You need to understand code structure or codebases
-- You need to discover detailed information about available tools or agents
-- You need to perform coding-related file system operations
-
-DO NOT use the Coding agent for:
-- Simple questions that don't require code file operations
-- Tasks that can be solved without accessing code files
-- General file operations that aren't code-related (use OS agent instead)
-- Questions about your own capabilities when you already have the information
-
-The Coding agent has access to file system tools for code files and expand tool for discovering capabilities.
-
-[HOW TO USE THE CODING AGENT]
-Delegate coding-related tasks to the Coding agent. Provide clear instructions about what code files to read, write, or what code analysis to perform. Use the expand tool to discover tool/agent capabilities when needed.`,
+		`Handles coding tasks: read/write code files, analyze codebases, and discover tool/agent capabilities using expand tool.`,
 		// Examples
 		[]string{
-			`✅ Correct: Read the contents of src/main.go and explain what it does`,
-			`✅ Correct: Create a new file called utils.go with a helper function`,
-			`✅ Correct: Analyze the codebase structure by reading multiple files`,
-			`✅ Correct: Use expand tool to understand what the fs tool can do`,
-			`✅ Correct: Read config.json and write a Go struct to match it`,
-			`❌ Wrong: What is the capital of France? (No code operations needed)`,
-			`❌ Wrong: Read a non-code file like data.txt (Use OS agent instead)`,
-			`❌ Wrong: How many sub agents do I have? (You already know this)`,
+			`✅ Use for: Reading/writing code files, code analysis, discovering tool capabilities`,
+			`❌ Don't use: Non-code file operations (use OS agent instead)`,
 		},
 	)
 

@@ -29,6 +29,14 @@ type SubAgent interface {
 	Troubleshooting() string
 }
 
+// maybeEphemeralToolCall is a tool call that may be ephemeral.
+// It is used to represent a tool call that may be ephemeral.
+// This is to avoid cluttering the history with too many tool call messages.
+type MaybeEphemeralToolCall interface {
+	Ephemeral() bool
+	ToolCall() *llms.ToolResult
+}
+
 type AgentHookFn any
 
 type Plugin interface {

@@ -10,12 +10,15 @@ import (
 )
 
 // delegate executes the delegation to a sub-agent.
-func (d *Delegate) delegate(agentContext map[string]any, subAgentName string, message string) llms.ToolReturn {
+func (d *Delegate) delegate(ctx map[string]any, subAgentName string, message string) llms.ToolReturn {
 	// Extract parent response channel from context
-	var parentResponseCh *core.ResponseCh
-	if responseCh, ok := agentContext["responseCh"].(*core.ResponseCh); ok {
-		parentResponseCh = responseCh
+	agentContext, err := core.RehydrateContext(ctx)
+
+	if err != nil {
+		return core.NewErrorResponse(fmt.Sprintf("error rehydrating context: %v", err))
 	}
+
+	parentResponseCh := agentContext.ResponseCh
 
 	// Find the sub agent
 	var assignedSubAgent core.SubAgent
@@ -31,12 +34,8 @@ func (d *Delegate) delegate(agentContext map[string]any, subAgentName string, me
 	}
 
 	// Get parent agent name from context
-	parentAgentName, ok := agentContext["agentName"].(string)
-	if !ok {
-		return core.NewErrorResponse("agentName must be a string")
-	}
-
-	agentforge.Info("%s ➡️ %s ➡️ %s", parentAgentName, subAgentName, message)
+	parentAgentName := agentContext.AgentName
+	agentforge.Info("[%s] ➡️ [%s] ➡️ \n%s", parentAgentName, subAgentName, message)
 
 	// Execute delegation by calling sub agent's ChatStream
 	delegateResponseCh := assignedSubAgent.ChatStream(message)
@@ -71,5 +70,5 @@ func (d *Delegate) delegate(agentContext map[string]any, subAgentName string, me
 		return core.NewFailureResponse(delegationError.Error(), fullResponse)
 	}
 
-	return core.NewSuccessResponse(fullResponse)
+	return core.NewSuccessEphemeralResponse(fullResponse)
 }

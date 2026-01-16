@@ -9,7 +9,7 @@ import (
 func (m *Meta) getCurrentModel(agentContext map[string]any) llms.ToolReturn {
 	model, ok := agentContext["model"].(string)
 	if !ok || model == "" {
-		return core.NewSuccessResponse("Model information not available")
+		return core.NewEphemeralResponse("Model information not available")
 	}
-	return core.NewSuccessResponse(model)
+	return core.NewEphemeralResponse(model)
 }

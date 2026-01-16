@@ -16,6 +16,8 @@ func (m *Meta) handleMethod(agentContext map[string]any, method string) llms.Too
 		return m.getAgentName(agentContext)
 	case "get_tools":
 		return m.getTools(agentContext)
+	case "get_subagents":
+		return m.getSubagents(agentContext)
 	default:
 		return core.NewErrorResponse(fmt.Sprintf("unknown method: %s", method))
 	}

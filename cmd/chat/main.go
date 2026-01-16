@@ -14,7 +14,6 @@ import (
 	"github.com/thinktwice/agentForge/src/llms"
 	"github.com/thinktwice/agentForge/src/plugins/logger"
 	"github.com/thinktwice/agentForge/src/plugins/todo"
-	"github.com/thinktwice/agentForge/src/tools/vector"
 )
 
 const (
@@ -185,11 +184,6 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 		agentforge.Warn("Failed to initialize vector components: %v", err)
 		agentforge.Info("Application will continue without vector database capabilities. " +
 			"Vector operations will not be available.")
-	} else {
-		// Create vector database tool for main agent
-		vectorTool := vector.NewVectorTool(vectorDB, embeddingGenerator)
-		tools = append(tools, vectorTool)
-		agentforge.Info("Vector tool initialized successfully with Milvus")
 	}
 
 	// Create agent configuration
@@ -222,6 +216,7 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 	}
 
 	// Add system agents
+	agent.AddSystemAgent(agents.GitAgent(llmEngine, codebasePath))
 	agent.AddSystemAgent(agents.ReasoningAgent(llmEngine))
 	agent.AddSystemAgent(agents.OsAgent(llmEngine, codebasePath))
 	agent.AddSystemAgent(agents.CodingAgent(codingLLMEngine, codebasePath))

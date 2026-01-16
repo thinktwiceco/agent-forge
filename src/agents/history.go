@@ -6,12 +6,12 @@ import (
 )
 
 type History struct {
-	history          []llms.UnifiedMessage
+	history          []*llms.UnifiedMessage
 	hasSystemMessage bool
 	persistence      persistence.Persistence
 }
 
-func (h *History) History() []llms.UnifiedMessage {
+func (h *History) History() []*llms.UnifiedMessage {
 	return h.history
 }
 
@@ -22,7 +22,7 @@ func (h *History) addUserMessage(message string) {
 func (h *History) addSystemMessage(message string) {
 	// System message should be the first message in the history
 	if !h.hasSystemMessage {
-		h.history = append([]llms.UnifiedMessage{llms.SystemMessage(message)}, h.history...)
+		h.history = append([]*llms.UnifiedMessage{llms.SystemMessage(message)}, h.history...)
 		h.hasSystemMessage = true
 	}
 }
@@ -36,15 +36,17 @@ func (h *History) addAssistantMessageWithToolCalls(content string, toolCalls []l
 }
 
 func (h *History) addToolMessage(toolCallID, result string, ephemeral bool) {
-	if !ephemeral {
-		h.history = append(h.history, llms.ToolMessage(toolCallID, result))
-	} else {
-		h.history = append(h.history, llms.ToolMessage(toolCallID, "[Tool Call Executed]"))
-	}
+	h.history = append(h.history, llms.ToolMessage(toolCallID, result, ephemeral))
 }
 
 func (h *History) save() {
 	if h.persistence != nil {
+		// Cleanup the history to remove ephemeral messages
+		for _, message := range h.history {
+			if message.Ephemeral() {
+				message.SetContent("[Tool Call Executed]")
+			}
+		}
 		h.persistence.SaveHystory(h.history)
 	}
 }

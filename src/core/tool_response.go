@@ -45,6 +45,15 @@ func NewSuccessResponse(data string) llms.ToolReturn {
 	}
 }
 
+func NewSuccessEphemeralResponse(data string) llms.ToolReturn {
+	return &ToolResponse{
+		success:   true,
+		error:     "",
+		data:      data,
+		ephemeral: true,
+	}
+}
+
 // NewErrorResponse creates an error response without data
 func NewErrorResponse(errorMsg string) llms.ToolReturn {
 	return &ToolResponse{

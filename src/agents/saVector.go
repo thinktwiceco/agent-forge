@@ -125,39 +125,11 @@ Found 1 programming document matching the search criteria.`,
 	// Build description with structured components
 	template.AddDescription(
 		// Incipit
-		`Use Vector agent to handle vector database operations including indexing, searching, and deleting documents.
-Use the Vector agent when:
-- You need to index documents in a vector database for semantic search
-- You need to perform semantic search queries to find similar documents
-- You need to delete documents from the vector database
-- You need to manage document metadata for filtering and organization
-- You need to work with embeddings and vector similarity
-
-DO NOT use the Vector agent for:
-- Simple questions that don't require vector database operations
-- Tasks that can be solved without accessing the vector database
-- Questions about your own capabilities (you already have this information)
-- File system operations (use OS or Coding agent instead)
-
-The Vector agent has access to the vector_db tool and can perform semantic search operations.
-
-[HOW TO USE THE VECTOR AGENT]
-Delegate vector database tasks to the Vector agent. Provide clear instructions about:
-- What documents to index (with optional metadata)
-- What queries to search for (with optional filters and top_k)
-- What documents to delete (by document_id)
-
-The agent will handle embedding generation and vector operations automatically.`,
+		`Handles vector database operations: index documents, perform semantic search, and delete documents. Automatically generates embeddings.`,
 		// Examples
 		[]string{
-			`✅ Correct: Index a document with text "Machine learning basics"`,
-			`✅ Correct: Search for documents related to "neural networks"`,
-			`✅ Correct: Delete document with ID "abc-123-def"`,
-			`✅ Correct: Index a document with metadata {"category": "tutorial", "level": "beginner"}`,
-			`✅ Correct: Search for documents with filters {"category": "tutorial"} and top_k=5`,
-			`❌ Wrong: What is the capital of France? (No vector operations needed)`,
-			`❌ Wrong: Read a file from disk (Use OS or Coding agent instead)`,
-			`❌ Wrong: How many sub agents do I have? (You already know this)`,
+			`✅ Use for: Indexing documents, semantic search queries, managing document metadata`,
+			`❌ Don't use: File system operations (use OS or Coding agent instead)`,
 		},
 	)
 

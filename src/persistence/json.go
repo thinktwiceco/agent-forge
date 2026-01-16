@@ -22,7 +22,7 @@ func NewJSONPersistence(filePath string) *JSONPersistence {
 }
 
 // SaveHystory saves the conversation history to a JSON file
-func (jp *JSONPersistence) SaveHystory(history []llms.UnifiedMessage) {
+func (jp *JSONPersistence) SaveHystory(history []*llms.UnifiedMessage) {
 	// Marshal to JSON with indentation for readability
 	data, err := json.MarshalIndent(history, "", "  ")
 	if err != nil {
@@ -49,23 +49,24 @@ func (jp *JSONPersistence) SaveHystory(history []llms.UnifiedMessage) {
 // GetHystory retrieves the conversation history from the JSON file
 // If limit == 0 and offset == 0, returns all messages
 // Otherwise applies standard pagination (offset = start index, limit = page size)
-func (jp *JSONPersistence) GetHystory(limit, offset int) []llms.UnifiedMessage {
+func (jp *JSONPersistence) GetHystory(limit, offset int) []*llms.UnifiedMessage {
 	// Read file
+	var messages []*llms.UnifiedMessage
+
 	data, err := os.ReadFile(jp.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			agentforge.Warn("History file does not exist: %s", jp.filePath)
-			return []llms.UnifiedMessage{}
+			return []*llms.UnifiedMessage{}
 		}
 		agentforge.Error("Failed to read history file: %v", err)
-		return []llms.UnifiedMessage{}
+		return messages
 	}
 
 	// Unmarshal from JSON
-	var messages []llms.UnifiedMessage
 	if err := json.Unmarshal(data, &messages); err != nil {
 		agentforge.Error("Failed to unmarshal history from JSON: %v", err)
-		return []llms.UnifiedMessage{}
+		return messages
 	}
 
 	// Apply pagination
@@ -82,13 +83,13 @@ func (jp *JSONPersistence) GetHystory(limit, offset int) []llms.UnifiedMessage {
 
 	if limit < 0 {
 		agentforge.Warn("Invalid limit %d, returning empty result", limit)
-		return []llms.UnifiedMessage{}
+		return messages
 	}
 
 	// Apply offset
 	if offset >= len(messages) {
 		agentforge.Debug("Offset %d is beyond message count %d, returning empty result", offset, len(messages))
-		return []llms.UnifiedMessage{}
+		return messages
 	}
 
 	start := offset

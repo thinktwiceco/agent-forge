@@ -85,31 +85,11 @@ Directory: /path/to`,
 	// Build description with structured components
 	template.AddDescription(
 		// Incipit
-		`Use OS agent to handle operating system related tasks and file system operations.
-Use the OS agent when:
-- You need to read files from the file system
-- You need to write or create files
-- You need to delete files
-- You need to perform file system operations
-- You need to execute OS-level commands or executables
-
-DO NOT use the OS agent for:
-- Simple questions that don't require file operations
-- Tasks that can be solved without accessing the file system
-- Questions about your own capabilities (you already have this information)
-
-The OS agent has access to file system tools and can safely perform operations within a restricted directory.
-
-[HOW TO USE THE OS AGENT]
-Delegate file system and OS-related tasks to the OS agent. Provide clear instructions about what files to read, write, or what operations to perform.`,
+		`Handles file system operations: read, write, delete files, and execute OS-level commands within a restricted directory.`,
 		// Examples
 		[]string{
-			`✅ Correct: Read the contents of src/main.go`,
-			`✅ Correct: Write "package main" to a new file called main.go`,
-			`✅ Correct: Delete the file temp.txt`,
-			`✅ Correct: Check if the file config.json exists and read it`,
-			`❌ Wrong: What is the capital of France? (No file operations needed)`,
-			`❌ Wrong: How many sub agents do I have? (You already know this)`,
+			`✅ Use for: Reading files, writing files, deleting files, file system operations`,
+			`❌ Don't use: Simple questions without file operations`,
 		},
 	)
 
