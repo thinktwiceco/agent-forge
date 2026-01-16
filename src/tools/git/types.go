@@ -2,6 +2,33 @@ package git
 
 import "fmt"
 
+// gitInitResponse represents a git init operation result.
+type gitInitResponse struct {
+	Operation  string
+	WorkingDir string
+	Branch     string
+	Success    bool
+	Output     string
+}
+
+// String formats the git init response as a string.
+func (r *gitInitResponse) String() string {
+	result := fmt.Sprintf(`Git Operation: Init
+Working Directory: %s
+Status: %s
+`, r.WorkingDir, map[bool]string{true: "Success", false: "Failed"}[r.Success])
+
+	if r.Branch != "" {
+		result += fmt.Sprintf("Default Branch: %s\n", r.Branch)
+	}
+
+	if r.Output != "" {
+		result += fmt.Sprintf("\nOutput:\n%s\n", r.Output)
+	}
+
+	return result
+}
+
 // gitStatusResponse represents a git status operation result.
 type gitStatusResponse struct {
 	Operation   string
