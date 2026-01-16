@@ -22,10 +22,10 @@ func NewGitTool(root string) llms.Tool {
 
 	return &core.Tool{
 		Name:        "git",
-		Description: "Perform git operations (status, add, commit, push, pull, branch, checkout, log, diff) within a restricted directory.",
+		Description: "Perform git operations (init, status, add, commit, push, pull, branch, checkout, log, diff) within a restricted directory.",
 		AdvanceDesc: `Advanced Details:
 - Parameters:
-  * operation (string, required): The operation to perform - "status", "add", "commit", "push", "pull", "branch", "checkout", "log", or "diff"
+  * operation (string, required): The operation to perform - "init", "status", "add", "commit", "push", "pull", "branch", "checkout", "log", or "diff"
   * path (string, optional): File or directory path relative to the root directory (for add, diff operations)
   * message (string, optional): Commit message - required for "commit" operation
   * branch (string, optional): Branch name - required for "checkout" operation, optional for "branch", "push", "pull" operations
@@ -33,10 +33,11 @@ func NewGitTool(root string) llms.Tool {
   * limit (number, optional): Number of commits to show - optional for "log" operation (defaults to 10)
 - Behavior:
   * All operations are executed within the root directory
-  * Git repository must exist in the root directory
+  * Git repository must exist in the root directory (except for "init" operation which creates it)
   * Path traversal attempts (e.g., "../") are blocked for security
   * Commands are executed using git CLI
 - Usage:
+  * Use "init" to initialize a new git repository in the root directory
   * Use "status" to check working tree status
   * Use "add" to stage files (provide path parameter, or omit to stage all changes)
   * Use "commit" to commit staged changes (provide message parameter)
@@ -48,18 +49,19 @@ func NewGitTool(root string) llms.Tool {
   * Use "diff" to view changes (optionally provide path parameter)
 - Security: All operations are sandboxed to the root directory to prevent unauthorized access`,
 		TroubleshootingInfo: `Troubleshooting:
-- "not a git repository": The root directory is not a git repository - initialize with 'git init' first
+- "not a git repository": The root directory is not a git repository - use "init" operation to initialize it first
 - "path traversal detected": The provided path attempts to escape the root directory - use relative paths only
 - "missing required parameter: message": Message parameter is required for commit operations
 - "missing required parameter: branch": Branch parameter is required for checkout operations
-- "invalid operation": Operation must be exactly "status", "add", "commit", "push", "pull", "branch", "checkout", "log", or "diff"
+- "invalid operation": Operation must be exactly "init", "status", "add", "commit", "push", "pull", "branch", "checkout", "log", or "diff"
 - Git command errors: Check that git is installed and accessible, and that the repository is in a valid state
-- Permission errors: Ensure the process has read/write permissions for the root directory`,
+- Permission errors: Ensure the process has read/write permissions for the root directory
+- Init on existing repository: Running "init" on an existing repository is safe and will not overwrite existing data`,
 		Parameters: []core.Parameter{
 			{
 				Name:        "operation",
 				Type:        "string",
-				Description: "The operation to perform: 'status', 'add', 'commit', 'push', 'pull', 'branch', 'checkout', 'log', or 'diff'",
+				Description: "The operation to perform: 'init', 'status', 'add', 'commit', 'push', 'pull', 'branch', 'checkout', 'log', or 'diff'",
 				Required:    true,
 				Validator:   validateOperation,
 			},
@@ -97,7 +99,16 @@ func NewGitTool(root string) llms.Tool {
 		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 			operation := args["operation"].(string)
 
-			// Validate git repository exists
+			// Handle init operation (bypasses repository validation since it creates the repo)
+			if operation == "init" {
+				result, err := git.init()
+				if err != nil {
+					return core.NewErrorResponse(err.Error())
+				}
+				return core.NewSuccessResponse(result)
+			}
+
+			// Validate git repository exists for all other operations
 			if err := git.validateGitRepo(); err != nil {
 				return core.NewErrorResponse(err.Error())
 			}
