@@ -16,6 +16,9 @@ A powerful Go framework for building intelligent agents with LLM integration, to
 - [System Agents](#system-agents)
   - [Reasoning Agent](#reasoning-agent)
   - [OS Agent](#os-agent)
+  - [Git Agent](#git-agent)
+  - [Coding Agent](#coding-agent)
+  - [Vector Agent](#vector-agent)
 - [Advanced Features](#advanced-features)
   - [Streaming Responses](#streaming-responses)
   - [Conversation Persistence](#conversation-persistence)
@@ -60,7 +63,10 @@ func main() {
     ctx := context.Background()
     
     // Create an LLM engine
-    llm, err := llms.GetTogetherAILLM(ctx, llms.Llama3170BInstructTurbo)
+    llm, err := llms.NewOpenAILLMBuilder("togetherai").
+        SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
+        SetCtx(ctx).
+        Build()
     if err != nil {
         panic(err)
     }
@@ -101,6 +107,11 @@ agent := agents.NewAgent(&agents.AgentConfig{
     MainAgent:         true,              // Optional: Is this the main agent?
     Persistence:       "json",            // Optional: Enable conversation history
     Plugins:           []core.Plugin{},   // Optional: Plugins
+    Tone:              "keep-it-short",  // Optional: Response tone
+    Trace:             "response",        // Optional: Trace identifier
+    CanExpand:         true,              // Optional: Enable tool/agent expansion
+    SubAgents:         []*core.SubAgent{}, // Optional: Sub-agents for delegation
+    ExtraEngines:      map[string]llms.LLMEngine{}, // Optional: Different engines for sub-agents
 })
 
 // Add system agents after creation
@@ -174,7 +185,7 @@ mainAgent.AddSystemAgent(reasoningAgent)
 
 ## System Agents
 
-System agents are pre-defined specialized agents that can be added to your main agent. They provide common functionality like reasoning analysis and OS operations.
+System agents are pre-defined specialized agents that can be added to your main agent. They provide common functionality like reasoning analysis, OS operations, Git operations, coding assistance, and vector database operations.
 
 ### Reasoning Agent
 
@@ -209,6 +220,58 @@ agent.AddSystemAgent(osAgent)
 - Managing file resources
 
 **Note:** The OS agent operates within a restricted root directory for security. All file paths are validated to prevent directory traversal.
+
+### Git Agent
+
+The Git agent provides Git repository operations and version control capabilities.
+
+```go
+// Create and add Git agent with repository root
+gitAgent := agents.GitAgent(llm, "/path/to/repo")
+agent.AddSystemAgent(gitAgent)
+```
+
+**Use cases:**
+- Git repository operations (add, commit, push, pull)
+- Branch management
+- Viewing git status and logs
+- Managing version control
+
+### Coding Agent
+
+The coding agent specializes in code generation, analysis, and manipulation within a codebase.
+
+```go
+// Create and add coding agent with codebase root
+codingAgent := agents.CodingAgent(codingLLM, "/path/to/codebase")
+agent.AddSystemAgent(codingAgent)
+```
+
+**Use cases:**
+- Code generation and modification
+- Code analysis and review
+- Refactoring assistance
+- Codebase navigation
+
+**Note:** The coding agent can use a different LLM engine optimized for code tasks.
+
+### Vector Agent
+
+The vector agent provides semantic search and document indexing capabilities using vector databases.
+
+```go
+// Create and add vector agent with vector DB and embedding generator
+vectorAgent := agents.VectorAgent(llm, vectorDB, embeddingGenerator)
+agent.AddSystemAgent(vectorAgent)
+```
+
+**Use cases:**
+- Semantic document search
+- Document indexing and storage
+- Knowledge base queries
+- Similarity searches
+
+**Note:** Requires a vector database (e.g., Milvus) and an embedding generator (e.g., OpenAI embeddings) to be initialized separately.
 
 ## Advanced Features
 
@@ -245,14 +308,22 @@ agent := agents.NewAgent(&agents.AgentConfig{
 
 ### Hook System
 
-Register hooks for lifecycle events:
+Hooks are registered through plugins. Plugins can register hooks for various lifecycle events:
 
 ```go
-agent.on(agents.EventBeforeToolExecution, func(a *agents.Agent, toolCall *llms.ToolCall) error {
-    fmt.Printf("About to execute tool: %s\n", toolCall.Name)
-    return nil
-})
+// Hooks are registered via plugins, not directly on agents
+// See the Plugins section for more information on creating custom plugins
 ```
+
+Available hook events include:
+- `EventAgentInitialization` - Before agent initialization
+- `EventAgentInitialized` - After agent initialization
+- `EventBeforeToolExecution` - Before tool execution
+- `EventToolExecution` - After tool execution
+- `EventNewUserMessage` - When a new user message is received
+- `EventNewAssistantMessage` - When assistant generates a message
+- `EventNewChunk` - For each streaming chunk
+- And more (see `core.Events` for complete list)
 
 ## Plugins
 
@@ -280,7 +351,10 @@ func main() {
     ctx := context.Background()
     
     // Initialize LLM
-    llm, err := llms.GetTogetherAILLM(ctx, llms.Llama3170BInstructTurbo)
+    llm, err := llms.NewOpenAILLMBuilder("togetherai").
+        SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
+        SetCtx(ctx).
+        Build()
     if err != nil {
         panic(err)
     }
@@ -326,11 +400,12 @@ func main() {
 
 ## Environment Variables
 
-- `TOGETHERAI_API_KEY` - API key for TogetherAI
-- `DEEPSEEK_API_KEY` - API key for DeepSeek
-- `OPENAI_API_KEY` - API key for OpenAI
+- `AF_TOGETHERAI_API_KEY` - API key for TogetherAI
+- `AF_DEEPSEEK_API_KEY` - API key for DeepSeek
+- `AF_OPENAI_API_KEY` - API key for OpenAI
+- `AF_LOG_LEVEL` - Logging level (DEBUG, INFO, WARN, ERROR). Default: INFO
 
-Set via `.env` file or system environment variables.
+Set via `.env` file or system environment variables. Environment variables take precedence over `.env` file values.
 
 ## Project Structure
 
@@ -341,6 +416,7 @@ src/
 ├── core/            # Core interfaces and implementations
 ├── tools/           # Tool implementations
 ├── persistence/     # Conversation persistence
+├── integrations/    # External integrations (Milvus, embeddings)
 └── plugins/         # Plugin system
     ├── logger/      # Logger plugin
     └── todo/        # Todo plugin

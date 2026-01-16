@@ -15,6 +15,7 @@ func validateOperation(value any) error {
 		return fmt.Errorf("operation must be a string")
 	}
 	validOperations := map[string]bool{
+		"init":     true,
 		"status":   true,
 		"add":      true,
 		"commit":   true,
@@ -26,7 +27,7 @@ func validateOperation(value any) error {
 		"diff":     true,
 	}
 	if !validOperations[operation] {
-		return fmt.Errorf("invalid operation: %s. Must be one of: status, add, commit, push, pull, branch, checkout, log, diff", operation)
+		return fmt.Errorf("invalid operation: %s. Must be one of: init, status, add, commit, push, pull, branch, checkout, log, diff", operation)
 	}
 	return nil
 }
