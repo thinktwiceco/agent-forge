@@ -7,11 +7,14 @@ import (
 	"os"
 	"strings"
 
+	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/agents"
 	"github.com/thinktwice/agentForge/src/core"
+	"github.com/thinktwice/agentForge/src/integrations"
 	"github.com/thinktwice/agentForge/src/llms"
 	"github.com/thinktwice/agentForge/src/plugins/logger"
 	"github.com/thinktwice/agentForge/src/plugins/todo"
+	"github.com/thinktwice/agentForge/src/tools/vector"
 )
 
 const (
@@ -107,6 +110,33 @@ func onTodoUpdate(todos []*todo.TodoItem) {
 	fmt.Println("======== END TODO =========")
 }
 
+// initializeVectorComponents initializes Milvus and embedding generator for vector operations.
+// Returns the vectorDB, embeddingGenerator, and an error if initialization fails.
+func initializeVectorComponents() (core.VectorDB, core.EmbeddingGenerator, error) {
+	// Initialize Milvus for vector database
+	// Note: VectorDim should match your embedding model dimension (e.g., 1536 for text-embedding-3-small)
+	milvusConfig := integrations.MilvusConfig{
+		Host:           "localhost",
+		Port:           19530, // Default Milvus port
+		CollectionName: "agent_knowledge",
+		DefaultTopK:    10,
+		VectorDim:      1536, // text-embedding-3-small dimension
+		// Username and Password are optional if Milvus doesn't require authentication
+	}
+	milvusDB, err := integrations.NewMilvusDB(milvusConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize Milvus: %w", err)
+	}
+
+	// Initialize OpenAI embedding generator for vector tool
+	embeddingGenerator, err := integrations.NewOpenAIEmbeddingGenerator("", "text-embedding-3-small")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize embedding generator: %w", err)
+	}
+
+	return milvusDB, embeddingGenerator, nil
+}
+
 // initializeAgent creates and configures the agent with the specified provider
 func initializeAgent(provider string) (*agents.Agent, error) {
 
@@ -140,17 +170,34 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 		return nil, fmt.Errorf("unsupported provider: %s (supported: togetherai, openai, deepseek)", provider)
 	}
 
-	codebasePath := "/home/verte/Desktop/thinktwice-agent/cmd/chat"
+	codebasePath := "/home/verte/Desktop/thinktwice-agent"
 
 	// Create logger plugin with default rules and stdout output
 	loggerPlugin := logger.NewPlugin(logger.DefaultColorRules(), logger.DefaultLabelRules(), os.Stdout)
 	todoPlugin := todo.NewTodoPlugin(onTodoUpdate)
+
+	tools := []llms.Tool{}
+	// Initialize vector database components
+	var vectorDB core.VectorDB
+	var embeddingGenerator core.EmbeddingGenerator
+	vectorDB, embeddingGenerator, err = initializeVectorComponents()
+	if err != nil {
+		agentforge.Warn("Failed to initialize vector components: %v", err)
+		agentforge.Info("Application will continue without vector database capabilities. " +
+			"Vector operations will not be available.")
+	} else {
+		// Create vector database tool for main agent
+		vectorTool := vector.NewVectorTool(vectorDB, embeddingGenerator)
+		tools = append(tools, vectorTool)
+		agentforge.Info("Vector tool initialized successfully with Milvus")
+	}
 
 	// Create agent configuration
 	config := agents.AgentConfig{
 		LLMEngine:   llmEngine,
 		AgentName:   "Assistant",
 		Description: "A helpful assistant with reasoning capabilities",
+		Tone:        "keep-it-short",
 		Trace:       agents.TraceResponse,
 		CanExpand:   true,
 		SystemPrompt: `You are a testing agent
@@ -160,14 +207,30 @@ func initializeAgent(provider string) (*agents.Agent, error) {
 		MainAgent:   true,
 		Persistence: "json",
 		Plugins:     []core.Plugin{loggerPlugin, todoPlugin},
+		Tools:       tools,
 	}
 
 	// Create the agent
 	agent := agents.NewAgent(&config)
 
+	codingLLMEngine, err := llms.NewOpenAILLMBuilder("togetherai").
+		SetModel(llms.TOGETHERAI_Qwen3Coder480B).
+		Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create coding LLM: %w", err)
+	}
+
 	// Add system agents
 	agent.AddSystemAgent(agents.ReasoningAgent(llmEngine))
 	agent.AddSystemAgent(agents.OsAgent(llmEngine, codebasePath))
+	agent.AddSystemAgent(agents.CodingAgent(codingLLMEngine, codebasePath))
+
+	// Add vector agent if vector components were initialized successfully
+	if vectorDB != nil && embeddingGenerator != nil {
+		agent.AddSystemAgent(agents.VectorAgent(llmEngine, vectorDB, embeddingGenerator))
+		agentforge.Info("Vector agent initialized successfully")
+	}
 
 	return agent, nil
 }

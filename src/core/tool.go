@@ -15,10 +15,11 @@ type Hooks interface {
 // Parameter defines a tool parameter with validation
 type Parameter struct {
 	Name        string
-	Type        string // "string", "number", "boolean", "object", "array"
+	Type        string                 // "string", "number", "boolean", "object", "array"
 	Description string
 	Required    bool
-	Validator   func(value any) error // Optional custom validation
+	Items       map[string]interface{} // For array types, defines the schema of array items
+	Validator   func(value any) error  // Optional custom validation
 }
 
 // Tool is a universal tool implementation that satisfies both llms.Tool and agentforge.Discoverable interfaces
@@ -68,11 +69,16 @@ func (t *Tool) GetFunctionDefinition() llms.FunctionDefinition {
 	var required []string
 
 	for _, param := range t.Parameters {
-		properties[param.Name] = llms.FunctionObjectParameter{
+		prop := llms.FunctionObjectParameter{
 			Type_:       param.Type,
 			Description: param.Description,
 			Name:        param.Name,
 		}
+		// For array types, include items schema if provided
+		if param.Type == "array" && param.Items != nil {
+			prop.Items = param.Items
+		}
+		properties[param.Name] = prop
 		if param.Required {
 			required = append(required, param.Name)
 		}
