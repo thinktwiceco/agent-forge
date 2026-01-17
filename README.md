@@ -18,6 +18,7 @@ A powerful Go framework for building intelligent agents with LLM integration, to
   - [OS Agent](#os-agent)
   - [Git Agent](#git-agent)
   - [Coding Agent](#coding-agent)
+  - [Web Agent](#web-agent)
   - [Vector Agent](#vector-agent)
 - [Advanced Features](#advanced-features)
   - [Streaming Responses](#streaming-responses)
@@ -40,6 +41,8 @@ A powerful Go framework for building intelligent agents with LLM integration, to
 - 🔄 **Streaming Responses** - Real-time streaming of agent responses
 - 💾 **Conversation Persistence** - Built-in conversation history storage
 - 🔌 **Multiple LLM Providers** - Support for OpenAI, DeepSeek, TogetherAI, and OpenAI-compatible APIs
+- 🌐 **Web Automation** - Navigate, interact with, and extract content from web pages using headless browser
+- 📊 **Session Management** - Automatic browser session cleanup and resource management
 
 ## Installation
 
@@ -186,7 +189,7 @@ mainAgent.AddSystemAgent(reasoningAgent)
 
 ## System Agents
 
-System agents are pre-defined specialized agents that can be added to your main agent. They provide common functionality like reasoning analysis, OS operations, Git operations, coding assistance, and vector database operations.
+System agents are pre-defined specialized agents that can be added to your main agent. They provide common functionality like reasoning analysis, OS operations, Git operations, coding assistance, web automation, and vector database operations.
 
 ### Reasoning Agent
 
@@ -221,6 +224,42 @@ agent.AddSystemAgent(osAgent)
 - Managing file resources
 
 **Note:** The OS agent operates within a restricted root directory for security. All file paths are validated to prevent directory traversal.
+
+### Web Agent
+
+The Web agent provides web navigation, automation, and content extraction capabilities using a headless browser.
+
+```go
+// Create and add Web agent with working directory
+webAgent := agents.WebAgent(llm, "/path/to/working/dir")
+agent.AddSystemAgent(webAgent)
+```
+
+**Use cases:**
+- Web navigation and page interaction
+- Form filling and clicking elements
+- Screenshot capture
+- Content extraction and saving
+- JavaScript execution
+- Browser history navigation
+
+**Available actions:**
+- `navigate`: Navigate to a URL (automatically adds https:// if scheme is missing)
+- `click`: Click elements by CSS selector (with optional wait for visibility)
+- `type`: Type text into input fields (with optional field clearing)
+- `screenshot`: Capture page or element screenshots (saves to temp directory if path not provided)
+- `get_content`: Extract page content as HTML, plain text, or title
+- `save_content`: Save page content to file in `workingDir/web` directory (preferred when vector indexing is available)
+- `wait`: Wait for elements to appear or pages to load (configurable timeout)
+- `back`/`forward`: Navigate browser history
+- `evaluate`: Execute JavaScript code and return results
+- `close`: Close browser session and free resources
+
+**Note:** 
+- The Web agent maintains browser context across tool calls, preserving cookies, session, and history
+- Browser sessions are automatically cleaned up after 5 minutes of inactivity
+- When a vector/indexing system is available (check for "system-vector" in sub-agents), use `save_content` instead of `get_content` to enable the workflow: Save → Index → Semantic Search
+- After saving content with `save_content`, the main agent can delegate to the vector agent to index it for semantic search capabilities
 
 ### Git Agent
 
