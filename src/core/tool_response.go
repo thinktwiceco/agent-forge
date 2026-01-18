@@ -8,6 +8,7 @@ type ToolResponse struct {
 	error     string
 	data      string
 	ephemeral bool
+	cleanup   func() // Optional cleanup function
 }
 
 func (t *ToolResponse) Success() bool {
@@ -24,6 +25,10 @@ func (t *ToolResponse) Data() string {
 
 func (t *ToolResponse) Ephemeral() bool {
 	return t.ephemeral
+}
+
+func (t *ToolResponse) Cleanup() func() {
+	return t.cleanup
 }
 
 func NewEphemeralResponse(data string) llms.ToolReturn {

@@ -101,13 +101,34 @@ func (a *Agent) loadDelegateTool() {
 
 // initAgentContext builds the agent context struct with static fields
 // that don't change during the agent's lifetime.
+// Preserves SessionStorage and PluginFields if they already exist.
 func (a *Agent) initAgentContext() {
+	// Preserve existing SessionStorage when reinitializing, or create new if doesn't exist
+	var existingSessionStorage map[string]any
+	if a.agentContext != nil && a.agentContext.SessionStorage != nil {
+		existingSessionStorage = a.agentContext.SessionStorage
+	} else {
+		// Always initialize SessionStorage, never leave it nil
+		existingSessionStorage = make(map[string]any)
+	}
+
+	// Preserve existing PluginFields when reinitializing, or create new if doesn't exist
+	var existingPluginFields map[string]any
+	if a.agentContext != nil && a.agentContext.PluginFields != nil {
+		existingPluginFields = a.agentContext.PluginFields
+	} else {
+		// Always initialize PluginFields, never leave it nil
+		existingPluginFields = make(map[string]any)
+	}
+
 	a.agentContext = &core.AgentContext{
-		AgentName: a.Name(),
-		Trace:     a.Trace(),
-		Model:     fmt.Sprintf("%s-%s", a.config.LLMEngine.Provider(), a.config.LLMEngine.Model()),
-		Tools:     a.tools,
-		SubAgents: a.subAgents,
+		AgentName:      a.Name(),
+		Trace:          a.Trace(),
+		Model:          fmt.Sprintf("%s-%s", a.config.LLMEngine.Provider(), a.config.LLMEngine.Model()),
+		Tools:          a.tools,
+		SubAgents:      a.subAgents,
+		SessionStorage: existingSessionStorage, // Always a valid map, never nil
+		PluginFields:   existingPluginFields,   // Always a valid map, never nil
 	}
 }
 

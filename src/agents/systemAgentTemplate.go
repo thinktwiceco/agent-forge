@@ -224,6 +224,6 @@ func (t *SystemAgentTemplate) ToAgentConfig(llmEngine llms.LLMEngine) AgentConfi
 		AdvanceDescription: t.advanceDescription,
 		Troubleshooting:    t.troubleshooting,
 		MainAgent:          false,
-		Tone:               "system-agent",
+		Tone:               ToneSystemAgent,
 	}
 }

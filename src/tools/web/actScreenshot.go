@@ -28,13 +28,15 @@ func (w *WebBrowser) screenshot(agentContext map[string]any, args map[string]any
 	selector, hasSelector := args["selector"].(string)
 	if hasSelector && selector != "" {
 		if err := validateSelector(selector); err != nil {
+			w.sessionManager.RecordOperation(false)
 			return core.NewErrorResponse(fmt.Sprintf("invalid selector: %v", err))
 		}
 	}
 
 	// Get browser context
-	ctx, _, err := getOrCreateBrowser(agentContext)
+	ctx, err := getOrCreateBrowser(agentContext)
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get browser context: %v", err))
 	}
 
@@ -57,28 +59,31 @@ func (w *WebBrowser) screenshot(agentContext map[string]any, args map[string]any
 	}
 
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to take screenshot: %v", err))
 	}
 
 	// Save screenshot
 	err = os.WriteFile(screenshotPath, buf, 0644)
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to save screenshot to %s: %v", screenshotPath, err))
 	}
 
 	// Get file info
 	fileInfo, err := os.Stat(screenshotPath)
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get screenshot file info: %v", err))
 	}
 
-	response := &ScreenshotResponse{
+	response := &screenshotResponse{
 		Operation: "screenshot",
 		Path:      screenshotPath,
 		Size:      fileInfo.Size(),
 		Success:   true,
 	}
 
+	w.sessionManager.RecordOperation(true)
 	return core.NewSuccessResponse(response.String())
 }
-

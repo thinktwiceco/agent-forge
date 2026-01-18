@@ -61,4 +61,3 @@ func (git *Git) init() (string, error) {
 
 	return response.String(), nil
 }
-

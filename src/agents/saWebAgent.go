@@ -30,11 +30,20 @@ When given a task, analyze what web operations are needed:
 - What content needs to be extracted from pages?
 - What screenshots need to be taken?
 - What JavaScript needs to be executed?
-- Do elements need to wait for before interacting?`,
+- Do elements need to wait for before interacting?
+
+IMPORTANT - CONTENT RETRIEVAL WITH INDEXING:
+- Check if a vector/indexing system is available (look for "system-vector" in available sub-agents)
+- If indexing system is present, use save_content as the PREFERRED method for retrieving webpage content instead of get_content
+- This enables the workflow: Save → Index → Semantic Search
+- After saving content with save_content, the main agent can delegate to the vector agent to index it for semantic search capabilities
+- Use get_content only when you need immediate content access without indexing (e.g., quick verification)`,
 		// Steps
 		[]string{
 			"Identify what web operations are needed for the task",
-			"Determine the appropriate action (navigate, click, type, screenshot, get_content, wait, back, forward, evaluate)",
+			"Check if vector/indexing system is available (look for 'system-vector' in available sub-agents)",
+			"Determine the appropriate action (navigate, click, type, screenshot, get_content, save_content, wait, back, forward, evaluate)",
+			"If content retrieval is needed and indexing system is available, prefer save_content over get_content",
 			"Extract or prepare the required parameters for the operation",
 			"Execute the web operation using the web_browser tool",
 			"Format and return the results clearly",
@@ -42,17 +51,19 @@ When given a task, analyze what web operations are needed:
 		// Output format
 		`
 You will perform web operations using the web_browser tool. When executing operations:
-- Always specify the action parameter (navigate, click, type, screenshot, get_content, wait, back, forward, evaluate)
+- Always specify the action parameter (navigate, click, type, screenshot, get_content, save_content, wait, back, forward, evaluate)
 - For navigate: provide url parameter
 - For click: provide selector parameter (optionally wait_visible)
 - For type: provide selector and text parameters (optionally clear)
 - For screenshot: optionally provide path and selector parameters
 - For get_content: optionally provide type parameter ("html", "text", or "title")
+- For save_content: no additional parameters needed (saves to workingdirectory/web)
+- CONTENT RETRIEVAL: If a vector/indexing system is available (check available sub-agents for "system-vector"), use save_content as the PREFERRED method for retrieving webpage content instead of get_content. This enables indexing and semantic search capabilities.
 - For wait: optionally provide selector and timeout parameters
 - For back/forward: no parameters needed
 - For evaluate: provide script parameter (optionally return_value)
 - Provide clear feedback about what operations were performed
-- Include relevant information from results (URLs, page titles, screenshot paths, etc.)
+- Include relevant information from results (URLs, page titles, screenshot paths, file paths, etc.)
 - Report any errors or issues encountered`,
 		// Examples
 		[]string{`
@@ -117,6 +128,18 @@ This domain is for use in illustrative examples...
 
 Successfully extracted the text content from the page.`,
 			`
+'user': Save the content of this webpage for later search
+
+'assistant':
+I'll save the page content to a file. Since a vector/indexing system is available, I'll use save_content to enable indexing and semantic search capabilities.
+[Uses web_browser tool with action="save_content"]
+Web Browser Operation: Save Content
+Filename: example_com_1234567890.txt
+Path: /workingdirectory/web/example_com_1234567890.txt
+Status: Success
+
+Successfully saved the page content to example_com_1234567890.txt. The content can now be indexed via the vector agent for semantic search.`,
+			`
 'user': Wait for the element with id "loading" to disappear, then click the "continue" button
 
 'assistant':
@@ -161,17 +184,20 @@ The page title is "Example Domain".`,
 		},
 		// Critical rules
 		[]string{
-			`Always specify the action parameter (navigate, click, type, screenshot, get_content, wait, back, forward, evaluate)`,
+			`Always specify the action parameter (navigate, click, type, screenshot, get_content, save_content, wait, back, forward, evaluate)`,
 			`For navigate action: url parameter is required`,
 			`For click action: selector parameter is required, wait_visible is optional (default: true)`,
 			`For type action: selector and text parameters are required, clear is optional (default: true)`,
 			`For screenshot action: path and selector are optional (saves to temp file if path not provided)`,
 			`For get_content action: type parameter is optional ("html", "text", or "title", default: "text")`,
+			`For save_content action: no parameters needed (saves to workingdirectory/web)`,
+			`CONTENT RETRIEVAL PREFERENCE: If a vector/indexing system is available (check available sub-agents for "system-vector"), use save_content as the PREFERRED method for retrieving webpage content instead of get_content. This enables the workflow: Save → Index → Semantic Search`,
+			`Use get_content only when you need immediate content access without indexing (e.g., quick verification, simple text extraction)`,
 			`For wait action: selector and timeout are optional (default timeout: 30 seconds)`,
 			`For back/forward actions: no parameters needed`,
 			`For evaluate action: script parameter is required, return_value is optional (default: true)`,
 			`Provide clear feedback about what operations were performed and their results`,
-			`Include URLs, page titles, screenshot paths, and other relevant information in responses`,
+			`Include URLs, page titles, screenshot paths, file paths, and other relevant information in responses`,
 			`Report errors clearly and suggest solutions when operations fail`,
 			`Use wait action before interacting with dynamically loaded elements`,
 			`Browser context persists across tool calls, maintaining cookies and session`,
@@ -223,6 +249,10 @@ Advanced Details:
   * get_content: Get page content
     - Optional: type ("html", "text", or "title", default: "text")
     - Returns: content string
+  * save_content: Save page content to file (PREFERRED when vector/indexing system is available)
+    - No parameters needed
+    - Returns: filename and file path
+    - Enables workflow: Save → Index → Semantic Search when indexing system is present
   * wait: Wait for condition
     - Optional: selector, timeout (seconds, default: 30)
     - Returns: success status, waited duration
@@ -254,6 +284,11 @@ Advanced Details:
   * Execute arbitrary JavaScript code
   * Results are JSON-serialized for complex types
   * Can execute code without returning values
+- Content Retrieval with Indexing:
+  * When a vector/indexing system is available (check available sub-agents for "system-vector"), use save_content as the PREFERRED method for retrieving webpage content
+  * This enables the workflow: Save → Index → Semantic Search
+  * After saving content with save_content, the main agent can delegate to the vector agent to index it for semantic search capabilities
+  * Use get_content only when you need immediate content access without indexing (e.g., quick verification, simple text extraction)
 - Integration: Automatically available as a sub-agent when web operations are needed`)
 
 	// Add troubleshooting information
@@ -298,18 +333,18 @@ Troubleshooting:
 //
 // Parameters:
 //   - llmEngine: The LLM engine to use for this agent
+//   - workingDir: The working directory where save_content will save files (to workingDir/web)
 //
 // Returns:
 //   - *core.SubAgent: The Web agent as a sub-agent
-func WebAgent(llmEngine llms.LLMEngine) *core.SubAgent {
+func WebAgent(llmEngine llms.LLMEngine, workingDir string) *core.SubAgent {
 	webTemplate := createWebAgentTemplate()
 	webConfig := webTemplate.ToAgentConfig(llmEngine)
 
 	// Add web_browser tool
-	webTool := web.NewWebTool()
+	webTool := web.NewWebTool(workingDir)
 	webConfig.Tools = []llms.Tool{webTool}
 
 	webAgent := NewAgent(&webConfig)
 	return webAgent.AgentAsSubAgent()
 }
-

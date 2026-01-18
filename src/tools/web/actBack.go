@@ -12,8 +12,9 @@ import (
 // back handles the back action for the web browser tool.
 func (w *WebBrowser) back(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 	// Get browser context
-	ctx, _, err := getOrCreateBrowser(agentContext)
+	ctx, err := getOrCreateBrowser(agentContext)
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get browser context: %v", err))
 	}
 
@@ -31,15 +32,16 @@ func (w *WebBrowser) back(agentContext map[string]any, args map[string]any) llms
 	)
 
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to navigate back: %v", err))
 	}
 
-	response := &HistoryResponse{
+	response := &historyResponse{
 		Operation: "back",
 		URL:       currentURL,
 		Success:   true,
 	}
 
+	w.sessionManager.RecordOperation(true)
 	return core.NewSuccessResponse(response.String())
 }
-

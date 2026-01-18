@@ -14,17 +14,20 @@ func (w *WebBrowser) typeAction(agentContext map[string]any, args map[string]any
 	// Extract selector (required)
 	selector, ok := args["selector"].(string)
 	if !ok || selector == "" {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse("selector parameter is required for type action and must be a non-empty string")
 	}
 
 	// Extract text (required)
 	text, ok := args["text"].(string)
 	if !ok {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse("text parameter is required for type action and must be a string")
 	}
 
 	// Validate selector
 	if err := validateSelector(selector); err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("invalid selector: %v", err))
 	}
 
@@ -37,8 +40,9 @@ func (w *WebBrowser) typeAction(agentContext map[string]any, args map[string]any
 	}
 
 	// Get browser context
-	ctx, _, err := getOrCreateBrowser(agentContext)
+	ctx, err := getOrCreateBrowser(agentContext)
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get browser context: %v", err))
 	}
 
@@ -60,15 +64,16 @@ func (w *WebBrowser) typeAction(agentContext map[string]any, args map[string]any
 	err = chromedp.Run(timeoutCtx, actions...)
 
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to type into element '%s': %v", selector, err))
 	}
 
-	response := &TypeResponse{
+	response := &typeResponse{
 		Operation: "type",
 		Selector:  selector,
 		Success:   true,
 	}
 
+	w.sessionManager.RecordOperation(true)
 	return core.NewSuccessResponse(response.String())
 }
-

@@ -3,11 +3,21 @@ package web
 import (
 	"fmt"
 
+	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
+// GetSessionMetrics returns metrics about browser session usage.
+// This can be used for monitoring and observability.
+func GetSessionMetrics() SessionMetrics {
+	return globalSessionManager.GetMetrics()
+}
+
 // NewWebTool creates a new web browser tool that allows web navigation and automation.
+//
+// Parameters:
+//   - workingDir: The working directory where save_content will save files (to workingDir/web)
 //
 // Available actions:
 //   - navigate: Navigate to a URL
@@ -15,12 +25,13 @@ import (
 //   - type: Type text into an input field
 //   - screenshot: Take a screenshot of the page or element
 //   - get_content: Get page content (HTML, text, or title)
+//   - save_content: Extract content from webpage and save it to a file
 //   - wait: Wait for an element to appear or page to load
 //   - back: Navigate back in browser history
 //   - forward: Navigate forward in browser history
 //   - evaluate: Execute JavaScript and return result
-func NewWebTool() llms.Tool {
-	w := NewWebBrowser()
+func NewWebTool(workingDir string) llms.Tool {
+	w := NewWebBrowser(workingDir)
 
 	return &core.Tool{
 		Name:        "web_browser",
@@ -31,21 +42,25 @@ func NewWebTool() llms.Tool {
   * click: Click an element by CSS selector. Optionally waits for element to be visible first.
   * type: Type text into an input field. Optionally clears the field first.
   * screenshot: Take a screenshot of the entire page or a specific element. Saves to temp directory if path not provided.
-  * get_content: Get page content as HTML, plain text, or just the title.
+  * get_content: Extract content from current page or navigate to a URL and get its content as HTML, plain text, or title.
+  * save_content: Extract plain text content from current page and save it to a file in workingdirectory/web. Returns the filename. PREFERRED method for retrieving webpage content when a vector database/indexing system is available, as it enables the workflow: Save → Index → Semantic Search. When vector indexing is present, use save_content instead of get_content for content that may need to be searched later. After saving, content can be indexed via the vector agent for semantic search capabilities.
   * wait: Wait for an element to appear or page to load. Configurable timeout.
   * back: Navigate back in browser history.
   * forward: Navigate forward in browser history.
   * evaluate: Execute JavaScript code and return the result.
+  * close: Close the browser session and free resources.
 - Parameters:
-  * action (required): The action to perform: "navigate", "click", "type", "screenshot", "get_content", "wait", "back", "forward", or "evaluate"
-  * url (required for navigate): The URL to navigate to
+  * action (required): The action to perform: "navigate", "click", "type", "screenshot", "get_content", "save_content", "wait", "back", "forward", "evaluate", or "close"
+  * url: The URL to navigate to
+    - REQUIRED for 'navigate' action
+    - OPTIONAL for 'get_content' action (if not provided, extracts from current page; if provided, navigates first then extracts)
   * selector (required for click/type, optional for screenshot/wait): CSS selector for the element
   * text (required for type): Text to type into the input field
   * clear (optional for type): Whether to clear the field before typing (default: true)
   * wait_visible (optional for click): Whether to wait for element to be visible before clicking (default: true)
   * path (optional for screenshot): File path to save screenshot (defaults to temp file)
   * type (optional for get_content): Content type - "html", "text", or "title" (default: "text")
-  * timeout (optional for get_content/wait): Timeout in seconds (default: 60 for get_content, 30 for wait)
+  * timeout (optional for get_content/save_content/wait): Timeout in seconds (default: 60 for get_content/save_content, 30 for wait)
   * script (required for evaluate): JavaScript code to execute
   * return_value (optional for evaluate): Whether to return the result (default: true)
 - Behavior:
@@ -54,14 +69,19 @@ func NewWebTool() llms.Tool {
   * Screenshots are saved as PNG files
   * JavaScript evaluation returns JSON-serialized results for complex types
 - Usage:
-  * Use navigate to go to a webpage
+  * WORKFLOW 1 (Two-step - for interaction): Use navigate to go to a webpage, then use other actions (click, type, screenshot, get_content, save_content)
+  * WORKFLOW 2 (One-step - for quick content extraction): Use get_content with url parameter to navigate and extract in one call
+  * After navigation, get_content without url parameter extracts from current page
+  * CONTENT RETRIEVAL PREFERENCE: When a vector database/indexing system is available (check available sub-agents), use save_content as the PREFERRED method for retrieving webpage content instead of get_content. This enables the workflow: Save → Index → Semantic Search. The saved content can then be indexed via the vector agent for semantic search capabilities.
+  * Use get_content when you only need immediate content access without indexing (e.g., quick verification, simple text extraction)
+  * Use save_content when content may need to be searched later or when vector indexing is available
   * Use click to interact with buttons and links
   * Use type to fill forms
   * Use screenshot to capture page state
-  * Use get_content to extract page information
   * Use wait to ensure elements are loaded before interaction
   * Use back/forward to navigate browser history
-  * Use evaluate to execute custom JavaScript`,
+  * Use evaluate to execute custom JavaScript
+  * Use close when done to free browser resources`,
 		TroubleshootingInfo: `Troubleshooting:
 - If navigate fails: Ensure URL is valid and accessible. Check network connectivity.
 - If click fails: Verify selector is correct and element exists on the page. Use wait action first if element loads dynamically.
@@ -78,14 +98,14 @@ func NewWebTool() llms.Tool {
 			{
 				Name:        "action",
 				Type:        "string",
-				Description: "The action to perform: 'navigate', 'click', 'type', 'screenshot', 'get_content', 'wait', 'back', 'forward', or 'evaluate'",
+				Description: "The action to perform: 'navigate', 'click', 'type', 'screenshot', 'get_content', 'save_content', 'wait', 'back', 'forward', 'evaluate', or 'close'",
 				Required:    true,
 				Validator:   validateAction,
 			},
 			{
 				Name:        "url",
 				Type:        "string",
-				Description: "The URL to navigate to (required for 'navigate' action)",
+				Description: "The URL to navigate to. REQUIRED for 'navigate'. OPTIONAL for 'get_content' (if omitted, extracts from current page)",
 				Required:    false,
 			},
 			{
@@ -149,6 +169,8 @@ func NewWebTool() llms.Tool {
 				return core.NewErrorResponse("action parameter is required and must be a string")
 			}
 
+			agentforge.Info("Action: ---> %s", action)
+
 			switch action {
 			case "navigate":
 				return w.navigate(agentContext, args)
@@ -160,6 +182,8 @@ func NewWebTool() llms.Tool {
 				return w.screenshot(agentContext, args)
 			case "get_content":
 				return w.getContent(agentContext, args)
+			case "save_content":
+				return w.saveContent(agentContext, args)
 			case "wait":
 				return w.wait(agentContext, args)
 			case "back":
@@ -168,10 +192,11 @@ func NewWebTool() llms.Tool {
 				return w.forward(agentContext, args)
 			case "evaluate":
 				return w.evaluate(agentContext, args)
+			case "close":
+				return w.close(agentContext, args)
 			default:
-				return core.NewErrorResponse(fmt.Sprintf("unknown action: %s. Valid actions are: navigate, click, type, screenshot, get_content, wait, back, forward, evaluate", action))
+				return core.NewErrorResponse(fmt.Sprintf("unknown action: %s. Valid actions are: navigate, click, type, screenshot, get_content, save_content, wait, back, forward, evaluate, close", action))
 			}
 		},
 	}
 }
-

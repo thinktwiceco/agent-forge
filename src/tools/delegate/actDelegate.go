@@ -65,6 +65,11 @@ func (d *Delegate) delegate(ctx map[string]any, subAgentName string, message str
 		}
 	}
 
+	// Store the subagent message content in the agent context
+	// The context map will be synced back to the struct by executeTool() after execution
+	agentContext.SetLastSubagentMessage(fullResponse)
+	ctx["lastSubagentMessage"] = fullResponse
+
 	// Return the accumulated result
 	if delegationError != nil {
 		return core.NewFailureResponse(delegationError.Error(), fullResponse)

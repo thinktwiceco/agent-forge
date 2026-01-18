@@ -12,8 +12,9 @@ import (
 // forward handles the forward action for the web browser tool.
 func (w *WebBrowser) forward(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 	// Get browser context
-	ctx, _, err := getOrCreateBrowser(agentContext)
+	ctx, err := getOrCreateBrowser(agentContext)
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get browser context: %v", err))
 	}
 
@@ -31,15 +32,16 @@ func (w *WebBrowser) forward(agentContext map[string]any, args map[string]any) l
 	)
 
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to navigate forward: %v", err))
 	}
 
-	response := &HistoryResponse{
+	response := &historyResponse{
 		Operation: "forward",
 		URL:       currentURL,
 		Success:   true,
 	}
 
+	w.sessionManager.RecordOperation(true)
 	return core.NewSuccessResponse(response.String())
 }
-

@@ -14,11 +14,13 @@ func (w *WebBrowser) click(agentContext map[string]any, args map[string]any) llm
 	// Extract selector (required)
 	selector, ok := args["selector"].(string)
 	if !ok || selector == "" {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse("selector parameter is required for click action and must be a non-empty string")
 	}
 
 	// Validate selector
 	if err := validateSelector(selector); err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("invalid selector: %v", err))
 	}
 
@@ -31,8 +33,9 @@ func (w *WebBrowser) click(agentContext map[string]any, args map[string]any) llm
 	}
 
 	// Get browser context
-	ctx, _, err := getOrCreateBrowser(agentContext)
+	ctx, err := getOrCreateBrowser(agentContext)
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get browser context: %v", err))
 	}
 
@@ -55,15 +58,16 @@ func (w *WebBrowser) click(agentContext map[string]any, args map[string]any) llm
 	err = chromedp.Run(timeoutCtx, actions...)
 
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to click element '%s': %v", selector, err))
 	}
 
-	response := &ClickResponse{
+	response := &clickResponse{
 		Operation: "click",
 		Selector:  selector,
 		Success:   true,
 	}
 
+	w.sessionManager.RecordOperation(true)
 	return core.NewSuccessResponse(response.String())
 }
-

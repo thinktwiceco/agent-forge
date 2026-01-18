@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/chromedp/chromedp"
+	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 )
@@ -22,46 +22,63 @@ func (w *WebBrowser) getContent(agentContext map[string]any, args map[string]any
 			"title": true,
 		}
 		if !validTypes[ct] {
+			w.sessionManager.RecordOperation(false)
 			return core.NewErrorResponse(fmt.Sprintf("invalid content type: %s. Must be one of: html, text, title", ct))
 		}
 		contentType = ct
 	}
 
 	// Extract timeout (optional, default: 60 seconds)
-	timeoutDuration := defaultTimeout
-	if ts, ok := args["timeout"]; ok {
-		switch v := ts.(type) {
-		case float64:
-			timeoutDuration = time.Duration(v) * time.Second
-		case int:
-			timeoutDuration = time.Duration(v) * time.Second
-		case int64:
-			timeoutDuration = time.Duration(v) * time.Second
-		}
-		if timeoutDuration <= 0 {
-			return core.NewErrorResponse("timeout must be greater than 0")
+	timeoutDuration, err := parseTimeout(args, "timeout", defaultTimeout)
+	if err != nil {
+		w.sessionManager.RecordOperation(false)
+		return core.NewErrorResponse(err.Error())
+	}
+
+	// Extract URL (optional - if provided, navigate first; if not, use current page)
+	urlStr, hasURL := args["url"].(string)
+	var normalizedURL string
+	if hasURL && urlStr != "" {
+		// Normalize and validate URL
+		normalizedURL, err = normalizeURL(urlStr)
+		if err != nil {
+			w.sessionManager.RecordOperation(false)
+			return core.NewErrorResponse(fmt.Sprintf("invalid URL: %v", err))
 		}
 	}
 
-	// Get browser context
-	ctx, _, err := getOrCreateBrowser(agentContext)
+	// Get or create browser context (reuses existing browser from previous navigate)
+	ctx, err := getOrCreateBrowser(agentContext)
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get browser context: %v", err))
 	}
 
-	// Create timeout context
+	// Create timeout context for this operation only
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, timeoutDuration)
 	defer timeoutCancel()
 
 	var content string
 
-	// Wait for page to be ready before extracting content
-	// This ensures the page has loaded and is ready for content extraction
-	err = chromedp.Run(timeoutCtx,
-		chromedp.WaitVisible("body", chromedp.ByQuery),
-	)
-	if err != nil {
-		return core.NewErrorResponse(fmt.Sprintf("failed to wait for page to load: %v", err))
+	// Navigate to URL if provided, otherwise use current page
+	if hasURL && normalizedURL != "" {
+		err = chromedp.Run(timeoutCtx,
+			chromedp.Navigate(normalizedURL),
+			chromedp.WaitVisible("body", chromedp.ByQuery),
+		)
+		if err != nil {
+			w.sessionManager.RecordOperation(false)
+			return core.NewErrorResponse(fmt.Sprintf("failed to navigate to %s: %v", normalizedURL, err))
+		}
+	} else {
+		// Ensure current page is ready
+		err = chromedp.Run(timeoutCtx,
+			chromedp.WaitVisible("body", chromedp.ByQuery),
+		)
+		if err != nil {
+			w.sessionManager.RecordOperation(false)
+			return core.NewErrorResponse(fmt.Sprintf("no page loaded in browser. Use navigate action first or provide url parameter: %v", err))
+		}
 	}
 
 	// Strip unwanted content (navigation, ads, sidebars, etc.) before extraction
@@ -71,6 +88,7 @@ func (w *WebBrowser) getContent(agentContext map[string]any, args map[string]any
 		if err != nil {
 			// Log error but don't fail - continue with content extraction
 			// Some pages might have elements that can't be removed, which is fine
+			agentforge.Info("Warning: failed to strip unwanted content: %v", err)
 		}
 	}
 
@@ -91,19 +109,20 @@ func (w *WebBrowser) getContent(agentContext map[string]any, args map[string]any
 	}
 
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get %s content: %v", contentType, err))
 	}
 
 	// Clean up content
 	content = strings.TrimSpace(content)
 
-	response := &ContentResponse{
+	response := &contentResponse{
 		Operation: "get_content",
 		Type:      contentType,
 		Content:   content,
 		Success:   true,
 	}
 
+	w.sessionManager.RecordOperation(true)
 	return core.NewSuccessResponse(response.String())
 }
-

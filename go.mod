@@ -3,21 +3,20 @@ module github.com/thinktwice/agentForge
 go 1.24.11
 
 require (
-	github.com/amikos-tech/chroma-go v0.2.5
+	github.com/chromedp/chromedp v0.9.5
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
+	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/milvus-io/milvus/client/v2 v2.6.2
 	github.com/openai/openai-go/v3 v3.8.1
 )
 
 require (
-	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chromedp/cdproto v0.0.0-20240202021202-6d0b6a386732 // indirect
-	github.com/chromedp/chromedp v0.9.5 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/cilium/ebpf v0.11.0 // indirect
 	github.com/cockroachdb/errors v1.9.1 // indirect
@@ -60,7 +59,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
 	github.com/panjf2000/ants/v2 v2.11.3 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -91,7 +89,6 @@ require (
 	github.com/uber/jaeger-client-go v2.30.0+incompatible // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
-	github.com/yalue/onnxruntime_go v1.22.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.5 // indirect
