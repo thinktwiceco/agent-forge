@@ -2,8 +2,8 @@ package web
 
 import "fmt"
 
-// NavigateResponse represents a navigation operation result.
-type NavigateResponse struct {
+// navigateResponse represents a navigation operation result.
+type navigateResponse struct {
 	Operation string
 	URL       string
 	Title     string
@@ -12,7 +12,7 @@ type NavigateResponse struct {
 }
 
 // String formats the navigate response as a string.
-func (r *NavigateResponse) String() string {
+func (r *navigateResponse) String() string {
 	result := fmt.Sprintf(`Web Browser Operation: Navigate
 URL: %s
 Status: %s
@@ -29,8 +29,8 @@ Status: %s
 	return result
 }
 
-// ClickResponse represents a click operation result.
-type ClickResponse struct {
+// clickResponse represents a click operation result.
+type clickResponse struct {
 	Operation string
 	Selector  string
 	Success   bool
@@ -38,7 +38,7 @@ type ClickResponse struct {
 }
 
 // String formats the click response as a string.
-func (r *ClickResponse) String() string {
+func (r *clickResponse) String() string {
 	result := fmt.Sprintf(`Web Browser Operation: Click
 Selector: %s
 Status: %s
@@ -51,8 +51,8 @@ Status: %s
 	return result
 }
 
-// TypeResponse represents a type operation result.
-type TypeResponse struct {
+// typeResponse represents a type operation result.
+type typeResponse struct {
 	Operation string
 	Selector  string
 	Success   bool
@@ -60,7 +60,7 @@ type TypeResponse struct {
 }
 
 // String formats the type response as a string.
-func (r *TypeResponse) String() string {
+func (r *typeResponse) String() string {
 	result := fmt.Sprintf(`Web Browser Operation: Type
 Selector: %s
 Status: %s
@@ -73,8 +73,8 @@ Status: %s
 	return result
 }
 
-// ScreenshotResponse represents a screenshot operation result.
-type ScreenshotResponse struct {
+// screenshotResponse represents a screenshot operation result.
+type screenshotResponse struct {
 	Operation string
 	Path      string
 	Size      int64
@@ -83,7 +83,7 @@ type ScreenshotResponse struct {
 }
 
 // String formats the screenshot response as a string.
-func (r *ScreenshotResponse) String() string {
+func (r *screenshotResponse) String() string {
 	result := fmt.Sprintf(`Web Browser Operation: Screenshot
 Path: %s
 Size: %d bytes
@@ -97,8 +97,8 @@ Status: %s
 	return result
 }
 
-// ContentResponse represents a get_content operation result.
-type ContentResponse struct {
+// contentResponse represents a get_content operation result.
+type contentResponse struct {
 	Operation string
 	Type      string
 	Content   string
@@ -107,7 +107,7 @@ type ContentResponse struct {
 }
 
 // String formats the content response as a string.
-func (r *ContentResponse) String() string {
+func (r *contentResponse) String() string {
 	result := fmt.Sprintf(`Web Browser Operation: Get Content
 Type: %s
 Status: %s
@@ -129,8 +129,8 @@ Status: %s
 	return result
 }
 
-// WaitResponse represents a wait operation result.
-type WaitResponse struct {
+// waitResponse represents a wait operation result.
+type waitResponse struct {
 	Operation string
 	Selector  string
 	Timeout   int
@@ -140,7 +140,7 @@ type WaitResponse struct {
 }
 
 // String formats the wait response as a string.
-func (r *WaitResponse) String() string {
+func (r *waitResponse) String() string {
 	result := fmt.Sprintf(`Web Browser Operation: Wait
 Selector: %s
 Timeout: %d seconds
@@ -155,8 +155,8 @@ Status: %s
 	return result
 }
 
-// HistoryResponse represents a browser history navigation result.
-type HistoryResponse struct {
+// historyResponse represents a browser history navigation result.
+type historyResponse struct {
 	Operation string
 	URL       string
 	Success   bool
@@ -164,7 +164,7 @@ type HistoryResponse struct {
 }
 
 // String formats the history response as a string.
-func (r *HistoryResponse) String() string {
+func (r *historyResponse) String() string {
 	result := fmt.Sprintf(`Web Browser Operation: %s
 URL: %s
 Status: %s
@@ -177,8 +177,8 @@ Status: %s
 	return result
 }
 
-// EvaluateResponse represents a JavaScript evaluation result.
-type EvaluateResponse struct {
+// evaluateResponse represents a JavaScript evaluation result.
+type evaluateResponse struct {
 	Operation string
 	Result    string
 	Success   bool
@@ -186,7 +186,7 @@ type EvaluateResponse struct {
 }
 
 // String formats the evaluate response as a string.
-func (r *EvaluateResponse) String() string {
+func (r *evaluateResponse) String() string {
 	result := fmt.Sprintf(`Web Browser Operation: Evaluate JavaScript
 Status: %s
 `, map[bool]string{true: "Success", false: "Failed"}[r.Success])
@@ -207,3 +207,26 @@ Status: %s
 	return result
 }
 
+// saveContentResponse represents a save_content operation result.
+type saveContentResponse struct {
+	Operation string
+	Filename  string
+	Path      string
+	Success   bool
+	Error     string
+}
+
+// String formats the save_content response as a string.
+func (r *saveContentResponse) String() string {
+	result := fmt.Sprintf(`Web Browser Operation: Save Content
+Filename: %s
+Path: %s
+Status: %s
+`, r.Filename, r.Path, map[bool]string{true: "Success", false: "Failed"}[r.Success])
+
+	if r.Error != "" {
+		result += fmt.Sprintf("Error: %s\n", r.Error)
+	}
+
+	return result
+}

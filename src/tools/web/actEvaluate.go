@@ -15,6 +15,7 @@ func (w *WebBrowser) evaluate(agentContext map[string]any, args map[string]any) 
 	// Extract script (required)
 	script, ok := args["script"].(string)
 	if !ok || script == "" {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse("script parameter is required for evaluate action and must be a non-empty string")
 	}
 
@@ -26,9 +27,14 @@ func (w *WebBrowser) evaluate(agentContext map[string]any, args map[string]any) 
 		}
 	}
 
+	// Wrap script in an IIFE to allow return statements
+	// This fixes "Illegal return statement" errors
+	wrappedScript := wrapJavaScript(script)
+
 	// Get browser context
-	ctx, _, err := getOrCreateBrowser(agentContext)
+	ctx, err := getOrCreateBrowser(agentContext)
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get browser context: %v", err))
 	}
 
@@ -41,16 +47,17 @@ func (w *WebBrowser) evaluate(agentContext map[string]any, args map[string]any) 
 	// Execute JavaScript
 	if returnValue {
 		err = chromedp.Run(timeoutCtx,
-			chromedp.Evaluate(script, &result),
+			chromedp.Evaluate(wrappedScript, &result),
 		)
 	} else {
 		err = chromedp.Run(timeoutCtx,
-			chromedp.Evaluate(script, nil),
+			chromedp.Evaluate(wrappedScript, nil),
 		)
 		result = "Script executed successfully (no return value)"
 	}
 
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to evaluate JavaScript: %v", err))
 	}
 
@@ -72,12 +79,12 @@ func (w *WebBrowser) evaluate(agentContext map[string]any, args map[string]any) 
 		resultStr = "null"
 	}
 
-	response := &EvaluateResponse{
+	response := &evaluateResponse{
 		Operation: "evaluate",
 		Result:    resultStr,
 		Success:   true,
 	}
 
+	w.sessionManager.RecordOperation(true)
 	return core.NewSuccessResponse(response.String())
 }
-

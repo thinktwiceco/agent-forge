@@ -38,3 +38,13 @@ const (
 	// This is used for pattern matching in formatting logic
 	TraceThinking = "thinking"
 )
+
+// Tone configuration values
+const (
+	// ToneKeepItShort instructs the agent to remain concise and to the point
+	ToneKeepItShort = "keep-it-short"
+	// ToneSystemAgent instructs the agent to provide detailed responses for system agents
+	ToneSystemAgent = "system-agent"
+	// ToneDefault is the default tone (empty string, no special instructions)
+	ToneDefault = ""
+)

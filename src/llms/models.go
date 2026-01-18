@@ -21,6 +21,7 @@ type ToolResult struct {
 	Result     string `json:"result"`     // Result data from the tool
 	Error      string `json:"error"`      // Error message if tool failed
 	Ephemeral  bool   `json:"ephemeral"`  // Whether the result is ephemeral
+	Cleanup    func() `json:"-"`          // Optional cleanup function (not serialized)
 }
 
 // ChunkResponse represents a streaming response chunk.

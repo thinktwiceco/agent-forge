@@ -9,6 +9,29 @@ import (
 // ===== System Prompt Management
 // ==============================
 
+// getTonePrompt returns the default system prompt instructions for the given tone.
+// Returns empty string if tone is empty or unknown.
+func getTonePrompt(tone string) string {
+	switch tone {
+	case ToneKeepItShort:
+		return `RESPONSE TONE:
+- Remain concise and to the point
+- Answer only what is asked, nothing more
+- Keep responses brief while maintaining accuracy
+- Avoid unnecessary elaboration or verbose explanations
+- Stay focused on the specific question or task at hand
+`
+	case ToneSystemAgent:
+		return `RESPONSE TONE:
+- You are a system agent. You need to provide detailed responses
+to the main agent. You don't need to impress anyone.
+only returns what's asked and perform your duty as a good system agent!
+`
+	default:
+		return ""
+	}
+}
+
 func (a *Agent) addSystemPrompt() {
 	a.systemPrompt = a.config.SystemPrompt
 
@@ -46,22 +69,8 @@ RESPOND DIRECTLY (no tool calls) for:
 - Questions you can answer from your context
 - Questions about your capabilities or sub-agents list
 `
-		if a.config.Tone == "keep-it-short" {
-			a.systemPrompt += `
-RESPONSE TONE:
-- Remain concise and to the point
-- Answer only what is asked, nothing more
-- Keep responses brief while maintaining accuracy
-- Avoid unnecessary elaboration or verbose explanations
-- Stay focused on the specific question or task at hand
-`
-		} else if a.config.Tone == "system-agent" {
-			a.systemPrompt += `
-RESPONSE TONE:
-- You are a system agent. You need to provide detailed responses
-to the main agent. You don't need to impress anyone.
-only returns what's asked and perform your duty as a good system agent!
-`
+		if tonePrompt := getTonePrompt(a.config.Tone); tonePrompt != "" {
+			a.systemPrompt += "\n" + tonePrompt
 		}
 	}
 }

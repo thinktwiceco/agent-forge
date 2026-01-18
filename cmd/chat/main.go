@@ -14,6 +14,7 @@ import (
 	"github.com/thinktwice/agentForge/src/llms"
 	"github.com/thinktwice/agentForge/src/plugins/logger"
 	"github.com/thinktwice/agentForge/src/plugins/todo"
+	"github.com/thinktwice/agentForge/src/tools/fs"
 )
 
 const (
@@ -142,14 +143,14 @@ func initializeAgent() (*agents.Agent, error) {
 		return nil, fmt.Errorf("failed to create OpenAI LLM: %w", err)
 	}
 
-	TogetherAIMultiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
-		SetModel(llms.TOGETHERAI_ZaiGLM47).
-		SetCheapModel(llms.TOGETHERAI_Llama323BInstructTurbo).
-		Build()
+	// TogetherAIMultiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
+	// 	SetModel(llms.TOGETHERAI_ZaiGLM47).
+	// 	SetCheapModel(llms.TOGETHERAI_Llama323BInstructTurbo).
+	// 	Build()
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to create TogetherAI LLM: %w", err)
-	}
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create TogetherAI LLM: %w", err)
+	// }
 
 	DeepSeekMultiModelLLM, err := llms.NewOpenAILLMBuilder("deepseek").
 		SetModel(llms.DEEPSEEK_CHAT).
@@ -167,16 +168,18 @@ func initializeAgent() (*agents.Agent, error) {
 	// Define the LLM Engines
 	mainAgentLLM := OpenAImultiModelLLM.MainModel()
 	codingAgentLLM := codingMultiModelLLM.MainModel()
-	reasoningAgentLLM := DeepSeekMultiModelLLM.ReasoningModel()
-	multipurposeAgentLLM := TogetherAIMultiModelLLM.CheapModel()
+	reasoningAgentLLM := DeepSeekMultiModelLLM.MainModel()
+	multipurposeAgentLLM := DeepSeekMultiModelLLM.MainModel()
 
-	codebasePath := "/home/verte/Desktop/thinktwice-agent"
+	sandboxPath := "/home/verte/Desktop/sandbox"
 
 	// Create logger plugin with default rules and stdout output
 	loggerPlugin := logger.NewPlugin(logger.DefaultColorRules(), logger.DefaultLabelRules(), os.Stdout)
 	todoPlugin := todo.NewTodoPlugin(onTodoUpdate)
 
-	tools := []llms.Tool{}
+	tools := []llms.Tool{
+		fs.NewFsTool(sandboxPath),
+	}
 	// Add web browser tool
 
 	// Initialize vector database components
@@ -194,7 +197,7 @@ func initializeAgent() (*agents.Agent, error) {
 		LLMEngine:   mainAgentLLM,
 		AgentName:   "Assistant",
 		Description: "A helpful assistant with reasoning capabilities",
-		Tone:        "keep-it-short",
+		Tone:        agents.ToneKeepItShort,
 		Trace:       agents.TraceResponse,
 		CanExpand:   true,
 		SystemPrompt: `You are a testing agent
@@ -215,11 +218,10 @@ func initializeAgent() (*agents.Agent, error) {
 	}
 
 	// Add system agents
-	agent.AddSystemAgent(agents.GitAgent(multipurposeAgentLLM, codebasePath))
+	agent.AddSystemAgent(agents.GitAgent(multipurposeAgentLLM, sandboxPath))
 	agent.AddSystemAgent(agents.ReasoningAgent(reasoningAgentLLM))
-	agent.AddSystemAgent(agents.OsAgent(multipurposeAgentLLM, codebasePath))
-	agent.AddSystemAgent(agents.CodingAgent(codingAgentLLM, codebasePath))
-	agent.AddSystemAgent(agents.WebAgent(multipurposeAgentLLM))
+	agent.AddSystemAgent(agents.CodingAgent(codingAgentLLM, sandboxPath))
+	agent.AddSystemAgent(agents.WebAgent(multipurposeAgentLLM, sandboxPath))
 
 	// Add vector agent if vector components were initialized successfully
 	if vectorDB != nil && embeddingGenerator != nil {

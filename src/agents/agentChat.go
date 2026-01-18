@@ -14,6 +14,7 @@ import (
 // It handles streaming responses, tool call detection, execution, and iteration.
 func (a *Agent) executeChatWithTools() error {
 	iteration := 0
+	var cleanupFuncs []func() // Accumulate cleanup functions from all tool executions
 
 	for iteration < a.config.MaxToolIterations {
 		iteration++
@@ -188,6 +189,11 @@ func (a *Agent) executeChatWithTools() error {
 			// Find and execute the tool
 			toolResult := a.executeTool(toolCall)
 
+			// Accumulate cleanup function if present
+			if toolResult.Cleanup != nil {
+				cleanupFuncs = append(cleanupFuncs, toolResult.Cleanup)
+			}
+
 			errs = a.hooks.toolExecutionEvent(a, &toolResult)
 			logHookErrors(errs)
 
@@ -217,6 +223,16 @@ func (a *Agent) executeChatWithTools() error {
 		agentforge.Debug("Completed iteration %d, continuing to next iteration with tool results in history", iteration)
 	}
 
+	// Execute all accumulated cleanup functions in reverse order (LIFO)
+	if len(cleanupFuncs) > 0 {
+		agentforge.Debug("Executing %d cleanup functions", len(cleanupFuncs))
+		for i := len(cleanupFuncs) - 1; i >= 0; i-- {
+			if cleanupFuncs[i] != nil {
+				cleanupFuncs[i]()
+			}
+		}
+	}
+
 	// If we reached max iterations, return error
 	agentforge.Debug("Reached maximum tool iterations (%d)", a.config.MaxToolIterations)
 	return fmt.Errorf("reached maximum tool iterations (%d)", a.config.MaxToolIterations)
@@ -224,6 +240,10 @@ func (a *Agent) executeChatWithTools() error {
 
 // executeTool finds and executes a tool by name.
 func (a *Agent) executeTool(toolCall llms.ToolCall) llms.ToolResult {
+	// Call contextBuildEvent hook to allow plugins to modify context before building
+	errs := a.hooks.contextBuildEvent(a, a.agentContext)
+	logHookErrors(errs)
+
 	// Build agent context from pre-built context struct
 	agentContext := a.agentContext.BuildContext(a.responseCh)
 
@@ -249,6 +269,12 @@ func (a *Agent) executeTool(toolCall llms.ToolCall) llms.ToolResult {
 	// Execute the tool
 	result := tool.Call(agentContext, toolCall.Arguments)
 
+	// Sync changes from context map back to struct to ensure persistence
+	// This ensures mutable fields (e.g., LastSubagentMessage, PluginFields) persist across tool calls
+	if err := a.agentContext.SyncFromMap(agentContext); err != nil {
+		agentforge.Debug("Warning: failed to sync context after tool execution: %v", err)
+	}
+
 	// Convert to ToolResult
 	return llms.ToolResult{
 		ToolCallID: toolCall.ID,
@@ -257,5 +283,6 @@ func (a *Agent) executeTool(toolCall llms.ToolCall) llms.ToolResult {
 		Result:     result.Data(),
 		Error:      result.Error(),
 		Ephemeral:  result.Ephemeral(),
+		Cleanup:    result.Cleanup(),
 	}
 }

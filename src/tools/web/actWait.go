@@ -16,36 +16,27 @@ func (w *WebBrowser) wait(agentContext map[string]any, args map[string]any) llms
 	selector, hasSelector := args["selector"].(string)
 	if hasSelector && selector != "" {
 		if err := validateSelector(selector); err != nil {
+			w.sessionManager.RecordOperation(false)
 			return core.NewErrorResponse(fmt.Sprintf("invalid selector: %v", err))
 		}
 	}
 
 	// Extract timeout (optional, default: 30 seconds)
-	timeoutSeconds := 30
-	if ts, ok := args["timeout"]; ok {
-		switch v := ts.(type) {
-		case float64:
-			timeoutSeconds = int(v)
-		case int:
-			timeoutSeconds = v
-		case int64:
-			timeoutSeconds = int(v)
-		default:
-			return core.NewErrorResponse("timeout parameter must be a number")
-		}
-		if timeoutSeconds <= 0 {
-			return core.NewErrorResponse("timeout must be greater than 0")
-		}
+	defaultWaitTimeout := 30 * time.Second
+	timeoutDuration, err := parseTimeout(args, "timeout", defaultWaitTimeout)
+	if err != nil {
+		w.sessionManager.RecordOperation(false)
+		return core.NewErrorResponse(err.Error())
 	}
 
 	// Get browser context
-	ctx, _, err := getOrCreateBrowser(agentContext)
+	ctx, err := getOrCreateBrowser(agentContext)
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get browser context: %v", err))
 	}
 
 	// Create timeout context
-	timeoutDuration := time.Duration(timeoutSeconds) * time.Second
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, timeoutDuration)
 	defer timeoutCancel()
 
@@ -66,17 +57,18 @@ func (w *WebBrowser) wait(agentContext map[string]any, args map[string]any) llms
 	waited := time.Since(startTime).Seconds()
 
 	if err != nil {
+		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("wait failed: %v", err))
 	}
 
-	response := &WaitResponse{
+	response := &waitResponse{
 		Operation: "wait",
 		Selector:  selector,
-		Timeout:   timeoutSeconds,
+		Timeout:   int(timeoutDuration.Seconds()),
 		Waited:    waited,
 		Success:   true,
 	}
 
+	w.sessionManager.RecordOperation(true)
 	return core.NewSuccessResponse(response.String())
 }
-

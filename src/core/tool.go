@@ -96,6 +96,24 @@ func (t *Tool) GetFunctionDefinition() llms.FunctionDefinition {
 }
 
 // Call executes the tool with validation (implements llms.Tool)
+//
+// Tool Usage Guidelines:
+//   - Tools receive agentContext as a map[string]any for read access
+//   - Tools can read any field from the context map directly
+//   - Tools that need to modify context should:
+//     1. Use RehydrateContext() to get the struct
+//     2. Use helper methods (e.g., SetLastSubagentMessage()) to modify fields
+//     3. Update the context map with changes (e.g., ctx["lastSubagentMessage"] = value)
+//   - Changes to mutable fields (LastSubagentMessage, PluginFields) will be synced back
+//     to the struct automatically after tool execution
+//   - SessionStorage is shared by reference - modifications persist automatically
+//
+// Parameters:
+//   - agentContext: The agent context map containing agent state and configuration
+//   - args: The tool arguments as a map
+//
+// Returns:
+//   - llms.ToolReturn: The result of tool execution
 func (t *Tool) Call(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 	// Validate arguments
 	validated, err := t.validateAndExtractArgs(args)

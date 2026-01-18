@@ -84,6 +84,7 @@ type ToolReturn interface {
 	Error() string
 	Data() string
 	Ephemeral() bool
+	Cleanup() func() // Optional cleanup function to be executed after all tool iterations complete
 }
 
 // toolReturn is an alias for ToolReturn to maintain backward compatibility.
