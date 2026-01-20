@@ -1,0 +1,139 @@
+name: Version Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  version-check:
+    name: Validate Version Changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if VERSION file changed
+        id: check_version
+        run: |
+          if git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep -q "^VERSION$"; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate version format
+        if: steps.check_version.outputs.changed == 'true'
+        id: validate_format
+        run: |
+          VERSION=$(cat VERSION)
+          if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Version must follow semantic versioning: MAJOR.MINOR.PATCH (e.g., 1.2.3)"
+            exit 1
+          fi
+          echo "✅ Version format is valid: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get PR labels
+        if: steps.check_version.outputs.changed == 'true'
+        id: pr_labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const labelNames = labels.map(l => l.name);
+            core.setOutput('labels', labelNames.join(','));
+
+      - name: Check version increment
+        if: steps.check_version.outputs.changed == 'true'
+        run: |
+          NEW_VERSION="${{ steps.validate_format.outputs.version }}"
+          
+          # Get latest tag
+          git fetch --tags
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LATEST_VERSION=${LATEST_TAG#v}
+          
+          if [ "$LATEST_VERSION" = "0.0.0" ]; then
+            echo "ℹ️ No previous version found, assuming initial release"
+            exit 0
+          fi
+          
+          # Parse versions
+          IFS='.' read -r -a NEW <<< "$NEW_VERSION"
+          IFS='.' read -r -a OLD <<< "$LATEST_VERSION"
+          
+          NEW_MAJOR=${NEW[0]}
+          NEW_MINOR=${NEW[1]}
+          NEW_PATCH=${NEW[2]}
+          OLD_MAJOR=${OLD[0]}
+          OLD_MINOR=${OLD[1]}
+          OLD_PATCH=${OLD[2]}
+          
+          # Get PR labels
+          LABELS="${{ steps.pr_labels.outputs.labels }}"
+          
+          # Determine expected increment
+          EXPECTED_INCREMENT=""
+          if [[ "$LABELS" == *"type:breaking"* ]]; then
+            EXPECTED_INCREMENT="MAJOR"
+          elif [[ "$LABELS" == *"type:feature"* ]]; then
+            EXPECTED_INCREMENT="MINOR"
+          elif [[ "$LABELS" == *"type:bugfix"* ]]; then
+            EXPECTED_INCREMENT="PATCH"
+          fi
+          
+          # Check increment
+          INCREMENT=""
+          if [ "$NEW_MAJOR" -gt "$OLD_MAJOR" ]; then
+            INCREMENT="MAJOR"
+          elif [ "$NEW_MAJOR" -eq "$OLD_MAJOR" ] && [ "$NEW_MINOR" -gt "$OLD_MINOR" ]; then
+            INCREMENT="MINOR"
+          elif [ "$NEW_MAJOR" -eq "$OLD_MAJOR" ] && [ "$NEW_MINOR" -eq "$OLD_MINOR" ] && [ "$NEW_PATCH" -gt "$OLD_PATCH" ]; then
+            INCREMENT="PATCH"
+          else
+            echo "❌ Version $NEW_VERSION is not greater than $LATEST_VERSION"
+            exit 1
+          fi
+          
+          # Validate increment matches label
+          if [ -n "$EXPECTED_INCREMENT" ] && [ "$INCREMENT" != "$EXPECTED_INCREMENT" ]; then
+            echo "⚠️ Warning: PR label suggests $EXPECTED_INCREMENT increment, but version change is $INCREMENT"
+            echo "Current version: $LATEST_VERSION"
+            echo "New version: $NEW_VERSION"
+            echo "Detected increment: $INCREMENT"
+            echo "Expected increment (from labels): $EXPECTED_INCREMENT"
+          else
+            echo "✅ Version increment is valid: $INCREMENT"
+            echo "Previous version: $LATEST_VERSION"
+            echo "New version: $NEW_VERSION"
+          fi
+
+      - name: Comment on PR
+        if: steps.check_version.outputs.changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ steps.validate_format.outputs.version }}';
+            const latestTag = '${{ github.event.pull_request.base.ref }}';
+            
+            const body = `## Version Check Results
+            
+            ✅ Version format is valid: \`${version}\`
+            
+            The VERSION file has been updated. Please ensure this matches the intended release version.
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+

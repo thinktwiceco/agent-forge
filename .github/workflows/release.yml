@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.2.3)'
+        required: true
+        type: string
 
 jobs:
   release:
@@ -16,6 +22,45 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION_TAG="${{ inputs.version }}"
+          else
+            VERSION_TAG="${{ github.ref_name }}"
+          fi
+          
+          # Remove 'v' prefix if present
+          VERSION=${VERSION_TAG#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Validate VERSION file exists
+        run: |
+          if [ ! -f "VERSION" ]; then
+            echo "❌ VERSION file not found"
+            exit 1
+          fi
+          echo "✅ VERSION file exists"
+
+      - name: Verify VERSION file matches tag
+        id: verify_version
+        run: |
+          VERSION_FILE=$(cat VERSION)
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          
+          if [ "$VERSION_FILE" != "$TAG_VERSION" ]; then
+            echo "❌ Version mismatch!"
+            echo "VERSION file: $VERSION_FILE"
+            echo "Tag version: $TAG_VERSION"
+            exit 1
+          fi
+          echo "✅ Version matches: $VERSION_FILE"
+          echo "match=true" >> $GITHUB_OUTPUT
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -36,19 +81,81 @@ jobs:
       - name: Run tests
         run: go test -v -race ./src/... ./cmd/...
 
+      - name: Get release date
+        id: release_date
+        run: |
+          RELEASE_DATE=$(date +%Y-%m-%d)
+          echo "date=$RELEASE_DATE" >> $GITHUB_OUTPUT
+          echo "Release date: $RELEASE_DATE"
+
+      - name: Generate changelog
+        id: changelog
+        uses: metcalfc/changelog-generator@v4
+        with:
+          myToken: ${{ secrets.GITHUB_TOKEN }}
+          path: CHANGELOG.md
+          version: ${{ steps.version.outputs.version }}
+          versionDate: ${{ steps.release_date.outputs.date }}
+          headingText: '##'
+          ignoreAuthor: true
+          sort: 'ASC'
+          tagPrefix: 'v'
+          unreleased: true
+          outputFile: CHANGELOG.md
+          breakingChangeText: '### Breaking Changes'
+          closedIssuePrefix: 'Closes'
+          closedIssueSuffix: ''
+          closedIssueText: 'Closes'
+          useCommitBody: true
+          useCommitFooter: true
+          useIssues: true
+          usePR: true
+          useSections: true
+          sections: |
+            ### Added
+            ### Changed
+            ### Deprecated
+            ### Removed
+            ### Fixed
+            ### Security
+
+      - name: Extract changelog section
+        id: extract_changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Extract the version section from CHANGELOG.md
+          awk "/^## \[${VERSION}\]/,/^## \[/" CHANGELOG.md | head -n -1 > /tmp/changelog_section.txt
+          CHANGELOG_CONTENT=$(cat /tmp/changelog_section.txt)
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Commit changelog update
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add CHANGELOG.md
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update changelog for v${{ steps.version.outputs.version }}"
+            git push
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          generate_release_notes: true
-          draft: false
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          tag_name: ${{ steps.version.outputs.version_tag }}
+          name: ${{ steps.version.outputs.version_tag }}
           body: |
             ## Installation
             
             ```bash
-            go get github.com/thinktwice/agentForge@${{ github.ref_name }}
+            go get github.com/thinktwice/agentForge@${{ steps.version.outputs.version_tag }}
             ```
             
-            ## What's Changed
+            ## Changelog
             
-            See the auto-generated release notes below.
+            ${{ steps.extract_changelog.outputs.content }}
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') || contains(inputs.version, 'alpha') || contains(inputs.version, 'beta') || contains(inputs.version, 'rc') }}

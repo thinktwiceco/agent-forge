@@ -1,0 +1,113 @@
+name: Generate Changelog
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.2.3)'
+        required: true
+        type: string
+      release_date:
+        description: 'Release date (YYYY-MM-DD)'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  generate-changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set release date
+        id: set_date
+        run: |
+          if [ -z "${{ inputs.release_date }}" ]; then
+            RELEASE_DATE=$(date +%Y-%m-%d)
+          else
+            RELEASE_DATE="${{ inputs.release_date }}"
+          fi
+          echo "date=$RELEASE_DATE" >> $GITHUB_OUTPUT
+          echo "Release date: $RELEASE_DATE"
+
+      - name: Get last tag
+        id: last_tag
+        run: |
+          git fetch --tags
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous tag found, using all commits"
+            echo "since=--root" >> $GITHUB_OUTPUT
+          else
+            echo "Last tag: $LAST_TAG"
+            echo "since=$LAST_TAG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        uses: metcalfc/changelog-generator@v4
+        with:
+          myToken: ${{ secrets.GITHUB_TOKEN }}
+          path: CHANGELOG.md
+          version: ${{ inputs.version }}
+          versionDate: ${{ steps.set_date.outputs.date }}
+          headingText: '##'
+          ignoreAuthor: true
+          sort: 'ASC'
+          tagPrefix: 'v'
+          unreleased: true
+          outputFile: CHANGELOG.md
+          breakingChangeText: '### Breaking Changes'
+          closedIssuePrefix: 'Closes'
+          closedIssueSuffix: ''
+          closedIssueText: 'Closes'
+          useCommitBody: true
+          useCommitFooter: true
+          useIssues: true
+          usePR: true
+          useSections: true
+          sections: |
+            ### Added
+            ### Changed
+            ### Deprecated
+            ### Removed
+            ### Fixed
+            ### Security
+
+      - name: Check if changelog was updated
+        id: check_update
+        run: |
+          if git diff --quiet CHANGELOG.md; then
+            echo "updated=false" >> $GITHUB_OUTPUT
+            echo "No changes to CHANGELOG.md"
+          else
+            echo "updated=true" >> $GITHUB_OUTPUT
+            echo "CHANGELOG.md has been updated"
+            git diff CHANGELOG.md
+          fi
+
+      - name: Commit changelog
+        if: steps.check_update.outputs.updated == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add CHANGELOG.md
+          git commit -m "chore: update changelog for v${{ inputs.version }}"
+          git push
+
+      - name: Output changelog content
+        if: steps.check_update.outputs.updated == 'true'
+        run: |
+          echo "## Changelog for v${{ inputs.version }}"
+          echo ""
+          # Extract the version section from CHANGELOG.md
+          awk "/^## \[${{ inputs.version }}\]/,/^## \[/" CHANGELOG.md | head -n -1
+

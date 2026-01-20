@@ -1,0 +1,32 @@
+# GitHub Release Template
+# This template is used when creating releases via GitHub UI
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+    authors:
+      - dependabot
+  categories:
+    - title: Breaking Changes 🚨
+      labels:
+        - type:breaking
+    - title: Features ✨
+      labels:
+        - type:feature
+    - title: Bug Fixes 🐛
+      labels:
+        - type:bugfix
+    - title: Performance Improvements ⚡
+      labels:
+        - type:performance
+    - title: Documentation 📚
+      labels:
+        - type:documentation
+    - title: Refactoring ♻️
+      labels:
+        - type:refactor
+    - title: Other Changes
+      labels:
+        - "*"
+
