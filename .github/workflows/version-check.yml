@@ -8,6 +8,10 @@ jobs:
   version-check:
     name: Validate Version Changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
