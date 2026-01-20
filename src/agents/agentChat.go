@@ -152,10 +152,8 @@ func (a *Agent) executeChatWithTools() error {
 		// Extract FullContent from completed chunk if available
 		if completedChunkBytes != nil {
 			var completedChunk llms.ChunkResponse
-			if err := json.Unmarshal(completedChunkBytes, &completedChunk); err == nil {
-				if completedChunk.FullContent != "" {
-					fullContent = completedChunk.FullContent
-				}
+			if err := json.Unmarshal(completedChunkBytes, &completedChunk); err == nil && completedChunk.FullContent != "" {
+				fullContent = completedChunk.FullContent
 			}
 		}
 		a.hooks.newAssistantMessageWithToolCallsEvent(a, fullContent, toolCalls, promptTokens, completionTokens, totalTokens)

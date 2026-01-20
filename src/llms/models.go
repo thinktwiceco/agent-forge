@@ -120,6 +120,7 @@ func (rc *responseCh) Start() <-chan ChunkResponse {
 						Content: err.Error(),
 					}
 				}
+				// Error channel closed, stream is complete
 				return
 			}
 		}

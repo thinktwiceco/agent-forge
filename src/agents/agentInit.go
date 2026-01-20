@@ -76,9 +76,12 @@ func (a *Agent) initSystemTools() {
 	}
 }
 
+// initResponseCh initializes the response channel.
+// This method is not used - setResponseCh() is used instead.
+// Keeping for backward compatibility if needed.
+//
+//nolint:unused // Reserved for backward compatibility
 func (a *Agent) initResponseCh() {
-	// This method is not used - setResponseCh() is used instead
-	// Keeping for backward compatibility if needed
 	a.responseCh = core.NewResponseCh(a.Name(), a.Trace(), nil)
 	a.responseCh.Start()
 }

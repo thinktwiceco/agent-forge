@@ -157,7 +157,9 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 	// Note: os.Stdout and os.Stderr are *os.File and will auto-flush on newline
 	// But we can force sync if needed
 	if file, ok := p.output.(*os.File); ok && (file == os.Stdout || file == os.Stderr) {
-		file.Sync()
+		if err := file.Sync(); err != nil {
+			// Ignore sync errors for stdout/stderr as they're typically non-critical
+		}
 	}
 
 	return nil

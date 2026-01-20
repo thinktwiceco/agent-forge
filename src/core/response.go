@@ -143,6 +143,7 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 						Trace:     arc.trace,
 					}
 				}
+				// Error channel closed, stream is complete
 				return
 			}
 		}
