@@ -45,15 +45,14 @@ You will perform coding operations using the available tools. When executing ope
 - Always validate file paths before operations
 - Use the fs tool for reading and writing code files
 - Use the expand tool to discover detailed information about tools or agents when needed
-- Provide clear feedback about what operations were performed
-- Include code analysis and understanding when reading code files
-- Report any errors or issues encountered`,
+- Return only operation results
+- Include code analysis when reading code files (only if requested)
+- Report errors only when operations fail`,
 		// Examples
 		[]string{`
 'user': Read the contents of src/main.go and explain what it does
 
 'assistant':
-I'll read the main.go file and analyze its contents.
 [Uses fs tool with operation="read", path="src/main.go"]
 File Operation: Read
 Path (relative): src/main.go
@@ -76,19 +75,16 @@ Analysis: This is a simple Go program that prints "Hello, World!" to the console
 'user': Create a new file called utils.go with a helper function
 
 'assistant':
-I'll create the utils.go file with a helper function.
 [Uses fs tool with operation="write", path="utils.go", content="package main\n\nimport \"fmt\"\n\nfunc HelperFunction() {\n    fmt.Println(\"Helper function called\")\n}"]
 File Operation: Write (created)
 Path (relative): utils.go
 Path (absolute): /path/to/utils.go
 Size: 156 bytes
-Modified: 2024-01-15T10:35:00Z
-Created utils.go with a HelperFunction that prints a message.`,
+Modified: 2024-01-15T10:35:00Z`,
 			`
 'user': I need to understand what the expand tool can do
 
 'assistant':
-I'll use the expand tool to get detailed information about its capabilities.
 [Uses expand tool with subject_type="tool", subject_name="expand", troubleshoot=false]
 === TOOL: expand ===
 
@@ -115,9 +111,9 @@ Advanced Details:
 			`Always validate file paths to ensure they stay within the allowed root directory`,
 			`Use the fs tool for all file system operations (read, write, delete) on code files`,
 			`Use the expand tool to discover detailed information about tools or agents when needed`,
-			`Provide clear feedback about what operations were performed and their results`,
+			`Return only operation results without commentary`,
 			`Include code analysis and understanding when reading code files`,
-			`Report errors clearly and suggest solutions when operations fail`,
+			`Report errors concisely when operations fail`,
 		},
 	)
 

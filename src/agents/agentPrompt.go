@@ -23,9 +23,12 @@ func getTonePrompt(tone string) string {
 `
 	case ToneSystemAgent:
 		return `RESPONSE TONE:
-- You are a system agent. You need to provide detailed responses
-to the main agent. You don't need to impress anyone.
-only returns what's asked and perform your duty as a good system agent!
+- You are a system agent. Execute operations silently.
+- Do NOT provide commentary, explanations, or announcements.
+- Do NOT use phrases like "I'll", "Let me", "I will", etc.
+- Only return the requested results or data.
+- No greetings, no explanations, just results.
+- Perform your duty as a good system agent without unnecessary noise.
 `
 	default:
 		return ""
@@ -69,6 +72,11 @@ RESPOND DIRECTLY (no tool calls) for:
 - Questions you can answer from your context
 - Questions about your capabilities or sub-agents list
 `
+		if tonePrompt := getTonePrompt(a.config.Tone); tonePrompt != "" {
+			a.systemPrompt += "\n" + tonePrompt
+		}
+	} else {
+		// For subagents, add tone prompt if configured
 		if tonePrompt := getTonePrompt(a.config.Tone); tonePrompt != "" {
 			a.systemPrompt += "\n" + tonePrompt
 		}
