@@ -90,44 +90,104 @@ jobs:
           echo "date=$RELEASE_DATE" >> $GITHUB_OUTPUT
           echo "Release date: $RELEASE_DATE"
 
+      - name: Get previous tag
+        id: previous_tag
+        run: |
+          # Try to get the previous tag
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | sed -n '2p' 2>/dev/null || echo "")
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # If no previous tag exists, use the root commit
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD 2>/dev/null || echo "")
+          fi
+          echo "tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+          echo "Previous tag: $PREVIOUS_TAG"
+
       - name: Generate changelog
         id: changelog
-        uses: metcalfc/changelog-generator@v4
+        uses: mikepenz/release-changelog-builder-action@v4
         with:
-          myToken: ${{ secrets.GITHUB_TOKEN }}
-          path: CHANGELOG.md
-          version: ${{ steps.version.outputs.version }}
-          versionDate: ${{ steps.release_date.outputs.date }}
-          headingText: '##'
-          ignoreAuthor: true
-          sort: 'ASC'
-          tagPrefix: 'v'
-          unreleased: true
-          outputFile: CHANGELOG.md
-          breakingChangeText: '### Breaking Changes'
-          closedIssuePrefix: 'Closes'
-          closedIssueSuffix: ''
-          closedIssueText: 'Closes'
-          useCommitBody: true
-          useCommitFooter: true
-          useIssues: true
-          usePR: true
-          useSections: true
-          sections: |
-            ### Added
-            ### Changed
-            ### Deprecated
-            ### Removed
-            ### Fixed
-            ### Security
+          fromTag: ${{ steps.previous_tag.outputs.tag }}
+          toTag: ${{ steps.version.outputs.version_tag }}
+          ignorePreReleases: false
+          configuration: |
+            {
+              "categories": [
+                {
+                  "title": "### Added",
+                  "labels": ["feature", "enhancement", "feat"]
+                },
+                {
+                  "title": "### Changed",
+                  "labels": ["change", "changed", "chore"]
+                },
+                {
+                  "title": "### Deprecated",
+                  "labels": ["deprecated"]
+                },
+                {
+                  "title": "### Removed",
+                  "labels": ["removed", "remove"]
+                },
+                {
+                  "title": "### Fixed",
+                  "labels": ["bug", "fix", "bugfix"]
+                },
+                {
+                  "title": "### Security",
+                  "labels": ["security"]
+                }
+              ],
+              "ignore_labels": ["ignore", "skip-changelog"],
+              "sort": "ASC"
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update CHANGELOG.md
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DATE="${{ steps.release_date.outputs.date }}"
+          CHANGELOG_CONTENT="${{ steps.changelog.outputs.changelog }}"
+          
+          # Create version header
+          VERSION_HEADER="## [$VERSION] - $DATE"
+          
+          # Create temporary file with new version section
+          {
+            echo "## [Unreleased]"
+            echo ""
+            echo "$VERSION_HEADER"
+            echo "$CHANGELOG_CONTENT"
+            echo ""
+          } > /tmp/new_changelog_section.txt
+          
+          # Prepend to CHANGELOG.md
+          if [ -f "CHANGELOG.md" ]; then
+            # Remove existing unreleased section if present
+            sed -i '/^## \[Unreleased\]/,/^## \[/{ /^## \[Unreleased\]/!{ /^## \[/!d; }; }' CHANGELOG.md || true
+            # Prepend new version section
+            cat /tmp/new_changelog_section.txt CHANGELOG.md > /tmp/changelog.tmp && mv /tmp/changelog.tmp CHANGELOG.md
+          else
+            # Create new CHANGELOG.md
+            cat /tmp/new_changelog_section.txt > CHANGELOG.md
+          fi
 
       - name: Extract changelog section
         id: extract_changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           # Extract the version section from CHANGELOG.md
-          awk "/^## \[${VERSION}\]/,/^## \[/" CHANGELOG.md | head -n -1 > /tmp/changelog_section.txt
-          CHANGELOG_CONTENT=$(cat /tmp/changelog_section.txt)
+          if [ -f "CHANGELOG.md" ]; then
+            awk "/^## \[${VERSION}\]/,/^## \[/" CHANGELOG.md | head -n -1 > /tmp/changelog_section.txt || true
+            if [ -s /tmp/changelog_section.txt ]; then
+              CHANGELOG_CONTENT=$(cat /tmp/changelog_section.txt)
+            else
+              # Fallback to the generated changelog
+              CHANGELOG_CONTENT="${{ steps.changelog.outputs.changelog }}"
+            fi
+          else
+            CHANGELOG_CONTENT="${{ steps.changelog.outputs.changelog }}"
+          fi
           echo "content<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
