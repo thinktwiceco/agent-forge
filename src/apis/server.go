@@ -15,16 +15,21 @@ import (
 
 // Server represents an HTTP server that exposes agent chat functionality via REST API.
 type Server struct {
-	agents              map[string]*agents.Agent
-	mu                  sync.RWMutex
-	vectorDB            core.VectorDB
-	embeddingGenerator  core.EmbeddingGenerator
-	httpServer          *http.Server
+	agents             map[string]*agents.Agent
+	mu                 sync.RWMutex
+	vectorDB           core.VectorDB
+	embeddingGenerator core.EmbeddingGenerator
+	httpServer         *http.Server
 }
 
 // ChatRequest represents the JSON request body for chat endpoint.
 type ChatRequest struct {
 	Message string `json:"message"`
+}
+
+// AgentsResponse represents the JSON response for listing agents.
+type AgentsResponse struct {
+	Agents []string `json:"agents"`
 }
 
 // NewServer creates a new Server instance.
@@ -70,22 +75,22 @@ func (s *Server) InitializeAgent(
 	defer s.mu.Unlock()
 
 	b := builder.NewAgentBuilder(agentName, "json")
-	
+
 	// Add tools
 	if len(tools) > 0 {
 		b.AddTools(tools...)
 	}
-	
+
 	// Set model
 	if model != "" {
 		b.SetModel(model)
 	}
-	
+
 	// Set working directory
 	if workingDir != "" {
 		b.SetWorkingDir(workingDir)
 	}
-	
+
 	// Set vector components if available
 	if s.vectorDB != nil {
 		b.SetVectorDB(s.vectorDB)
@@ -93,22 +98,22 @@ func (s *Server) InitializeAgent(
 	if s.embeddingGenerator != nil {
 		b.SetEmbeddingGenerator(s.embeddingGenerator)
 	}
-	
+
 	// Add subagents
 	for subagent, subagentModel := range subagents {
 		b.AddSubagent(subagent, subagentModel)
 	}
-	
+
 	// Add plugins
 	for _, plugin := range plugins {
 		b.AddPlugin(plugin)
 	}
-	
+
 	agent, err := b.Build()
 	if err != nil {
 		return fmt.Errorf("failed to build agent: %w", err)
 	}
-	
+
 	s.agents[name] = agent
 	return nil
 }
@@ -125,6 +130,33 @@ func (s *Server) GetAgent(name string) *agents.Agent {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.agents[name]
+}
+
+// handleListAgents handles GET requests to /api/server/agents
+func (s *Server) handleListAgents(w http.ResponseWriter, r *http.Request) {
+	// Only allow GET
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get all agent names
+	s.mu.RLock()
+	agentNames := make([]string, 0, len(s.agents))
+	for name := range s.agents {
+		agentNames = append(agentNames, name)
+	}
+	s.mu.RUnlock()
+
+	// Set response headers
+	w.Header().Set("Content-Type", "application/json")
+
+	// Encode and send response
+	response := AgentsResponse{Agents: agentNames}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 // handleChat handles POST requests to /api/server/{agentname}/chat
@@ -215,6 +247,7 @@ func (s *Server) Start(port string) error {
 	}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/server/agents", s.handleListAgents)
 	mux.HandleFunc("/api/server/", s.handleChat)
 
 	s.httpServer = &http.Server{
@@ -232,4 +265,3 @@ func (s *Server) Shutdown() error {
 	}
 	return nil
 }
-
