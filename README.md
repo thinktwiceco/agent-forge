@@ -159,7 +159,6 @@ agent := agents.NewAgent(&agents.AgentConfig{
     Trace:             "response",        // Optional: Trace identifier
     CanExpand:         true,              // Optional: Enable tool/agent expansion
     SubAgents:         []*core.SubAgent{}, // Optional: Sub-agents for delegation
-    ExtraEngines:      map[string]llms.LLMEngine{}, // Optional: Different engines for sub-agents
 })
 
 // Add system agents after creation

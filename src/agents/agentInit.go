@@ -141,18 +141,7 @@ func (a *Agent) addSystemAgents() {
 
 	if a.config.Reasoning {
 		// Create reasoning agent from template
-		// Check if a specific engine is configured for this sub agent
-		var engineForReasoning llms.LLMEngine
-		if a.config.ExtraEngines != nil {
-			if engine, ok := a.config.ExtraEngines[AgentNameSystemReasoning]; ok && engine != nil {
-				engineForReasoning = engine
-			} else {
-				engineForReasoning = a.config.LLMEngine
-			}
-		} else {
-			engineForReasoning = a.config.LLMEngine
-		}
-		raAsSubAgent := ReasoningAgent(engineForReasoning)
+		raAsSubAgent := ReasoningAgent(a.config.LLMEngine)
 		systemAgents = append(systemAgents, raAsSubAgent)
 	}
 
