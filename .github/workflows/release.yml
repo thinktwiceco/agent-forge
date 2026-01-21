@@ -93,12 +93,23 @@ jobs:
       - name: Get previous tag
         id: previous_tag
         run: |
-          # Try to get the previous tag
-          PREVIOUS_TAG=$(git tag --sort=-version:refname | sed -n '2p' 2>/dev/null || echo "")
+          CURRENT_TAG="${{ steps.version.outputs.version_tag }}"
+          
+          # Get all tags sorted by version (newest first), excluding current tag
+          PREVIOUS_TAG=$(git tag --sort=-version:refname 2>/dev/null | grep -v "^${CURRENT_TAG}$" | head -n 1 | tr -d '[:space:]' || echo "")
+          
+          # If no previous tag found, use the root commit
           if [ -z "$PREVIOUS_TAG" ]; then
-            # If no previous tag exists, use the root commit
-            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD 2>/dev/null || echo "")
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD 2>/dev/null | head -n 1 | tr -d '[:space:]' || echo "")
           fi
+          
+          # Ensure we have a valid value
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "Error: Could not determine previous tag or root commit"
+            exit 1
+          fi
+          
+          # Output to GITHUB_OUTPUT (single line, no extra output)
           echo "tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
           echo "Previous tag: $PREVIOUS_TAG"
 
