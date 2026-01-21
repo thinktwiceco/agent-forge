@@ -22,10 +22,17 @@ func (git *Git) commit(message string) (string, error) {
 
 	// Get current branch
 	branchOutput, _, err := git.executeGitCommand("rev-parse", "--abbrev-ref", "HEAD")
+	branch := "master" // default branch name
 	if err != nil {
-		return "", fmt.Errorf("failed to get current branch: %w", err)
+		// If HEAD doesn't exist, try alternative methods
+		if branchConfig, _, branchErr := git.executeGitCommand("config", "--get", "init.defaultBranch"); branchErr == nil && strings.TrimSpace(branchConfig) != "" {
+			branch = strings.TrimSpace(branchConfig)
+		} else if branchName, _, branchErr := git.executeGitCommand("branch", "--show-current"); branchErr == nil && strings.TrimSpace(branchName) != "" {
+			branch = strings.TrimSpace(branchName)
+		}
+	} else {
+		branch = strings.TrimSpace(branchOutput)
 	}
-	branch := strings.TrimSpace(branchOutput)
 
 	// Get list of committed files
 	filesOutput, _, err := git.executeGitCommand("diff-tree", "--no-commit-id", "--name-only", "-r", hash)

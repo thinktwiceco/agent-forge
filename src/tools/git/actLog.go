@@ -9,8 +9,18 @@ import (
 func (git *Git) log(limit int) (string, error) {
 	// Execute git log with limit
 	args := []string{"log", "--oneline", "-n", fmt.Sprintf("%d", limit)}
-	logOutput, _, err := git.executeGitCommand(args...)
+	logOutput, stderr, err := git.executeGitCommand(args...)
 	if err != nil {
+		// Check if error is due to no commits (common case)
+		if strings.Contains(stderr, "does not have any commits") || strings.Contains(err.Error(), "does not have any commits") {
+			// Return empty log response instead of error
+			response := &gitLogResponse{
+				Operation: "Log",
+				Limit:     limit,
+				Commits:   []commitInfo{},
+			}
+			return response.String(), nil
+		}
 		return "", fmt.Errorf("failed to get git log: %w", err)
 	}
 
