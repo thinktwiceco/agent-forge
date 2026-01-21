@@ -4,17 +4,18 @@ run:
   timeout: 5m
   tests: true
 
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
 linters:
   enable:
     - errcheck
     - staticcheck
-    - gofmt
-    - goimports
     - govet
     - ineffassign
     - unused
-    - gosimple
-    - typecheck
 
 linters-settings:
   errcheck:
