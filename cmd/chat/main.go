@@ -12,7 +12,6 @@ import (
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/integrations"
 	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/plugins/todo"
 )
 
 const (
@@ -86,18 +85,6 @@ func printBanner() {
 `
 	fmt.Printf("%s%s%s\n", ColorBold, ColorCyan, banner)
 	fmt.Print(ColorReset)
-}
-
-func onTodoUpdate(todos []*todo.TodoItem) {
-	fmt.Println("======== TODO =========")
-	for _, item := range todos {
-		completed := "✅"
-		if !item.Completed {
-			completed = "⬜"
-		}
-		fmt.Printf("%s %s: %s\n", completed, item.Title, item.Description)
-	}
-	fmt.Println("======== END TODO =========")
 }
 
 // initializeVectorComponents initializes Milvus and embedding generator for vector operations.
