@@ -13,6 +13,7 @@ type SubAgentDiscoverable interface {
 
 // findAgent searches for a sub-agent by name in the agent context.
 // This function is currently unused but kept for potential future use.
+//
 //nolint:unused // Reserved for future use
 func findAgent(agentContext map[string]any, agentName string) (agentforge.Discoverable, bool) {
 	subAgentsInterface, ok := agentContext["subAgents"]

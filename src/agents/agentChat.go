@@ -98,6 +98,7 @@ func (a *Agent) executeChatWithTools() error {
 					agentforge.Debug("LLM stream error received: %v", err)
 					return fmt.Errorf("llm stream error: %w", err)
 				}
+				// Error channel closed without error, continue processing
 				agentforge.Debug("LLM stream error channel closed (no error), going to processToolCalls")
 				goto processToolCalls
 			}

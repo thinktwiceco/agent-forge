@@ -23,9 +23,12 @@ func (d *Delegate) delegate(ctx map[string]any, subAgentName string, message str
 	// Find the sub agent
 	var assignedSubAgent core.SubAgent
 	for _, subAgent := range d.subAgents {
-		if subAgent != nil && (*subAgent).Name() == subAgentName {
-			assignedSubAgent = *subAgent
-			break
+		if subAgent != nil {
+			subAgentVal := *subAgent
+			if subAgentVal.Name() == subAgentName {
+				assignedSubAgent = subAgentVal
+				break
+			}
 		}
 	}
 
