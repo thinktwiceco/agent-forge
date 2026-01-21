@@ -123,10 +123,8 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 
 				// Trigger hook when chunk is read from channel
 				if arc.onChunkRead != nil {
-					if err := arc.onChunkRead(&extendedChunk); err != nil {
-						// Log hook error but continue processing
-						// Hook errors shouldn't stop chunk processing
-					}
+					_ = arc.onChunkRead(&extendedChunk)
+					// Ignore hook errors - they shouldn't stop chunk processing
 				}
 
 				// Send chunk
@@ -142,7 +140,9 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 						AgentName: arc.agentName,
 						Trace:     arc.trace,
 					}
+					return
 				}
+				// Error channel closed without error, stream is complete
 				return
 			}
 		}

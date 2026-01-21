@@ -200,7 +200,7 @@ func NewGitTool(root string) llms.Tool {
 
 			// Handle log operation
 			if operation == "log" {
-				var limit int = 10
+				limit := 10
 				if limitVal, ok := args["limit"]; ok {
 					switch v := limitVal.(type) {
 					case float64:

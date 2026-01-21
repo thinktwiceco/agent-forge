@@ -76,9 +76,12 @@ func (a *Agent) initSystemTools() {
 	}
 }
 
+// initResponseCh initializes the response channel.
+// This method is not used - setResponseCh() is used instead.
+// Keeping for backward compatibility if needed.
+//
+//nolint:unused // Reserved for backward compatibility
 func (a *Agent) initResponseCh() {
-	// This method is not used - setResponseCh() is used instead
-	// Keeping for backward compatibility if needed
 	a.responseCh = core.NewResponseCh(a.Name(), a.Trace(), nil)
 	a.responseCh.Start()
 }
@@ -138,18 +141,7 @@ func (a *Agent) addSystemAgents() {
 
 	if a.config.Reasoning {
 		// Create reasoning agent from template
-		// Check if a specific engine is configured for this sub agent
-		var engineForReasoning llms.LLMEngine
-		if a.config.ExtraEngines != nil {
-			if engine, ok := a.config.ExtraEngines[AgentNameSystemReasoning]; ok && engine != nil {
-				engineForReasoning = engine
-			} else {
-				engineForReasoning = a.config.LLMEngine
-			}
-		} else {
-			engineForReasoning = a.config.LLMEngine
-		}
-		raAsSubAgent := ReasoningAgent(engineForReasoning)
+		raAsSubAgent := ReasoningAgent(a.config.LLMEngine)
 		systemAgents = append(systemAgents, raAsSubAgent)
 	}
 

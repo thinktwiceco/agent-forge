@@ -119,7 +119,9 @@ func (sm *SessionManager) cleanupIdleSessions() {
 	// Close idle sessions
 	for _, sessionInfo := range sessionsToClose {
 		agentforge.Info("Closing idle browser session %s (idle for %v)", sessionInfo.key, sessionInfo.idleFor)
-		sm.closeSessionLocked(sessionInfo.key)
+		if err := sm.closeSessionLocked(sessionInfo.key); err != nil {
+			agentforge.Debug("Error closing idle session %s: %v", sessionInfo.key, err)
+		}
 	}
 
 	if len(sessionsToClose) > 0 {
@@ -185,7 +187,9 @@ func (sm *SessionManager) GetOrCreateBrowser(agentContext map[string]any, headle
 		case <-session.ctx.Done():
 			// Context is invalid, clean it up and create a new one
 			agentforge.Info("Browser context %s is closed, creating new one", sessionKey)
-			sm.closeSessionLocked(sessionKey)
+			if err := sm.closeSessionLocked(sessionKey); err != nil {
+				agentforge.Debug("Error closing invalid session %s: %v", sessionKey, err)
+			}
 		default:
 			// Context is still valid, reuse it
 			agentforge.Info("Reusing existing browser context %s", sessionKey)
@@ -282,7 +286,9 @@ func (sm *SessionManager) CloseAllBrowsers() {
 	defer sm.mutex.Unlock()
 
 	for key := range sm.sessions {
-		sm.closeSessionLocked(key)
+		if err := sm.closeSessionLocked(key); err != nil {
+			agentforge.Debug("Error closing session %s: %v", key, err)
+		}
 	}
 }
 

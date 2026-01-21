@@ -1,0 +1,88 @@
+# GitHub Labels Configuration
+# These labels can be applied to PRs and issues
+# Use GitHub CLI or GitHub API to sync: gh label sync .github/labels.yml
+
+- name: type:feature
+  color: '0E8A16'
+  description: 'New features'
+
+- name: type:bugfix
+  color: 'D73A4A'
+  description: 'Bug fixes'
+
+- name: type:breaking
+  color: 'B60205'
+  description: 'Breaking changes'
+
+- name: type:documentation
+  color: '0075CA'
+  description: 'Documentation updates'
+
+- name: type:refactor
+  color: '7057FF'
+  description: 'Code refactoring'
+
+- name: type:performance
+  color: 'FBCA04'
+  description: 'Performance improvements'
+
+- name: type:chore
+  color: 'C5DEF5'
+  description: 'Maintenance tasks'
+
+- name: area:agents
+  color: '1D76DB'
+  description: 'Changes to agent system'
+
+- name: area:tools
+  color: '1D76DB'
+  description: 'Changes to tool system'
+
+- name: area:llms
+  color: '1D76DB'
+  description: 'Changes to LLM integration'
+
+- name: area:plugins
+  color: '1D76DB'
+  description: 'Changes to plugin system'
+
+- name: area:web
+  color: '1D76DB'
+  description: 'Changes to web agent'
+
+- name: area:vector
+  color: '1D76DB'
+  description: 'Changes to vector agent'
+
+- name: area:git
+  color: '1D76DB'
+  description: 'Changes to git agent'
+
+- name: area:os
+  color: '1D76DB'
+  description: 'Changes to OS agent'
+
+- name: area:coding
+  color: '1D76DB'
+  description: 'Changes to coding agent'
+
+- name: area:reasoning
+  color: '1D76DB'
+  description: 'Changes to reasoning agent'
+
+- name: area:core
+  color: '1D76DB'
+  description: 'Changes to core functionality'
+
+- name: status:ready
+  color: '0E8A16'
+  description: 'PR is ready for review'
+
+- name: status:blocked
+  color: 'D73A4A'
+  description: 'PR is blocked'
+
+- name: status:wip
+  color: 'FBCA04'
+  description: 'Work in progress'
+

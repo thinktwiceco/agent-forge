@@ -13,9 +13,9 @@ func TestLoggerIntegrationWithConfig(t *testing.T) {
 	originalLogLevel := os.Getenv("AF_LOG_LEVEL")
 	defer func() {
 		if originalLogLevel != "" {
-			os.Setenv("AF_LOG_LEVEL", originalLogLevel)
+			_ = os.Setenv("AF_LOG_LEVEL", originalLogLevel)
 		} else {
-			os.Unsetenv("AF_LOG_LEVEL")
+			_ = os.Unsetenv("AF_LOG_LEVEL")
 		}
 	}()
 
@@ -48,7 +48,7 @@ func TestLoggerIntegrationWithConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variable
-			os.Setenv("AF_LOG_LEVEL", tt.envValue)
+			_ = os.Setenv("AF_LOG_LEVEL", tt.envValue)
 
 			// Create config
 			config, err := NewConfig()
@@ -88,14 +88,14 @@ func TestLoggerWithConfigValidation(t *testing.T) {
 	originalLogLevel := os.Getenv("AF_LOG_LEVEL")
 	defer func() {
 		if originalLogLevel != "" {
-			os.Setenv("AF_LOG_LEVEL", originalLogLevel)
+			_ = os.Setenv("AF_LOG_LEVEL", originalLogLevel)
 		} else {
-			os.Unsetenv("AF_LOG_LEVEL")
+			_ = os.Unsetenv("AF_LOG_LEVEL")
 		}
 	}()
 
 	// Set invalid log level
-	os.Setenv("AF_LOG_LEVEL", "INVALID")
+	_ = os.Setenv("AF_LOG_LEVEL", "INVALID")
 
 	// Create config - should fail validation
 	_, err := NewConfig()

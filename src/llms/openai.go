@@ -165,7 +165,9 @@ func (a *openAILLM) streamResponse(messages []*UnifiedMessage, tools []Tool, res
 
 	// Create streaming request
 	stream := a.client.Chat.Completions.NewStreaming(a.ctx, params)
-	defer stream.Close()
+	defer func() {
+		_ = stream.Close()
+	}()
 
 	var fullContent string
 	var promptTokens, completionTokens, totalTokens int

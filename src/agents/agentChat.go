@@ -98,6 +98,7 @@ func (a *Agent) executeChatWithTools() error {
 					agentforge.Debug("LLM stream error received: %v", err)
 					return fmt.Errorf("llm stream error: %w", err)
 				}
+				// Error channel closed without error, continue processing
 				agentforge.Debug("LLM stream error channel closed (no error), going to processToolCalls")
 				goto processToolCalls
 			}
@@ -152,10 +153,8 @@ func (a *Agent) executeChatWithTools() error {
 		// Extract FullContent from completed chunk if available
 		if completedChunkBytes != nil {
 			var completedChunk llms.ChunkResponse
-			if err := json.Unmarshal(completedChunkBytes, &completedChunk); err == nil {
-				if completedChunk.FullContent != "" {
-					fullContent = completedChunk.FullContent
-				}
+			if err := json.Unmarshal(completedChunkBytes, &completedChunk); err == nil && completedChunk.FullContent != "" {
+				fullContent = completedChunk.FullContent
 			}
 		}
 		a.hooks.newAssistantMessageWithToolCallsEvent(a, fullContent, toolCalls, promptTokens, completionTokens, totalTokens)

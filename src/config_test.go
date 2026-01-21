@@ -10,9 +10,9 @@ func TestNewConfig(t *testing.T) {
 	originalLogLevel := os.Getenv("AF_LOG_LEVEL")
 	defer func() {
 		if originalLogLevel != "" {
-			os.Setenv("AF_LOG_LEVEL", originalLogLevel)
+			_ = os.Setenv("AF_LOG_LEVEL", originalLogLevel)
 		} else {
-			os.Unsetenv("AF_LOG_LEVEL")
+			_ = os.Unsetenv("AF_LOG_LEVEL")
 		}
 	}()
 
@@ -70,9 +70,9 @@ func TestNewConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variable
 			if tt.envValue != "" {
-				os.Setenv("AF_LOG_LEVEL", tt.envValue)
+				_ = os.Setenv("AF_LOG_LEVEL", tt.envValue)
 			} else {
-				os.Unsetenv("AF_LOG_LEVEL")
+				_ = os.Unsetenv("AF_LOG_LEVEL")
 			}
 
 			// Create config
@@ -185,17 +185,17 @@ func TestGetEnv(t *testing.T) {
 			originalValue := os.Getenv(tt.key)
 			defer func() {
 				if originalValue != "" {
-					os.Setenv(tt.key, originalValue)
+					_ = os.Setenv(tt.key, originalValue)
 				} else {
-					os.Unsetenv(tt.key)
+					_ = os.Unsetenv(tt.key)
 				}
 			}()
 
 			// Set test environment variable
 			if tt.envValue != "" {
-				os.Setenv(tt.key, tt.envValue)
+				_ = os.Setenv(tt.key, tt.envValue)
 			} else {
-				os.Unsetenv(tt.key)
+				_ = os.Unsetenv(tt.key)
 			}
 
 			// Test getEnv

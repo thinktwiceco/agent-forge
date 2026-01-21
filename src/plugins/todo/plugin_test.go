@@ -123,9 +123,15 @@ func TestTodoPlugin_GetTodoItems(t *testing.T) {
 	}
 
 	// Add some items
-	plugin.addTodoItem("Todo 1", "Description 1")
-	plugin.addTodoItem("Todo 2", "Description 2")
-	plugin.addTodoItem("Todo 3", "Description 3")
+	if err := plugin.addTodoItem("Todo 1", "Description 1"); err != nil {
+		t.Fatalf("Failed to add todo 1: %v", err)
+	}
+	if err := plugin.addTodoItem("Todo 2", "Description 2"); err != nil {
+		t.Fatalf("Failed to add todo 2: %v", err)
+	}
+	if err := plugin.addTodoItem("Todo 3", "Description 3"); err != nil {
+		t.Fatalf("Failed to add todo 3: %v", err)
+	}
 
 	items = plugin.getTodoItems()
 	if len(items) != 3 {
@@ -137,14 +143,16 @@ func TestTodoPlugin_GetTodoItems(t *testing.T) {
 func TestTodoPlugin_GetTodoItem(t *testing.T) {
 	plugin := NewTodoPlugin(nil)
 
-	plugin.addTodoItem("Test Todo", "Test Description")
+	if err := plugin.addTodoItem("Test Todo", "Test Description"); err != nil {
+		t.Fatalf("Failed to add todo: %v", err)
+	}
 	items := plugin.getTodoItems()
 	expectedID := items[0].ID
 
 	// Test finding by ID
 	found := plugin.getTodoItem(expectedID)
 	if found == nil {
-		t.Error("Expected to find todo item by ID")
+		t.Fatal("Expected to find todo item by ID")
 	}
 
 	if found.Title != "Test Todo" {
@@ -162,12 +170,14 @@ func TestTodoPlugin_GetTodoItem(t *testing.T) {
 func TestTodoPlugin_GetTodoItemByTitle(t *testing.T) {
 	plugin := NewTodoPlugin(nil)
 
-	plugin.addTodoItem("Unique Title", "Description")
+	if err := plugin.addTodoItem("Unique Title", "Description"); err != nil {
+		t.Fatalf("Failed to add todo: %v", err)
+	}
 
 	// Test finding by title
 	found := plugin.getTodoItemByTitle("Unique Title")
 	if found == nil {
-		t.Error("Expected to find todo item by title")
+		t.Fatal("Expected to find todo item by title")
 	}
 
 	if found.Description != "Description" {
@@ -185,7 +195,9 @@ func TestTodoPlugin_GetTodoItemByTitle(t *testing.T) {
 func TestTodoPlugin_UpdateTodoStatus(t *testing.T) {
 	plugin := NewTodoPlugin(nil)
 
-	plugin.addTodoItem("Test Todo", "Description")
+	if err := plugin.addTodoItem("Test Todo", "Description"); err != nil {
+		t.Fatalf("Failed to add todo: %v", err)
+	}
 	items := plugin.getTodoItems()
 	id := items[0].ID
 
@@ -234,7 +246,9 @@ func TestTodoPlugin_UpdateTodoStatus(t *testing.T) {
 func TestTodoPlugin_UpdateTodoStatusByTitle(t *testing.T) {
 	plugin := NewTodoPlugin(nil)
 
-	plugin.addTodoItem("Test Todo", "Description")
+	if err := plugin.addTodoItem("Test Todo", "Description"); err != nil {
+		t.Fatalf("Failed to add todo: %v", err)
+	}
 
 	// Update to completed
 	err := plugin.updateTodoStatusByTitle("Test Todo", true)
@@ -299,7 +313,9 @@ func TestTodoPlugin_HandleToolExecution(t *testing.T) {
 	plugin := NewTodoPlugin(callback)
 
 	// Add a todo item
-	plugin.addTodoItem("Test Todo", "Description")
+	if err := plugin.addTodoItem("Test Todo", "Description"); err != nil {
+		t.Fatalf("Failed to add todo: %v", err)
+	}
 
 	// Create a mock agent (we only need it for the hook signature)
 	var mockAgent *agents.Agent
@@ -530,8 +546,12 @@ func TestTodoHandlerTool_GetTodos(t *testing.T) {
 	plugin := NewTodoPlugin(nil)
 
 	// Add some todos
-	plugin.addTodoItem("Todo 1", "Description 1")
-	plugin.addTodoItem("Todo 2", "Description 2")
+	if err := plugin.addTodoItem("Todo 1", "Description 1"); err != nil {
+		t.Fatalf("Failed to add todo 1: %v", err)
+	}
+	if err := plugin.addTodoItem("Todo 2", "Description 2"); err != nil {
+		t.Fatalf("Failed to add todo 2: %v", err)
+	}
 
 	tools := plugin.Tools()
 	tool := tools[0]
@@ -595,7 +615,9 @@ func TestTodoHandlerTool_UpdateTodo_ByID(t *testing.T) {
 	plugin := NewTodoPlugin(nil)
 
 	// Add a todo
-	plugin.addTodoItem("Test Todo", "Description")
+	if err := plugin.addTodoItem("Test Todo", "Description"); err != nil {
+		t.Fatalf("Failed to add todo: %v", err)
+	}
 	items := plugin.getTodoItems()
 	id := items[0].ID
 
@@ -626,7 +648,9 @@ func TestTodoHandlerTool_UpdateTodo_ByTitle(t *testing.T) {
 	plugin := NewTodoPlugin(nil)
 
 	// Add a todo
-	plugin.addTodoItem("Test Todo", "Description")
+	if err := plugin.addTodoItem("Test Todo", "Description"); err != nil {
+		t.Fatalf("Failed to add todo: %v", err)
+	}
 
 	tools := plugin.Tools()
 	tool := tools[0]
@@ -849,7 +873,7 @@ func TestNewTodoPlugin(t *testing.T) {
 
 	plugin := NewTodoPlugin(callback)
 	if plugin == nil {
-		t.Error("Expected non-nil plugin")
+		t.Fatal("Expected non-nil plugin")
 	}
 
 	if plugin.onTodoUpdate == nil {
@@ -859,7 +883,7 @@ func TestNewTodoPlugin(t *testing.T) {
 	// Test with nil callback
 	plugin2 := NewTodoPlugin(nil)
 	if plugin2 == nil {
-		t.Error("Expected non-nil plugin")
+		t.Fatal("Expected non-nil plugin")
 	}
 
 	if plugin2.onTodoUpdate != nil {

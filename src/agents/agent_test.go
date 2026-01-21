@@ -134,7 +134,7 @@ func TestAgent_fooTool_WithRealLLM(t *testing.T) {
 	}
 
 	// Verify streaming works (minimum requirement)
-	if !sawFinalContent && !(sawToolCall || sawToolExecuting || sawToolResult) {
+	if !sawFinalContent && !sawToolCall && !sawToolExecuting && !sawToolResult {
 		t.Error("Expected to see either content streaming or tool execution")
 	}
 

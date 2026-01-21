@@ -30,6 +30,9 @@ func CleanupAllBrowsers() {
 
 // getBrowserContext returns the existing browser context without creating a new one.
 // Returns nil if no browser context exists.
+// This function is currently unused but kept for potential future use.
+//
+//nolint:unused // Reserved for future use
 func getBrowserContext(agentContext map[string]any) context.Context {
 	return globalSessionManager.GetBrowserContext(agentContext)
 }

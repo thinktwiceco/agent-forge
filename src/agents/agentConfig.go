@@ -64,11 +64,6 @@ type AgentConfig struct {
 	// Use constants from the agents package (e.g., agents.ToneKeepItShort)
 	Tone string
 
-	// ExtraEngines allows specifying different LLM engines for team agents.
-	// Key is the agent name (e.g., "system-reasoning"), value is the LLM engine to use.
-	// If nil or if a team agent's name is not found, the default LLMEngine is used.
-	ExtraEngines map[string]llms.LLMEngine
-
 	// Persistence specifies the persistence layer type for conversation history.
 	// Supported values: "" (none), "json"
 	// If empty or not set, no persistence is used.

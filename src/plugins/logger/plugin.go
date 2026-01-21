@@ -103,7 +103,7 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 
 		// Print agent name header
 		agentLabel := formatLabelWithRules(agentName, trace, p.labelRules)
-		fmt.Fprintf(p.output, "\n%s%s%s%s\n", ColorBold, color, agentLabel, ColorReset)
+		_, _ = fmt.Fprintf(p.output, "\n%s%s%s%s\n", ColorBold, color, agentLabel, ColorReset)
 	}
 
 	// Handle different chunk types
@@ -115,13 +115,13 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 			if content == "" {
 				content = extendedChunk.Delta
 			}
-			fmt.Fprintf(p.output, "%s%s%s", color, content, ColorReset)
+			_, _ = fmt.Fprintf(p.output, "%s%s%s", color, content, ColorReset)
 		}
 
 	case llms.TypeCompletion:
 		// Final completion - display token usage if available
 		if extendedChunk.TotalTokens > 0 {
-			fmt.Fprintf(p.output, "\n%s%s📊 Tokens: %d prompt + %d completion = %d total%s\n",
+			_, _ = fmt.Fprintf(p.output, "\n%s%s📊 Tokens: %d prompt + %d completion = %d total%s\n",
 				ColorBlue, ColorDim,
 				extendedChunk.PromptTokens, extendedChunk.CompletionTokens, extendedChunk.TotalTokens,
 				ColorReset)
@@ -130,7 +130,7 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 	case llms.TypeToolExecuting:
 		// Show tool execution (suppress for delegate tool when delegating to sub-agents)
 		if extendedChunk.ToolExecuting != nil && extendedChunk.ToolExecuting.Name != delegate.DELEGATE_TOOL {
-			fmt.Fprintf(p.output, "\n%s%s⚙️  Executing tool: %s%s\n", ColorMagenta, ColorBold, extendedChunk.ToolExecuting.Name, ColorReset)
+			_, _ = fmt.Fprintf(p.output, "\n%s%s⚙️  Executing tool: %s%s\n", ColorMagenta, ColorBold, extendedChunk.ToolExecuting.Name, ColorReset)
 		}
 
 	case llms.TypeToolResult:
@@ -142,9 +142,9 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 					continue
 				}
 				if result.Success {
-					fmt.Fprintf(p.output, "%s%s✓ Tool completed: %s%s\n", ColorGreen, ColorBold, result.ToolName, ColorReset)
+					_, _ = fmt.Fprintf(p.output, "%s%s✓ Tool completed: %s%s\n", ColorGreen, ColorBold, result.ToolName, ColorReset)
 				} else {
-					fmt.Fprintf(p.output, "%s%s✗ Tool failed: %s - %s%s\n", ColorRed, ColorBold, result.ToolName, result.Error, ColorReset)
+					_, _ = fmt.Fprintf(p.output, "%s%s✗ Tool failed: %s - %s%s\n", ColorRed, ColorBold, result.ToolName, result.Error, ColorReset)
 				}
 			}
 		}
@@ -152,12 +152,12 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 
 	// Flush output if it's a file or buffered writer
 	if flusher, ok := p.output.(interface{ Flush() error }); ok {
-		flusher.Flush()
+		_ = flusher.Flush()
 	}
 	// Note: os.Stdout and os.Stderr are *os.File and will auto-flush on newline
 	// But we can force sync if needed
 	if file, ok := p.output.(*os.File); ok && (file == os.Stdout || file == os.Stderr) {
-		file.Sync()
+		_ = file.Sync() // Ignore sync errors for stdout/stderr as they're typically non-critical
 	}
 
 	return nil

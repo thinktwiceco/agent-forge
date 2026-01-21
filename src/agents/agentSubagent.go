@@ -10,11 +10,12 @@ import (
 
 // getSubAgentsAsInterfaces converts internal sub-agents to core.SubAgent interfaces
 // for use in tool execution context (e.g., for the expand tool)
+// This method is currently unused but kept for potential future use.
+//
+//nolint:unused // Reserved for future use
 func (a *Agent) getSubAgentsAsInterfaces() []*core.SubAgent {
-	var subAgentInterfaces []*core.SubAgent
-	for _, sa := range a.subAgents {
-		subAgentInterfaces = append(subAgentInterfaces, sa)
-	}
+	subAgentInterfaces := make([]*core.SubAgent, 0, len(a.subAgents))
+	subAgentInterfaces = append(subAgentInterfaces, a.subAgents...)
 	return subAgentInterfaces
 }
 

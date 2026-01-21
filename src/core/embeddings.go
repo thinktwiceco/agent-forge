@@ -8,4 +8,3 @@ type EmbeddingGenerator interface {
 	// Returns the embedding vector, the model name used, and any error that occurred.
 	GenerateEmbedding(text string) ([]float32, string, error)
 }
-

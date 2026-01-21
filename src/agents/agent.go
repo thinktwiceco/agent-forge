@@ -25,9 +25,6 @@ type Agent struct {
 	history *History
 	// Subsystem of agents
 	subAgents []*core.SubAgent
-	// If this is a main agent of a team of agents.
-	// Extra engine configurations for subsystems of agents.
-	extraEngines map[string]llms.LLMEngine
 	// System Prompt as a final system prompt
 	// Agent context built once at initialization
 	agentContext *core.AgentContext

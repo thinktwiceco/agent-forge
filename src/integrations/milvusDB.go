@@ -62,13 +62,13 @@ func NewMilvusDB(config MilvusConfig) (*MilvusDB, error) {
 
 	// Verify Milvus is accessible with a health check
 	if err := mdb.healthCheck(ctx); err != nil {
-		client.Close(ctx)
-		return nil, fmt.Errorf("Milvus is not accessible at %s - please ensure Milvus is running. Error: %w", address, err)
+		_ = client.Close(ctx)
+		return nil, fmt.Errorf("milvus is not accessible at %s - please ensure Milvus is running. Error: %w", address, err)
 	}
 
 	// Get or create collection
 	if err := mdb.ensureCollection(ctx); err != nil {
-		client.Close(ctx)
+		_ = client.Close(ctx)
 		return nil, fmt.Errorf("failed to ensure collection: %w", err)
 	}
 
@@ -200,12 +200,10 @@ func (m *MilvusDB) Search(queryEmbedding []float32, topK int, filters map[string
 
 	// Build filter expression if filters are provided
 	var filterExpr string
-	if len(filters) > 0 {
-		// Convert filters to Milvus filter expression
-		// For JSON field, we need to use JSON_CONTAINS or similar
-		// For simplicity, we'll search without filters for now
-		// TODO: Implement proper filter expression building for JSON metadata
-	}
+	// TODO: Implement proper filter expression building for JSON metadata
+	// For JSON field, we need to use JSON_CONTAINS or similar
+	// For now, we'll search without filters
+	_ = len(filters) // Suppress unused variable warning until filter implementation
 
 	// Perform search
 	searchOption := milvusclient.NewSearchOption(m.collectionName, topK, searchVectors).

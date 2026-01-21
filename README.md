@@ -8,6 +8,7 @@ A powerful Go framework for building intelligent agents with LLM integration, to
 
 - [Features](#features)
 - [Installation](#installation)
+- [Development](#development)
 - [Quick Start](#quick-start)
 - [Core Concepts](#core-concepts)
   - [Creating Agents](#creating-agents)
@@ -49,6 +50,49 @@ A powerful Go framework for building intelligent agents with LLM integration, to
 ```bash
 go get github.com/thinktwice/agentForge
 ```
+
+## Development
+
+### Running Tests
+
+Run unit tests using the test script:
+
+```bash
+./scripts/test.sh --unit
+```
+
+This runs all unit tests with race detection and coverage reporting.
+
+### Linting
+
+Run the linter using the lint script:
+
+```bash
+./scripts/lint.sh
+```
+
+**Note:** You'll need to install `golangci-lint` first. See installation instructions below.
+
+#### Installing golangci-lint
+
+**Using the official installation script (recommended):**
+```bash
+curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin latest
+```
+
+Make sure `$(go env GOPATH)/bin` is in your PATH:
+```bash
+export PATH=$PATH:$(go env GOPATH)/bin
+```
+
+**Using Go install:**
+```bash
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+```
+
+**Using package managers:**
+- macOS: `brew install golangci-lint`
+- Linux (snap): `sudo snap install golangci-lint`
 
 ## Quick Start
 
@@ -115,7 +159,6 @@ agent := agents.NewAgent(&agents.AgentConfig{
     Trace:             "response",        // Optional: Trace identifier
     CanExpand:         true,              // Optional: Enable tool/agent expansion
     SubAgents:         []*core.SubAgent{}, // Optional: Sub-agents for delegation
-    ExtraEngines:      map[string]llms.LLMEngine{}, // Optional: Different engines for sub-agents
 })
 
 // Add system agents after creation

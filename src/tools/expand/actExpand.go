@@ -31,10 +31,12 @@ func (e *Expand) expand(agentContext map[string]any, subjectType string, subject
 	// Search based on subject type
 	if subjectType == "tool" {
 		for _, tool := range tools {
-			if tool.GetName() == subjectName {
-				discoverable = tool.(agentforge.Discoverable)
-				found = true
-				break
+			if tool != nil && tool.GetName() == subjectName {
+				if disc, ok := tool.(agentforge.Discoverable); ok {
+					discoverable = disc
+					found = true
+					break
+				}
 			}
 		}
 		if !found {
@@ -47,10 +49,13 @@ func (e *Expand) expand(agentContext map[string]any, subjectType string, subject
 
 	if subjectType == "agent" {
 		for _, subAgent := range subAgents {
-			if (*subAgent).Name() == subjectName {
-				discoverable = *subAgent
-				found = true
-				break
+			if subAgent != nil {
+				subAgentVal := *subAgent
+				if subAgentVal.Name() == subjectName {
+					discoverable = subAgentVal
+					found = true
+					break
+				}
 			}
 		}
 		if !found {

@@ -6,6 +6,9 @@ import (
 )
 
 // findTool searches for a tool by name in the agent context.
+// This function is currently unused but kept for potential future use.
+//
+//nolint:unused // Reserved for future use
 func findTool(agentContext map[string]any, toolName string) (agentforge.Discoverable, bool) {
 	toolsInterface, ok := agentContext["tools"]
 	if !ok {

@@ -157,12 +157,16 @@ func initializeAgent() (*agents.Agent, error) {
 		SetReasoningModel(llms.DEEPSEEK_REASONING).
 		Build()
 
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DeepSeek LLM: %w", err)
+	}
+
 	codingMultiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
 		SetModel(llms.TOGETHERAI_Qwen3Coder480B).
 		Build()
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create DeepSeek LLM: %w", err)
+		return nil, fmt.Errorf("failed to create coding LLM: %w", err)
 	}
 
 	// Define the LLM Engines
@@ -212,10 +216,6 @@ func initializeAgent() (*agents.Agent, error) {
 
 	// Create the agent
 	agent := agents.NewAgent(&config)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create coding LLM: %w", err)
-	}
 
 	// Add system agents
 	agent.AddSystemAgent(agents.GitAgent(multipurposeAgentLLM, sandboxPath))

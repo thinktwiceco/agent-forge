@@ -255,18 +255,18 @@ func TestPackageLevelFunctions(t *testing.T) {
 	// Reset the default logger for this test
 	// Save original values
 	originalLogger := defaultLogger
-	
+
 	defer func() {
 		defaultLogger = originalLogger
 		loggerOnce = sync.Once{}
 	}()
-	
+
 	defaultLogger = nil
 	loggerOnce = sync.Once{}
 
 	var buf bytes.Buffer
 	testLogger := NewLogger(DebugLevel, &buf)
-	
+
 	// Set defaultLogger after ensuring GetLogger() won't overwrite it
 	// We need to call GetLogger() first to initialize loggerOnce, then set our logger
 	_ = GetLogger()
