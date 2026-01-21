@@ -14,7 +14,7 @@ func GetSessionMetrics() SessionMetrics {
 	return globalSessionManager.GetMetrics()
 }
 
-// NewWebTool creates a new web browser tool that allows web navigation and automation.
+// NewWebTool creates a new web browser tool that allows web navigation and content pulling.
 //
 // Parameters:
 //   - workingDir: The working directory where save_content will save files (to workingDir/web)
@@ -22,75 +22,43 @@ func GetSessionMetrics() SessionMetrics {
 // Available actions:
 //   - navigate: Navigate to a URL
 //   - click: Click an element by CSS selector
-//   - type: Type text into an input field
-//   - screenshot: Take a screenshot of the page or element
 //   - get_content: Get page content (HTML, text, or title)
-//   - save_content: Extract content from webpage and save it to a file
-//   - wait: Wait for an element to appear or page to load
-//   - back: Navigate back in browser history
-//   - forward: Navigate forward in browser history
-//   - evaluate: Execute JavaScript and return result
+//   - save_content: Pull content from webpage and save it to a text file
 func NewWebTool(workingDir string) llms.Tool {
 	w := NewWebBrowser(workingDir)
 
 	return &core.Tool{
 		Name:        "web_browser",
-		Description: "Navigate the web, interact with pages, take screenshots, and execute JavaScript using a headless browser.",
+		Description: "Navigate the web, pull content from pages, and interact with buttons using a headless browser.",
 		AdvanceDesc: `Advanced Details:
 - Actions:
   * navigate: Navigate to a URL. Automatically adds https:// if scheme is missing.
   * click: Click an element by CSS selector. Optionally waits for element to be visible first.
-  * type: Type text into an input field. Optionally clears the field first.
-  * screenshot: Take a screenshot of the entire page or a specific element. Saves to temp directory if path not provided.
-  * get_content: Extract content from current page or navigate to a URL and get its content as HTML, plain text, or title.
-  * save_content: Extract plain text content from current page and save it to a file in workingdirectory/web. Returns the filename. PREFERRED method for retrieving webpage content when a vector database/indexing system is available, as it enables the workflow: Save → Index → Semantic Search. When vector indexing is present, use save_content instead of get_content for content that may need to be searched later. After saving, content can be indexed via the vector agent for semantic search capabilities.
-  * wait: Wait for an element to appear or page to load. Configurable timeout.
-  * back: Navigate back in browser history.
-  * forward: Navigate forward in browser history.
-  * evaluate: Execute JavaScript code and return the result.
-  * close: Close the browser session and free resources.
+  * get_content: Pull content from current page or navigate to a URL and pull its content as HTML, plain text, or title. USE ONLY when explicitly requested by main agent for immediate content access.
+  * save_content: Pull plain text content from current page and save it to a text file in workingdirectory/web. Returns the filename and file path. DEFAULT method for pulling webpage content. Default workflow: Navigate → Pull Content (Save) → Report location. Enables the workflow: Pull → Save → Index → Semantic Search.
 - Parameters:
-  * action (required): The action to perform: "navigate", "click", "type", "screenshot", "get_content", "save_content", "wait", "back", "forward", "evaluate", or "close"
+  * action (required): The action to perform: "navigate", "click", "get_content", or "save_content"
   * url: The URL to navigate to
     - REQUIRED for 'navigate' action
-    - OPTIONAL for 'get_content' action (if not provided, extracts from current page; if provided, navigates first then extracts)
-  * selector (required for click/type, optional for screenshot/wait): CSS selector for the element
-  * text (required for type): Text to type into the input field
-  * clear (optional for type): Whether to clear the field before typing (default: true)
+    - OPTIONAL for 'get_content' action (if not provided, pulls from current page; if provided, navigates first then pulls)
+  * selector (required for click): CSS selector for the element to click
   * wait_visible (optional for click): Whether to wait for element to be visible before clicking (default: true)
-  * path (optional for screenshot): File path to save screenshot (defaults to temp file)
   * type (optional for get_content): Content type - "html", "text", or "title" (default: "text")
-  * timeout (optional for get_content/save_content/wait): Timeout in seconds (default: 60 for get_content/save_content, 30 for wait)
-  * script (required for evaluate): JavaScript code to execute
-  * return_value (optional for evaluate): Whether to return the result (default: true)
+  * timeout (optional for get_content/save_content): Timeout in seconds (default: 60)
 - Behavior:
   * Browser context is maintained across tool calls, preserving cookies, session, and history
   * All operations include proper timeout handling
-  * Screenshots are saved as PNG files
-  * JavaScript evaluation returns JSON-serialized results for complex types
 - Usage:
-  * WORKFLOW 1 (Two-step - for interaction): Use navigate to go to a webpage, then use other actions (click, type, screenshot, get_content, save_content)
-  * WORKFLOW 2 (One-step - for quick content extraction): Use get_content with url parameter to navigate and extract in one call
-  * After navigation, get_content without url parameter extracts from current page
-  * CONTENT RETRIEVAL PREFERENCE: When a vector database/indexing system is available (check available sub-agents), use save_content as the PREFERRED method for retrieving webpage content instead of get_content. This enables the workflow: Save → Index → Semantic Search. The saved content can then be indexed via the vector agent for semantic search capabilities.
-  * Use get_content when you only need immediate content access without indexing (e.g., quick verification, simple text extraction)
-  * Use save_content when content may need to be searched later or when vector indexing is available
-  * Use click to interact with buttons and links
-  * Use type to fill forms
-  * Use screenshot to capture page state
-  * Use wait to ensure elements are loaded before interaction
-  * Use back/forward to navigate browser history
-  * Use evaluate to execute custom JavaScript
-  * Use close when done to free browser resources`,
+  * DEFAULT CONTENT PULLING WORKFLOW: Navigate → Pull Content (Save) → Report location. Always use this workflow when pulling webpage content. Always report the file path where content was pulled and saved.
+  * WORKFLOW 1 (Content pulling): Use navigate to go to a webpage, then use save_content to pull and save the content and report the file path
+  * Use get_content ONLY when explicitly requested by main agent for immediate content access or when content must be returned directly (not saved)
+  * Use save_content as the default method for pulling content - it pulls content from the page and saves it to a text file, enabling the workflow: Pull → Save → Index → Semantic Search
+  * Use click to interact with buttons and links`,
 		TroubleshootingInfo: `Troubleshooting:
 - If navigate fails: Ensure URL is valid and accessible. Check network connectivity.
-- If click fails: Verify selector is correct and element exists on the page. Use wait action first if element loads dynamically.
-- If type fails: Ensure selector targets an input field. Check if element is visible and enabled.
-- If screenshot fails: Check file system permissions if custom path is provided.
-- If get_content fails: Ensure page has loaded completely. Use wait action if needed.
-- If wait fails: Element may not appear within timeout. Increase timeout or verify selector.
-- If back/forward fails: Browser history may be empty. Navigate to pages first to build history.
-- If evaluate fails: Check JavaScript syntax. Some browser APIs may not be available.
+- If click fails: Verify selector is correct and element exists on the page. Element must be visible and clickable.
+- If get_content fails: Ensure page has loaded completely. Increase timeout if page loads slowly.
+- If save_content fails: Ensure page has loaded completely. Check file system permissions for workingdirectory/web directory.
 - Browser initialization errors: Ensure Chrome/Chromium is installed and accessible.
 - Timeout errors: Increase timeout parameter or check network connectivity.
 - Selector errors: Use browser developer tools to verify CSS selector syntax.`,
@@ -98,44 +66,26 @@ func NewWebTool(workingDir string) llms.Tool {
 			{
 				Name:        "action",
 				Type:        "string",
-				Description: "The action to perform: 'navigate', 'click', 'type', 'screenshot', 'get_content', 'save_content', 'wait', 'back', 'forward', 'evaluate', or 'close'",
+				Description: "The action to perform: 'navigate', 'click', 'get_content', or 'save_content'",
 				Required:    true,
 				Validator:   validateAction,
 			},
 			{
 				Name:        "url",
 				Type:        "string",
-				Description: "The URL to navigate to. REQUIRED for 'navigate'. OPTIONAL for 'get_content' (if omitted, extracts from current page)",
+				Description: "The URL to navigate to. REQUIRED for 'navigate'. OPTIONAL for 'get_content' (if omitted, pulls from current page)",
 				Required:    false,
 			},
 			{
 				Name:        "selector",
 				Type:        "string",
-				Description: "CSS selector for the element (required for 'click'/'type', optional for 'screenshot'/'wait')",
-				Required:    false,
-			},
-			{
-				Name:        "text",
-				Type:        "string",
-				Description: "Text to type into the input field (required for 'type' action)",
-				Required:    false,
-			},
-			{
-				Name:        "clear",
-				Type:        "boolean",
-				Description: "Whether to clear the field before typing (optional for 'type' action, default: true)",
+				Description: "CSS selector for the element (required for 'click' action)",
 				Required:    false,
 			},
 			{
 				Name:        "wait_visible",
 				Type:        "boolean",
 				Description: "Whether to wait for element to be visible before clicking (optional for 'click' action, default: true)",
-				Required:    false,
-			},
-			{
-				Name:        "path",
-				Type:        "string",
-				Description: "File path to save screenshot (optional for 'screenshot' action, defaults to temp file)",
 				Required:    false,
 			},
 			{
@@ -147,19 +97,7 @@ func NewWebTool(workingDir string) llms.Tool {
 			{
 				Name:        "timeout",
 				Type:        "number",
-				Description: "Timeout in seconds (optional for 'get_content'/'wait' actions, default: 60 for get_content, 30 for wait)",
-				Required:    false,
-			},
-			{
-				Name:        "script",
-				Type:        "string",
-				Description: "JavaScript code to execute (required for 'evaluate' action)",
-				Required:    false,
-			},
-			{
-				Name:        "return_value",
-				Type:        "boolean",
-				Description: "Whether to return the JavaScript execution result (optional for 'evaluate' action, default: true)",
+				Description: "Timeout in seconds (optional for 'get_content'/'save_content' actions, default: 60)",
 				Required:    false,
 			},
 		},
@@ -176,26 +114,12 @@ func NewWebTool(workingDir string) llms.Tool {
 				return w.navigate(agentContext, args)
 			case "click":
 				return w.click(agentContext, args)
-			case "type":
-				return w.typeAction(agentContext, args)
-			case "screenshot":
-				return w.screenshot(agentContext, args)
 			case "get_content":
 				return w.getContent(agentContext, args)
 			case "save_content":
 				return w.saveContent(agentContext, args)
-			case "wait":
-				return w.wait(agentContext, args)
-			case "back":
-				return w.back(agentContext, args)
-			case "forward":
-				return w.forward(agentContext, args)
-			case "evaluate":
-				return w.evaluate(agentContext, args)
-			case "close":
-				return w.close(agentContext, args)
 			default:
-				return core.NewErrorResponse(fmt.Sprintf("unknown action: %s. Valid actions are: navigate, click, type, screenshot, get_content, save_content, wait, back, forward, evaluate, close", action))
+				return core.NewErrorResponse(fmt.Sprintf("unknown action: %s. Valid actions are: navigate, click, get_content, save_content", action))
 			}
 		},
 	}

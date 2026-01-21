@@ -138,8 +138,10 @@ func stripUnwantedContent(ctx context.Context) error {
 	`
 
 	// Execute the script to remove unwanted content
-	var result interface{}
-	err := chromedp.Evaluate(script, &result).Do(ctx)
+	var result any
+	err := chromedp.Run(ctx,
+		chromedp.Evaluate(script, &result),
+	)
 	if err != nil {
 		return err
 	}

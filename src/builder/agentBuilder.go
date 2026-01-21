@@ -21,6 +21,8 @@ type AgentBuilder struct {
 	persistence        string
 }
 
+// Public API methods
+
 func NewAgentBuilder(name string, persistence string) *AgentBuilder {
 	if persistence != "" && persistence != "json" {
 		panic("invalid persistence type: " + persistence)
@@ -83,6 +85,49 @@ func (b *AgentBuilder) SetWorkingDir(workingDir string) *AgentBuilder {
 	return b
 }
 
+func (b *AgentBuilder) Build() (*agents.Agent, error) {
+	err := b.validate()
+	if err != nil {
+		return nil, err
+	}
+
+	subagents, err := b.buildSubagents()
+
+	if err != nil {
+		return nil, err
+	}
+
+	tools, err := b.buildTools()
+	if err != nil {
+		return nil, err
+	}
+
+	plugins, err := b.buildPlugins()
+	if err != nil {
+		return nil, err
+	}
+
+	agentConfig := &agents.AgentConfig{
+		LLMEngine:   b.llmEngine,
+		AgentName:   b.name,
+		Description: "Main Agent",
+		Tone:        agents.ToneKeepItShort,
+		Trace:       fmt.Sprintf("%s-trace", b.name),
+		CanExpand:   true,
+		MainAgent:   true,
+		Persistence: b.persistence,
+		SubAgents:   subagents,
+		Tools:       tools,
+		Plugins:     plugins,
+	}
+
+	agent := agents.NewAgent(agentConfig)
+
+	return agent, nil
+}
+
+// Private helper methods
+
 func (b *AgentBuilder) validate() error {
 	if b.name == "" {
 		return fmt.Errorf("`name` is required to build an agent")
@@ -143,45 +188,4 @@ func (b *AgentBuilder) buildPlugins() ([]core.Plugin, error) {
 		plugins = append(plugins, plugin)
 	}
 	return plugins, nil
-}
-
-func (b *AgentBuilder) Build() (*agents.Agent, error) {
-	err := b.validate()
-	if err != nil {
-		return nil, err
-	}
-
-	subagents, err := b.buildSubagents()
-
-	if err != nil {
-		return nil, err
-	}
-
-	tools, err := b.buildTools()
-	if err != nil {
-		return nil, err
-	}
-
-	plugins, err := b.buildPlugins()
-	if err != nil {
-		return nil, err
-	}
-
-	agentConfig := &agents.AgentConfig{
-		LLMEngine:   b.llmEngine,
-		AgentName:   b.name,
-		Description: "Main Agent",
-		Tone:        agents.ToneKeepItShort,
-		Trace:       fmt.Sprintf("%s-trace", b.name),
-		CanExpand:   true,
-		MainAgent:   true,
-		Persistence: b.persistence,
-		SubAgents:   subagents,
-		Tools:       tools,
-		Plugins:     plugins,
-	}
-
-	agent := agents.NewAgent(agentConfig)
-
-	return agent, nil
 }
