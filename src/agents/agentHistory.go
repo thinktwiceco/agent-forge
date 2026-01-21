@@ -27,6 +27,7 @@ func (a *Agent) ensureHistory() {
 
 // handleNewAssistantMessage handles new assistant messages.
 // This method is currently unused but kept for potential future use.
+//
 //nolint:unused // Reserved for future use
 func (a *Agent) handleNewAssistantMessage(message string) {
 	a.ensureHistory()

@@ -39,11 +39,12 @@ func (b *OpenAILLMBuilder) validate() {
 	}
 
 	if b.apiKey == "" {
-		if b.provider == "openai" {
+		switch b.provider {
+		case "openai":
 			b.apiKey = c.AFOpenAIAPIKey
-		} else if b.provider == "deepseek" {
+		case "deepseek":
 			b.apiKey = c.AFDeepSeekAPIKey
-		} else if b.provider == "togetherai" {
+		case "togetherai":
 			b.apiKey = c.AFTogetherAIAPIKey
 		}
 	}

@@ -77,7 +77,7 @@ func NewSQLiteDB(config SQLiteConfig) (*SQLiteDB, error) {
 	// Test connection
 	ctx := context.Background()
 	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to connect to SQLite database: %w", err)
 	}
 
@@ -90,7 +90,7 @@ func NewSQLiteDB(config SQLiteConfig) (*SQLiteDB, error) {
 
 	// Ensure table exists
 	if err := sdb.ensureTable(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to ensure table: %w", err)
 	}
 
@@ -256,7 +256,9 @@ func (s *SQLiteDB) Search(queryEmbedding []float32, topK int, filters map[string
 	if err != nil {
 		return nil, fmt.Errorf("failed to query documents: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	// Load all documents and calculate similarities
 	type docWithEmbedding struct {
@@ -381,7 +383,9 @@ func (s *SQLiteDB) ListDocuments(opts core.ListOptions) ([]core.DocumentSummary,
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query documents: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	summaries := make([]core.DocumentSummary, 0)
 	for rows.Next() {
@@ -444,4 +448,3 @@ func (s *SQLiteDB) Close() error {
 	}
 	return nil
 }
-

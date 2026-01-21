@@ -109,9 +109,9 @@ func TestExpandTool_ExpandTool(t *testing.T) {
 
 func TestExpandTool_ExpandToolInfo(t *testing.T) {
 	tests := []struct {
-		name                string
-		troubleshoot        bool
-		wantTroubleshooting bool
+		name                 string
+		troubleshoot         bool
+		wantTroubleshooting  bool
 		wantTroubleshootText string
 	}{
 		{
@@ -120,9 +120,9 @@ func TestExpandTool_ExpandToolInfo(t *testing.T) {
 			wantTroubleshooting: false,
 		},
 		{
-			name:                "with troubleshooting",
-			troubleshoot:        true,
-			wantTroubleshooting: true,
+			name:                 "with troubleshooting",
+			troubleshoot:         true,
+			wantTroubleshooting:  true,
 			wantTroubleshootText: "Check parameters carefully",
 		},
 	}
@@ -237,15 +237,15 @@ func TestExpandTool_NotFound(t *testing.T) {
 		agentContext map[string]any
 	}{
 		{
-			name:        "tool not found",
-			subjectType: "tool",
-			subjectName: "nonexistent-tool",
+			name:         "tool not found",
+			subjectType:  "tool",
+			subjectName:  "nonexistent-tool",
 			agentContext: createAgentContextWithTools([]llms.Tool{}),
 		},
 		{
-			name:        "agent not found",
-			subjectType: "agent",
-			subjectName: "nonexistent-agent",
+			name:         "agent not found",
+			subjectType:  "agent",
+			subjectName:  "nonexistent-agent",
 			agentContext: createAgentContextWithSubAgents([]*core.SubAgent{}),
 		},
 	}
@@ -317,5 +317,3 @@ func TestExpandTool_DefaultTroubleshootFalse(t *testing.T) {
 		t.Error("Response should NOT contain troubleshooting section when troubleshoot is not specified")
 	}
 }
-
-

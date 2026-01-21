@@ -10,7 +10,7 @@ import (
 // validateSubjectType ensures that the subject_type is either "tool" or "agent".
 func validateSubjectType(subjectType string) error {
 	if subjectType != "tool" && subjectType != "agent" {
-		return fmt.Errorf("Invalid subject_type '%s'. Must be either 'tool' or 'agent'", subjectType)
+		return fmt.Errorf("invalid subject_type '%s'. Must be either 'tool' or 'agent'", subjectType)
 	}
 	return nil
 }

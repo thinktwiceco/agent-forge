@@ -62,13 +62,13 @@ func NewMilvusDB(config MilvusConfig) (*MilvusDB, error) {
 
 	// Verify Milvus is accessible with a health check
 	if err := mdb.healthCheck(ctx); err != nil {
-		client.Close(ctx)
-		return nil, fmt.Errorf("Milvus is not accessible at %s - please ensure Milvus is running. Error: %w", address, err)
+		_ = client.Close(ctx)
+		return nil, fmt.Errorf("milvus is not accessible at %s - please ensure Milvus is running. Error: %w", address, err)
 	}
 
 	// Get or create collection
 	if err := mdb.ensureCollection(ctx); err != nil {
-		client.Close(ctx)
+		_ = client.Close(ctx)
 		return nil, fmt.Errorf("failed to ensure collection: %w", err)
 	}
 
