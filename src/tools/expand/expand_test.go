@@ -287,7 +287,7 @@ func TestExpandTool_InvalidSubjectType(t *testing.T) {
 		t.Error("Expected failure for invalid subject_type")
 	}
 
-	if !strings.Contains(result.Error(), "Invalid subject_type") {
+	if !strings.Contains(result.Error(), "invalid subject_type") {
 		t.Errorf("Error should mention invalid subject_type, got: %s", result.Error())
 	}
 }
