@@ -29,6 +29,18 @@ type TodoPlugin struct {
 	onTodoUpdate func(todos []*TodoItem)
 }
 
+var defaultOnTodoUpdate = func(todos []*TodoItem) {
+	fmt.Println("========= Todo List ==========")
+	for _, item := range todos {
+		status := "[ ]"
+		if item.Completed {
+			status = "[x]"
+		}
+		fmt.Printf("%s %s: %s\n", status, item.Title, item.Description)
+	}
+	fmt.Println("========================")
+}
+
 func (p *TodoPlugin) Name() string {
 	return PLUGIN_NAME
 }
@@ -51,6 +63,8 @@ func (p *TodoPlugin) handleToolExecution(a *agents.Agent, toolResult *llms.ToolR
 
 	if p.onTodoUpdate != nil {
 		p.onTodoUpdate(todoItems)
+	} else {
+		defaultOnTodoUpdate(todoItems)
 	}
 
 	return nil

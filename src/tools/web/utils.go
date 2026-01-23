@@ -67,22 +67,3 @@ func parseTimeout(args map[string]any, key string, defaultDuration time.Duration
 
 	return time.Duration(seconds) * time.Second, nil
 }
-
-// wrapJavaScript wraps JavaScript code in an IIFE to allow return statements.
-// Checks if the script is already wrapped to avoid double-wrapping.
-func wrapJavaScript(script string) string {
-	script = strings.TrimSpace(script)
-
-	// Check if already wrapped in IIFE
-	if strings.HasPrefix(script, "(function()") && strings.HasSuffix(script, "})()") {
-		return script
-	}
-
-	// Check if already wrapped in arrow function IIFE
-	if strings.HasPrefix(script, "(() =>") && strings.HasSuffix(script, "})()") {
-		return script
-	}
-
-	// Wrap in IIFE
-	return fmt.Sprintf("(function() { %s })()", script)
-}

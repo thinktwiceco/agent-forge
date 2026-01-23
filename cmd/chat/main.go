@@ -7,14 +7,11 @@ import (
 	"os"
 	"strings"
 
-	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/agents"
+	"github.com/thinktwice/agentForge/src/builder"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/integrations"
 	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/plugins/logger"
-	"github.com/thinktwice/agentForge/src/plugins/todo"
-	"github.com/thinktwice/agentForge/src/tools/fs"
 )
 
 const (
@@ -90,18 +87,6 @@ func printBanner() {
 	fmt.Print(ColorReset)
 }
 
-func onTodoUpdate(todos []*todo.TodoItem) {
-	fmt.Println("======== TODO =========")
-	for _, item := range todos {
-		completed := "✅"
-		if !item.Completed {
-			completed = "⬜"
-		}
-		fmt.Printf("%s %s: %s\n", completed, item.Title, item.Description)
-	}
-	fmt.Println("======== END TODO =========")
-}
-
 // initializeVectorComponents initializes Milvus and embedding generator for vector operations.
 // Returns the vectorDB, embeddingGenerator, and an error if initialization fails.
 func initializeVectorComponents() (core.VectorDB, core.EmbeddingGenerator, error) {
@@ -132,104 +117,27 @@ func initializeVectorComponents() (core.VectorDB, core.EmbeddingGenerator, error
 // initializeAgent creates and configures the agent with the specified provider
 func initializeAgent() (*agents.Agent, error) {
 
-	var err error
-
-	// Create LLM engine based on provider
-	OpenAImultiModelLLM, err := llms.NewOpenAILLMBuilder("openai").
-		SetModel(llms.OPENAI_GPT5_2).
-		Build()
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OpenAI LLM: %w", err)
-	}
-
-	// TogetherAIMultiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
-	// 	SetModel(llms.TOGETHERAI_ZaiGLM47).
-	// 	SetCheapModel(llms.TOGETHERAI_Llama323BInstructTurbo).
-	// 	Build()
-
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to create TogetherAI LLM: %w", err)
-	// }
-
-	DeepSeekMultiModelLLM, err := llms.NewOpenAILLMBuilder("deepseek").
-		SetModel(llms.DEEPSEEK_CHAT).
-		SetReasoningModel(llms.DEEPSEEK_REASONING).
-		Build()
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create DeepSeek LLM: %w", err)
-	}
-
-	codingMultiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
-		SetModel(llms.TOGETHERAI_Qwen3Coder480B).
-		Build()
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create coding LLM: %w", err)
-	}
-
-	// Define the LLM Engines
-	mainAgentLLM := OpenAImultiModelLLM.MainModel()
-	codingAgentLLM := codingMultiModelLLM.MainModel()
-	reasoningAgentLLM := DeepSeekMultiModelLLM.MainModel()
-	multipurposeAgentLLM := DeepSeekMultiModelLLM.MainModel()
-
-	sandboxPath := "/home/verte/Desktop/sandbox"
-
-	// Create logger plugin with default rules and stdout output
-	loggerPlugin := logger.NewPlugin(logger.DefaultColorRules(), logger.DefaultLabelRules(), os.Stdout)
-	todoPlugin := todo.NewTodoPlugin(onTodoUpdate)
-
-	tools := []llms.Tool{
-		fs.NewFsTool(sandboxPath),
-	}
-	// Add web browser tool
-
 	// Initialize vector database components
 	var vectorDB core.VectorDB
 	var embeddingGenerator core.EmbeddingGenerator
-	vectorDB, embeddingGenerator, err = initializeVectorComponents()
-	if err != nil {
-		agentforge.Warn("Failed to initialize vector components: %v", err)
-		agentforge.Info("Application will continue without vector database capabilities. " +
-			"Vector operations will not be available.")
-	}
+	vectorDB, embeddingGenerator, _ = initializeVectorComponents()
 
-	// Create agent configuration
-	config := agents.AgentConfig{
-		LLMEngine:   mainAgentLLM,
-		AgentName:   "Assistant",
-		Description: "A helpful assistant with reasoning capabilities",
-		Tone:        agents.ToneKeepItShort,
-		Trace:       agents.TraceResponse,
-		CanExpand:   true,
-		SystemPrompt: `You are a testing agent
-		You will receive requests in order to test your sub agents and tool usage.
-		Report at the best of your ability.
-		`,
-		MainAgent:   true,
-		Persistence: "json",
-		Plugins:     []core.Plugin{loggerPlugin, todoPlugin},
-		Tools:       tools,
-	}
+	b := builder.NewAgentBuilder("Test Agent", "json")
+	b.AddTools(
+		builder.FILE_SYSTEM_TOOL,
+		builder.GIT_TOOL,
+	)
+	b.SetModel(fmt.Sprintf("openai::%s", llms.OPENAI_GPT5_2))
+	b.SetWorkingDir("/home/verte/Desktop/sandbox")
+	b.SetEmbeddingGenerator(embeddingGenerator)
+	b.SetVectorDB(vectorDB)
+	b.AddSubagent(builder.REASONING_AGENT, fmt.Sprintf("deepseek::%s", llms.DEEPSEEK_REASONING))
+	b.AddSubagent(builder.VECTOR_DB_AGENT, fmt.Sprintf("togetherai::%s", llms.TOGETHERAI_ZaiGLM47))
+	b.AddSubagent(builder.WEB_AGENT, fmt.Sprintf("deepseek::%s", llms.DEEPSEEK_CHAT))
+	b.AddPlugin(builder.LOGGER_PLUGIN)
+	b.AddPlugin(builder.TODO_PLUGIN)
 
-	// Create the agent
-	agent := agents.NewAgent(&config)
-
-	// Add system agents
-	agent.AddSystemAgent(agents.GitAgent(multipurposeAgentLLM, sandboxPath))
-	agent.AddSystemAgent(agents.ReasoningAgent(reasoningAgentLLM))
-	agent.AddSystemAgent(agents.CodingAgent(codingAgentLLM, sandboxPath))
-	agent.AddSystemAgent(agents.WebAgent(multipurposeAgentLLM, sandboxPath))
-
-	// Add vector agent if vector components were initialized successfully
-	if vectorDB != nil && embeddingGenerator != nil {
-		agent.AddSystemAgent(agents.VectorAgent(multipurposeAgentLLM, vectorDB, embeddingGenerator))
-		agentforge.Info("Vector agent initialized successfully")
-	}
-
-	return agent, nil
+	return b.Build()
 }
 
 // processResponse sends a message to the agent and processes the response

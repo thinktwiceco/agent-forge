@@ -25,7 +25,7 @@ const OPENAI_GPT5_2 = "gpt-5.2"
 
 // Models for DeepSeek
 const DEEPSEEK_CHAT = "deepseek-chat"
-const DEEPSEEK_REASONING = "deepseek-reasoning"
+const DEEPSEEK_REASONING = "deepseek-chat" // Using deepseek-chat as reasoning model (deepseek-reasoning doesn't exist in API)
 
 var DefaultModel = map[string]string{
 	"openai":     OPENAI_GPT5_1,

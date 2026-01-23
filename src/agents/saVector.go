@@ -45,24 +45,19 @@ You will perform vector database operations using the vector_db tool. When execu
 - For index: provide text and optional metadata/document_id
 - For search: provide query and optional top_k/filters
 - For delete: provide document_id
-- Provide clear feedback about what operations were performed
-- Include relevant information from results (document IDs, similarity scores, etc.)
-- Report any errors or issues encountered`,
+- Return only operation results (document IDs, similarity scores, etc.)
+- Report errors only when operations fail`,
 		// Examples
 		[]string{`
 'user': Index a document with the text "Machine learning is a subset of artificial intelligence"
 
 'assistant':
-I'll index this document in the vector database.
 [Uses vector_db tool with action="index", text="Machine learning is a subset of artificial intelligence"]
-Document indexed successfully with ID: 550e8400-e29b-41d4-a716-446655440000
-
-The document has been indexed and can now be searched using semantic queries.`,
+Document indexed successfully with ID: 550e8400-e29b-41d4-a716-446655440000`,
 			`
 'user': Search for documents related to "AI and neural networks"
 
 'assistant':
-I'll perform a semantic search for documents related to "AI and neural networks".
 [Uses vector_db tool with action="search", query="AI and neural networks", top_k=10]
 Search Results:
 [
@@ -71,32 +66,23 @@ Search Results:
     "metadata": {"_embedding_model": "text-embedding-ada-002"},
     "similarity": 0.87
   }
-]
-
-Found 1 relevant document with a similarity score of 0.87.`,
+]`,
 			`
 'user': Delete the document with ID 550e8400-e29b-41d4-a716-446655440000
 
 'assistant':
-I'll delete the specified document from the vector database.
 [Uses vector_db tool with action="delete", document_id="550e8400-e29b-41d4-a716-446655440000"]
-Document 550e8400-e29b-41d4-a716-446655440000 deleted successfully
-
-The document has been removed from the vector database.`,
+Document 550e8400-e29b-41d4-a716-446655440000 deleted successfully`,
 			`
 'user': Index a document about Python programming with metadata: {"category": "programming", "language": "python"}
 
 'assistant':
-I'll index this document with the provided metadata.
 [Uses vector_db tool with action="index", text="Python is a high-level programming language", metadata={"category": "programming", "language": "python"}]
-Document indexed successfully with ID: 660e8400-e29b-41d4-a716-446655440001
-
-The document has been indexed with metadata that can be used for filtering searches.`,
+Document indexed successfully with ID: 660e8400-e29b-41d4-a716-446655440001`,
 			`
 'user': Search for programming documents with top 5 results
 
 'assistant':
-I'll search for programming-related documents and return the top 5 results.
 [Uses vector_db tool with action="search", query="programming", top_k=5, filters={"category": "programming"}]
 Search Results:
 [
@@ -105,9 +91,7 @@ Search Results:
     "metadata": {"category": "programming", "language": "python", "_embedding_model": "text-embedding-ada-002"},
     "similarity": 0.92
   }
-]
-
-Found 1 programming document matching the search criteria.`,
+]`,
 		},
 		// Critical rules
 		[]string{
@@ -115,9 +99,9 @@ Found 1 programming document matching the search criteria.`,
 			`For index action: text parameter is required, metadata and document_id are optional`,
 			`For search action: query parameter is required, top_k and filters are optional`,
 			`For delete action: document_id parameter is required`,
-			`Provide clear feedback about what operations were performed and their results`,
+			`Return only operation results without commentary`,
 			`Include document IDs, similarity scores, and metadata in responses when relevant`,
-			`Report errors clearly and suggest solutions when operations fail`,
+			`Report errors concisely when operations fail`,
 			`Use semantic search capabilities - queries don't need exact matches`,
 		},
 	)

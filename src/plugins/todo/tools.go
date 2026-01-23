@@ -80,14 +80,14 @@ of the todo items.
 				Type:        "array",
 				Description: "Array of todo items to add. Each item should be an object with 'title' (string) and 'description' (string) fields",
 				Required:    false,
-				Items: map[string]interface{}{
+				Items: map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"title": map[string]interface{}{
+					"properties": map[string]any{
+						"title": map[string]any{
 							"type":        "string",
 							"description": "The title of the todo item",
 						},
-						"description": map[string]interface{}{
+						"description": map[string]any{
 							"type":        "string",
 							"description": "The description of the todo item",
 						},

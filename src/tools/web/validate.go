@@ -13,18 +13,11 @@ func validateAction(value any) error {
 	validActions := map[string]bool{
 		"navigate":     true,
 		"click":        true,
-		"type":         true,
-		"screenshot":   true,
 		"get_content":  true,
 		"save_content": true,
-		"wait":         true,
-		"back":         true,
-		"forward":      true,
-		"evaluate":     true,
-		"close":        true,
 	}
 	if !validActions[action] {
-		return fmt.Errorf("invalid action: %s. Must be one of: navigate, click, type, screenshot, get_content, save_content, wait, back, forward, evaluate, close", action)
+		return fmt.Errorf("invalid action: %s. Must be one of: navigate, click, get_content, save_content", action)
 	}
 	return nil
 }

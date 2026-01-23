@@ -16,12 +16,6 @@ func getOrCreateBrowser(agentContext map[string]any, headless ...bool) (context.
 	return globalSessionManager.GetOrCreateBrowser(agentContext, headless...)
 }
 
-// cleanupBrowser cleans up browser resources for a specific agent.
-// This should only be called when explicitly closing the browser session.
-func cleanupBrowser(agentContext map[string]any) error {
-	return globalSessionManager.CloseBrowser(agentContext)
-}
-
 // CleanupAllBrowsers cleans up all browser sessions.
 // Useful for graceful shutdown.
 func CleanupAllBrowsers() {
@@ -138,8 +132,10 @@ func stripUnwantedContent(ctx context.Context) error {
 	`
 
 	// Execute the script to remove unwanted content
-	var result interface{}
-	err := chromedp.Evaluate(script, &result).Do(ctx)
+	var result any
+	err := chromedp.Run(ctx,
+		chromedp.Evaluate(script, &result),
+	)
 	if err != nil {
 		return err
 	}
