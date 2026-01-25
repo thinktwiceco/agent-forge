@@ -118,6 +118,44 @@ func (s *Server) InitializeAgent(
 	return nil
 }
 
+// InitializeAgentFromConfig builds and registers an agent using a configuration file.
+func (s *Server) InitializeAgentFromConfig(name string, configPath string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	b, err := builder.NewAgentBuilderFromConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to create builder from config: %w", err)
+	}
+
+	// Set name for registration if provided, otherwise use from config
+	agentName := name
+	if agentName == "" {
+		// Use default name from config if registration name is empty
+		// We can't access private fields of b easily here, but we can assume
+		// the user wants to use for registration what they put in the config if name is empty.
+		// However, s.InitializeAgent takes 'name' as registration key.
+		// Let's just say 'name' is required for registration key in Server.
+		return fmt.Errorf("registration name is required")
+	}
+
+	// Set vector components if available
+	if s.vectorDB != nil {
+		b.SetVectorDB(s.vectorDB)
+	}
+	if s.embeddingGenerator != nil {
+		b.SetEmbeddingGenerator(s.embeddingGenerator)
+	}
+
+	agent, err := b.Build()
+	if err != nil {
+		return fmt.Errorf("failed to build agent: %w", err)
+	}
+
+	s.agents[agentName] = agent
+	return nil
+}
+
 // RegisterAgent registers a pre-built agent with the given name.
 func (s *Server) RegisterAgent(name string, agent *agents.Agent) {
 	s.mu.Lock()

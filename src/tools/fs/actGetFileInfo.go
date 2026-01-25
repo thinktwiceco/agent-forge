@@ -3,7 +3,7 @@ package fs
 import (
 	"fmt"
 	"os"
-	"syscall"
+
 	"time"
 )
 
@@ -26,11 +26,8 @@ func (fs *Fs) getFileInfo(path string) (string, error) {
 	}
 
 	// Get ownership information (UID/GID)
-	var uid, gid uint32
-	if stat, ok := fileInfo.Sys().(*syscall.Stat_t); ok {
-		uid = stat.Uid
-		gid = stat.Gid
-	}
+	// Get ownership information (UID/GID)
+	uid, gid := getOwnerInfo(fileInfo)
 
 	// Build detailed response
 	response := &fileInfoResponse{

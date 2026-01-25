@@ -506,6 +506,14 @@ src/
     └── todo/        # Todo plugin
 ```
 
+## Python SDK Usage
+
+The project includes a Python SDK for interacting with the AgentForge server.
+
+- **Documentation**: [Python SDK README](python-sdk/README.md)
+- **Build Script**: Use `scripts/build-python-sdk.sh` to compile the required Go server binaries for the SDK.
+
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
