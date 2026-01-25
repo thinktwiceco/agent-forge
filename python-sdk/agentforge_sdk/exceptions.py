@@ -1,13 +1,13 @@
-"""Custom exceptions for Agentforge SDK."""
+"""Custom exceptions for ThinkTwice SDK."""
 
 
-class AgentforgeError(Exception):
-    """Base exception for all Agentforge SDK errors."""
+class ThinkTwiceError(Exception):
+    """Base exception for all ThinkTwice SDK errors."""
 
     pass
 
 
-class APIError(AgentforgeError):
+class APIError(ThinkTwiceError):
     """Raised when an API request fails."""
 
     def __init__(self, message: str, status_code: int = None, response_text: str = None):
@@ -24,7 +24,7 @@ class AgentNotFoundError(APIError):
         self.agent_name = agent_name
 
 
-class ServerError(AgentforgeError):
+class ServerError(ThinkTwiceError):
     """Raised when server operations fail."""
 
     pass
@@ -58,3 +58,4 @@ class BinaryNotFoundError(ServerError):
         super().__init__(f"Server binary not found for platform {platform}/{arch}")
         self.platform = platform
         self.arch = arch
+

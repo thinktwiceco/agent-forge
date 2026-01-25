@@ -1,4 +1,4 @@
-"""Version information for Agentforge SDK."""
+"""Version information for ThinkTwice SDK."""
 
 import os
 from pathlib import Path
@@ -16,7 +16,8 @@ def _get_version() -> str:
             return version
     
     # Fallback to environment variable or default
-    return os.getenv("AGENTFORGE_SDK_VERSION", "0.1.0")
+    return os.getenv("THINKTWICE_SDK_VERSION", "0.1.0")
 
 
 __version__ = _get_version()
+

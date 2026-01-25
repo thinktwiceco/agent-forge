@@ -3,26 +3,10 @@ package builder
 import (
 	"fmt"
 
-	"os"
-
 	"github.com/thinktwice/agentForge/src/agents"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
-	"gopkg.in/yaml.v3"
 )
-
-type Config struct {
-	Agent struct {
-		Name         string              `yaml:"name"`
-		SystemPrompt string              `yaml:"system_prompt"`
-		Model        string              `yaml:"model"`
-		WorkingDir   string              `yaml:"working_dir"`
-		Persistence  string              `yaml:"persistence"`
-		Tools        []Tool              `yaml:"tools"`
-		Subagents    map[Subagent]string `yaml:"subagents"`
-		Plugins      []Plugin            `yaml:"plugins"`
-	} `yaml:"agent"`
-}
 
 type AgentBuilder struct {
 	name               string
@@ -47,40 +31,6 @@ func NewAgentBuilder(name string, persistence string) *AgentBuilder {
 		name:        name,
 		persistence: persistence,
 	}
-}
-
-func NewAgentBuilderFromConfig(configPath string) (*AgentBuilder, error) {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
-	}
-
-	b := NewAgentBuilder(cfg.Agent.Name, cfg.Agent.Persistence)
-	if cfg.Agent.SystemPrompt != "" {
-		b.SetSystemPrompt(cfg.Agent.SystemPrompt)
-	}
-	if cfg.Agent.Model != "" {
-		b.SetModel(cfg.Agent.Model)
-	}
-	if cfg.Agent.WorkingDir != "" {
-		b.SetWorkingDir(cfg.Agent.WorkingDir)
-	}
-	if len(cfg.Agent.Tools) > 0 {
-		b.AddTools(cfg.Agent.Tools...)
-	}
-	for sub, model := range cfg.Agent.Subagents {
-		b.AddSubagent(sub, model)
-	}
-	for _, plugin := range cfg.Agent.Plugins {
-		b.AddPlugin(plugin)
-	}
-
-	return b, nil
 }
 
 func (b *AgentBuilder) SetSystemPrompt(prompt string) *AgentBuilder {

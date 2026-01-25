@@ -1,4 +1,4 @@
-"""Data models for Agentforge SDK.
+"""Data models for ThinkTwice SDK.
 
 These models match the Go structures in src/core/response.go and src/llms/models.go.
 """
@@ -100,3 +100,4 @@ class ChunkResponse:
             agent_name=data.get("agentName", ""),
             trace=data.get("trace", ""),
         )
+

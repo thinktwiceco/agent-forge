@@ -1,4 +1,4 @@
-"""Server lifecycle management for Agentforge SDK.
+"""Server lifecycle management for ThinkTwice SDK.
 
 Handles starting, stopping, and monitoring the Go server process as a daemon.
 """
@@ -15,7 +15,7 @@ from typing import List, Optional
 
 import requests
 
-from agentforge_sdk.exceptions import (
+from thinktwice_sdk.exceptions import (
     BinaryNotFoundError,
     ServerError,
     ServerNotRunningError,
@@ -35,7 +35,7 @@ class ServerStatus(Enum):
 
 
 class ServerManager:
-    """Manages the lifecycle of the Agentforge server process."""
+    """Manages the lifecycle of the ThinkTwice server process."""
 
     def __init__(self, server_path: Optional[str] = None, port: int = 8080):
         """Initialize server manager.
@@ -47,8 +47,8 @@ class ServerManager:
         self.port = port
         self.base_url = f"http://localhost:{port}"
         self.server_path = server_path or self._detect_binary()
-        self.pid_file = Path(tempfile.gettempdir()) / f"agentforge-server-{port}.pid"
-        self.log_file = Path(tempfile.gettempdir()) / f"agentforge-server-{port}.log"
+        self.pid_file = Path(tempfile.gettempdir()) / f"thinktwice-server-{port}.pid"
+        self.log_file = Path(tempfile.gettempdir()) / f"thinktwice-server-{port}.log"
         self._process: Optional[subprocess.Popen] = None
 
     def _detect_binary(self) -> str:
@@ -59,19 +59,19 @@ class ServerManager:
         # Map platform to binary name
         if system == "linux":
             if machine in ("x86_64", "amd64"):
-                binary_name = "agentforge-server-linux-amd64"
+                binary_name = "thinktwice-server-linux-amd64"
             else:
                 raise BinaryNotFoundError(system, machine)
         elif system == "darwin":
             if machine in ("arm64", "aarch64"):
-                binary_name = "agentforge-server-darwin-arm64"
+                binary_name = "thinktwice-server-darwin-arm64"
             elif machine in ("x86_64", "amd64"):
-                binary_name = "agentforge-server-darwin-amd64"
+                binary_name = "thinktwice-server-darwin-amd64"
             else:
                 raise BinaryNotFoundError(system, machine)
         elif system == "windows":
             if machine in ("x86_64", "amd64"):
-                binary_name = "agentforge-server-windows-amd64.exe"
+                binary_name = "thinktwice-server-windows-amd64.exe"
             else:
                 raise BinaryNotFoundError(system, machine)
         else:
@@ -303,3 +303,4 @@ class ServerManager:
                 return [line.rstrip("\n") for line in all_lines[-lines:]]
         except IOError:
             return []
+

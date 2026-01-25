@@ -1,22 +1,22 @@
-"""Main client class for Agentforge SDK."""
+"""Main client class for ThinkTwice SDK."""
 
 import json
 from typing import Iterator, List, Optional
 
 import requests
 
-from agentforge_sdk.constants import StatusError
-from agentforge_sdk.exceptions import (
+from thinktwice_sdk.constants import StatusError
+from thinktwice_sdk.exceptions import (
     AgentNotFoundError,
     APIError,
     ServerNotRunningError,
 )
-from agentforge_sdk.models import ChunkResponse
-from agentforge_sdk.server_manager import ServerManager
+from thinktwice_sdk.models import ChunkResponse
+from thinktwice_sdk.server_manager import ServerManager
 
 
-class AgentforgeClient:
-    """Client for interacting with the Agentforge Agent API server."""
+class ThinkTwiceClient:
+    """Client for interacting with the ThinkTwice Agent API server."""
 
     def __init__(
         self,
@@ -25,7 +25,7 @@ class AgentforgeClient:
         auto_start: bool = True,
         port: int = 8080,
     ):
-        """Initialize Agentforge client.
+        """Initialize ThinkTwice client.
 
         Args:
             base_url: Base URL of the server (default: http://localhost:8080).
@@ -165,3 +165,4 @@ class AgentforgeClient:
                 raise ServerNotRunningError(
                     "Server is not reachable. Ensure the server is running."
                 )
+

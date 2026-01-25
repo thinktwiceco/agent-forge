@@ -1,9 +1,9 @@
-"""Agentforge Agent Python SDK."""
+"""ThinkTwice Agent Python SDK."""
 
-from agentforge_sdk._version import __version__
-from agentforge_sdk.client import AgentforgeClient
-from agentforge_sdk.models import ChunkResponse, ToolCall, ToolResult
-from agentforge_sdk.constants import (
+from thinktwice_sdk._version import __version__
+from thinktwice_sdk.client import ThinkTwiceClient
+from thinktwice_sdk.models import ChunkResponse, ToolCall, ToolResult
+from thinktwice_sdk.constants import (
     StatusStreaming,
     StatusCompleted,
     StatusError,
@@ -16,18 +16,18 @@ from agentforge_sdk.constants import (
     TypeToolResult,
     TypeCompletion,
 )
-from agentforge_sdk.exceptions import (
-    AgentforgeError,
+from thinktwice_sdk.exceptions import (
+    ThinkTwiceError,
     APIError,
     AgentNotFoundError,
     ServerError,
     ServerNotRunningError,
 )
 
-from agentforge_sdk._version import __version__
+from thinktwice_sdk._version import __version__
 
 __all__ = [
-    "AgentforgeClient",
+    "ThinkTwiceClient",
     "ChunkResponse",
     "ToolCall",
     "ToolResult",
@@ -42,9 +42,10 @@ __all__ = [
     "TypeToolExecuting",
     "TypeToolResult",
     "TypeCompletion",
-    "AgentforgeError",
+    "ThinkTwiceError",
     "APIError",
     "AgentNotFoundError",
     "ServerError",
     "ServerNotRunningError",
 ]
+

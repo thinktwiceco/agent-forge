@@ -9,7 +9,6 @@ import (
 
 	"github.com/thinktwice/agentForge/src/apis"
 	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/integrations"
 )
 
 func main() {
@@ -57,34 +56,6 @@ func main() {
 		fmt.Printf("Error shutting down server: %v\n", err)
 	}
 	fmt.Println("Server stopped")
-}
-
-// initializeVectorComponents initializes Milvus and embedding generator for vector operations.
-// Returns the vectorDB, embeddingGenerator, and an error if initialization fails.
-// Errors are ignored to allow the server to run without vector components.
-func initializeVectorComponents() (core.VectorDB, core.EmbeddingGenerator, error) {
-	// Initialize Milvus for vector database
-	// Note: VectorDim should match your embedding model dimension (e.g., 1536 for text-embedding-3-small)
-	milvusConfig := integrations.MilvusConfig{
-		Host:           "localhost",
-		Port:           19530, // Default Milvus port
-		CollectionName: "agent_knowledge",
-		DefaultTopK:    10,
-		VectorDim:      1536, // text-embedding-3-small dimension
-		// Username and Password are optional if Milvus doesn't require authentication
-	}
-	milvusDB, err := integrations.NewMilvusDB(milvusConfig)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize Milvus: %w", err)
-	}
-
-	// Initialize OpenAI embedding generator for vector tool
-	embeddingGenerator, err := integrations.NewOpenAIEmbeddingGenerator("", "text-embedding-3-small")
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize embedding generator: %w", err)
-	}
-
-	return milvusDB, embeddingGenerator, nil
 }
 
 // initializeAgents creates and registers agents with the server.

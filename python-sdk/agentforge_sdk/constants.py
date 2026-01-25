@@ -1,4 +1,4 @@
-"""Constants for Agentforge SDK.
+"""Constants for ThinkTwice SDK.
 
 These constants match the Go implementation in src/llms/constants.go.
 """
@@ -63,3 +63,4 @@ TypeToolResult = "tool-result"
 # TypeCompletion indicates the final chunk signaling that the response is complete.
 # This type marks the end of the streaming response when no more data will be sent.
 TypeCompletion = "completion"
+
