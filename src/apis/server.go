@@ -167,7 +167,9 @@ func (s *Server) GetAgent(name string) core.SubAgent {
 // handleHealth handles requests to /health
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
+		http.Error(w, "Failed to encode health status", http.StatusInternalServerError)
+	}
 }
 
 // handleListAgents handles GET requests to /api/server/agents
