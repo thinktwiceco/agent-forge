@@ -109,7 +109,7 @@ Troubleshooting:
 //
 // Returns:
 //   - *core.SubAgent: The OS agent as a sub-agent
-func OsAgent(llmEngine llms.LLMEngine, root string) *core.SubAgent {
+func OsAgent(llmEngine llms.LLMEngine, root string) core.SubAgent {
 	osTemplate := createOsAgentTemplate()
 	osConfig := osTemplate.ToAgentConfig(llmEngine)
 

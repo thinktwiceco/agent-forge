@@ -22,7 +22,7 @@ type AgentContext struct {
 	// Tools is the list of tools available to the agent (immutable)
 	Tools []llms.Tool
 	// SubAgents is the list of sub-agents available for delegation (immutable)
-	SubAgents []*SubAgent
+	SubAgents []SubAgent
 	// ResponseCh is the response channel for the current chat session (immutable per session)
 	ResponseCh *ResponseCh
 	// LastSubagentMessage stores the last message from a subagent (mutable)
@@ -182,7 +182,7 @@ func (ac *AgentContext) validateSubAgents(contextMap map[string]any) error {
 		return nil
 	}
 
-	if subAgents, ok := subAgentsRaw.([]*SubAgent); ok {
+	if subAgents, ok := subAgentsRaw.([]SubAgent); ok {
 		ac.SubAgents = subAgents
 		return nil
 	}
@@ -193,18 +193,14 @@ func (ac *AgentContext) validateSubAgents(contextMap map[string]any) error {
 		return fmt.Errorf("subAgents must be []*SubAgent or []interface{}, got %T", subAgentsRaw)
 	}
 
-	subAgents := make([]*SubAgent, 0, len(subAgentsSlice))
+	subAgents := make([]SubAgent, 0, len(subAgentsSlice))
 	for i, subAgentRaw := range subAgentsSlice {
-		// Try to assert as *SubAgent directly
-		// This works if the original value was stored as a pointer
-		subAgentPtr, ok := subAgentRaw.(*SubAgent)
+		// Try to assert as SubAgent directly
+		subAgent, ok := subAgentRaw.(SubAgent)
 		if !ok {
-			// If direct assertion fails, check if it implements SubAgent
-			// Note: We cannot convert a non-pointer value to *SubAgent
-			// In practice, SubAgents should always be stored as pointers
-			return fmt.Errorf("subAgents[%d] must be *SubAgent (pointer to SubAgent implementer), got %T", i, subAgentRaw)
+			return fmt.Errorf("subAgents[%d] must be SubAgent, got %T", i, subAgentRaw)
 		}
-		subAgents = append(subAgents, subAgentPtr)
+		subAgents = append(subAgents, subAgent)
 	}
 	ac.SubAgents = subAgents
 	return nil

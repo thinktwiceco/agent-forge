@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/thinktwice/agentForge/src/apis"
-	"github.com/thinktwice/agentForge/src/core"
 )
 
 func main() {
@@ -18,16 +17,8 @@ func main() {
 
 	fmt.Println("Starting ThinkTwice Agent API Server...")
 
-	// Initialize vector components (optional - can fail silently)
-	// vectorDB, embeddingGenerator, _ := initializeVectorComponents()
-	var vectorDB core.VectorDB
-	var embeddingGenerator core.EmbeddingGenerator
-
 	// Create server
 	server := apis.NewServer()
-	if vectorDB != nil && embeddingGenerator != nil {
-		server.SetVectorComponents(vectorDB, embeddingGenerator)
-	}
 
 	// Initialize and register agents
 	if err := initializeAgents(server); err != nil {

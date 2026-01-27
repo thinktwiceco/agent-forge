@@ -23,7 +23,7 @@ func (s Subagent) getSubagent(
 	vectorDB core.VectorDB,
 	embeddingGenerator core.EmbeddingGenerator,
 	workingDir string,
-) (*core.SubAgent, error) {
+) (core.SubAgent, error) {
 	switch s {
 	case GIT_AGENT:
 		return agents.GitAgent(llmEngine, workingDir), nil
@@ -34,6 +34,9 @@ func (s Subagent) getSubagent(
 	case WEB_AGENT:
 		return agents.WebAgent(llmEngine, workingDir), nil
 	case VECTOR_DB_AGENT:
+		if vectorDB == nil || embeddingGenerator == nil {
+			return nil, fmt.Errorf("vectorDB and embeddingGenerator are required for vector DB subagent")
+		}
 		return agents.VectorAgent(llmEngine, vectorDB, embeddingGenerator), nil
 	}
 	return nil, fmt.Errorf("invalid subagent: %s", s)

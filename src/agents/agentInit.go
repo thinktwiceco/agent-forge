@@ -135,9 +135,8 @@ func (a *Agent) initAgentContext() {
 	}
 }
 
-// addSystemAgents adds system agents based on configs
 func (a *Agent) addSystemAgents() {
-	var systemAgents []*core.SubAgent
+	var systemAgents []core.SubAgent
 
 	if a.config.Reasoning {
 		// Create reasoning agent from template

@@ -49,13 +49,10 @@ func (e *Expand) expand(agentContext map[string]any, subjectType string, subject
 
 	if subjectType == "agent" {
 		for _, subAgent := range subAgents {
-			if subAgent != nil {
-				subAgentVal := *subAgent
-				if subAgentVal.Name() == subjectName {
-					discoverable = subAgentVal
-					found = true
-					break
-				}
+			if subAgent != nil && subAgent.Name() == subjectName {
+				discoverable = subAgent
+				found = true
+				break
 			}
 		}
 		if !found {

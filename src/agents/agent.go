@@ -24,7 +24,7 @@ type Agent struct {
 	// Deal with message history.
 	history *History
 	// Subsystem of agents
-	subAgents []*core.SubAgent
+	subAgents []core.SubAgent
 	// System Prompt as a final system prompt
 	// Agent context built once at initialization
 	agentContext *core.AgentContext
@@ -243,7 +243,7 @@ func (a *Agent) Troubleshooting() string {
 //
 //	evalAgent := agents.EvalAgent(llmEngine, "/path/to/root")
 //	mainAgent.AddSystemAgent(evalAgent)
-func (a *Agent) AddSystemAgent(subAgent *core.SubAgent) {
+func (a *Agent) AddSystemAgent(subAgent core.SubAgent) {
 	errs := a.hooks.addSystemAgentEvent(a, subAgent)
 	logHookErrors(errs)
 
@@ -254,8 +254,7 @@ func (a *Agent) AddSystemAgent(subAgent *core.SubAgent) {
 	logHookErrors(errs)
 }
 
-func (a *Agent) AgentAsSubAgent() *core.SubAgent {
+func (a *Agent) AgentAsSubAgent() core.SubAgent {
 	a.config.MainAgent = false
-	sa := core.SubAgent(a)
-	return &sa
+	return a
 }

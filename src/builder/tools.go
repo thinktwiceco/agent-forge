@@ -31,6 +31,9 @@ func (t Tool) getTool(
 	case WEB_BROWSER_TOOL:
 		return web.NewWebTool(workingDir), nil
 	case VECTOR_DB_TOOL:
+		if vectorDB == nil || embeddingGenerator == nil {
+			return nil, fmt.Errorf("vectorDB and embeddingGenerator are required for vector DB tool")
+		}
 		return vector.NewVectorTool(vectorDB, embeddingGenerator), nil
 	case GIT_TOOL:
 		return git.NewGitTool(workingDir), nil

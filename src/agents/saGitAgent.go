@@ -1,6 +1,8 @@
 package agents
 
 import (
+	"fmt"
+
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
 	"github.com/thinktwice/agentForge/src/tools/git"
@@ -11,10 +13,10 @@ import (
 // This agent handles git operations including status checks, staging files, committing changes,
 // pushing and pulling from remotes, branch management, and viewing history and diffs.
 
-func createGitAgentTemplate() *SystemAgentTemplate {
+func createGitAgentTemplate() (*SystemAgentTemplate, error) {
 	template, err := NewSystemAgentTemplate(AgentNameSystemGit, TraceGit)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to create git agent template: %w", err)
 	}
 
 	// Build system prompt with structured components
@@ -169,7 +171,7 @@ Troubleshooting:
   * Review diffs before committing to ensure correct changes
   * Include relevant git information (branch, commit hash) in responses`)
 
-	return template
+	return template, nil
 }
 
 // GitAgent creates a Git version control agent with git tools.
@@ -180,8 +182,11 @@ Troubleshooting:
 //
 // Returns:
 //   - *core.SubAgent: The Git agent as a sub-agent
-func GitAgent(llmEngine llms.LLMEngine, root string) *core.SubAgent {
-	gitTemplate := createGitAgentTemplate()
+func GitAgent(llmEngine llms.LLMEngine, root string) core.SubAgent {
+	gitTemplate, err := createGitAgentTemplate()
+	if err != nil {
+		panic(err) // Still panic here for now as this is a constructor-like function
+	}
 	gitConfig := gitTemplate.ToAgentConfig(llmEngine)
 
 	// Add GitTool as the first tool

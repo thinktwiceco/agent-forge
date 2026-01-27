@@ -13,9 +13,9 @@ import (
 // This method is currently unused but kept for potential future use.
 //
 //nolint:unused // Reserved for future use
-func (a *Agent) getSubAgentsAsInterfaces() []*core.SubAgent {
-	subAgentInterfaces := make([]*core.SubAgent, 0, len(a.subAgents))
-	subAgentInterfaces = append(subAgentInterfaces, a.subAgents...)
+func (a *Agent) getSubAgentsAsInterfaces() []core.SubAgent {
+	subAgentInterfaces := make([]core.SubAgent, len(a.subAgents))
+	copy(subAgentInterfaces, a.subAgents)
 	return subAgentInterfaces
 }
 

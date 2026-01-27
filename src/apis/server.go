@@ -1,13 +1,14 @@
 package apis
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/thinktwice/agentForge/src/agents"
 	"github.com/thinktwice/agentForge/src/builder"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
@@ -15,11 +16,9 @@ import (
 
 // Server represents an HTTP server that exposes agent chat functionality via REST API.
 type Server struct {
-	agents             map[string]*agents.Agent
-	mu                 sync.RWMutex
-	vectorDB           core.VectorDB
-	embeddingGenerator core.EmbeddingGenerator
-	httpServer         *http.Server
+	agents     map[string]core.SubAgent
+	mu         sync.RWMutex
+	httpServer *http.Server
 }
 
 // ChatRequest represents the JSON request body for chat endpoint.
@@ -35,17 +34,8 @@ type AgentsResponse struct {
 // NewServer creates a new Server instance.
 func NewServer() *Server {
 	return &Server{
-		agents: make(map[string]*agents.Agent),
+		agents: make(map[string]core.SubAgent),
 	}
-}
-
-// SetVectorComponents sets the vector database and embedding generator for agent initialization.
-// These components are optional and will be used when initializing agents that require them.
-func (s *Server) SetVectorComponents(vectorDB core.VectorDB, embeddingGenerator core.EmbeddingGenerator) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.vectorDB = vectorDB
-	s.embeddingGenerator = embeddingGenerator
 }
 
 // InitializeAgent builds and registers an agent using the agent builder.
@@ -62,71 +52,113 @@ func (s *Server) SetVectorComponents(vectorDB core.VectorDB, embeddingGenerator 
 //
 // Returns:
 //   - error: Any error that occurred during agent initialization
-func (s *Server) InitializeAgent(
-	name string,
-	agentName string,
-	model string,
-	workingDir string,
-	tools []builder.Tool,
-	subagents map[builder.Subagent]string,
-	plugins []builder.Plugin,
-) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+// func (s *Server) InitializeAgent(
+// 	name string,
+// 	agentName string,
+// 	model string,
+// 	workingDir string,
+// 	tools []builder.Tool,
+// 	subagents map[builder.Subagent]string,
+// 	plugins []builder.Plugin,
+// ) error {
 
-	b := builder.NewAgentBuilder(agentName, "json")
+// 	agentBuilder := builder.NewAgentBuilder(agentName, "json")
 
-	// Add tools
-	if len(tools) > 0 {
-		b.AddTools(tools...)
+// 	// Add tools
+// 	if len(tools) > 0 {
+// 		agentBuilder.AddTools(tools...)
+// 	}
+
+// 	// Set model
+// 	if model != "" {
+// 		agentBuilder.SetModel(model)
+// 	}
+
+// 	// Set working directory
+// 	if workingDir != "" {
+// 		agentBuilder.SetWorkingDir(workingDir)
+// 	}
+
+// 	// Add subagents
+// 	for subagent, subagentModel := range subagents {
+// 		agentBuilder.AddSubagent(subagent, subagentModel)
+// 	}
+
+// 	// Add plugins
+// 	for _, plugin := range plugins {
+// 		agentBuilder.AddPlugin(plugin)
+// 	}
+
+// 	agent, err := agentBuilder.Build()
+// 	if err != nil {
+// 		return fmt.Errorf("failed to build agent: %w", err)
+// 	}
+
+// 	s.agents[name] = agent
+// 	return nil
+// }
+
+// InitializeAgentFromConfig builds and registers an agent using a configuration file.
+func (s *Server) InitializeAgentFromConfig(name string, configPath string) error {
+
+	agentBuilder, err := builder.NewAgentBuilderFromConfig(configPath)
+
+	if err != nil {
+		return fmt.Errorf("failed to create agent builder from config: %w", err)
 	}
 
-	// Set model
-	if model != "" {
-		b.SetModel(model)
+	// Set name for registration: use provided name if not empty, otherwise use name from config
+	agentName := name
+
+	if agentName == "" {
+		agentName = agentBuilder.GetName()
 	}
 
-	// Set working directory
-	if workingDir != "" {
-		b.SetWorkingDir(workingDir)
+	if agentName == "" {
+		return fmt.Errorf("registration name is required (none provided and none found in config)")
 	}
 
-	// Set vector components if available
-	if s.vectorDB != nil {
-		b.SetVectorDB(s.vectorDB)
-	}
-	if s.embeddingGenerator != nil {
-		b.SetEmbeddingGenerator(s.embeddingGenerator)
+	// Initialize Vector Builder from configs
+	vectorBuilder, err := builder.NewVectorBuilderFromConfig(configPath)
+
+	if err != nil {
+		return fmt.Errorf("failed to create vector builder from config: %w", err)
 	}
 
-	// Add subagents
-	for subagent, subagentModel := range subagents {
-		b.AddSubagent(subagent, subagentModel)
+	err = vectorBuilder.Build()
+
+	if err != nil {
+		return fmt.Errorf("failed to build vector components: %w", err)
 	}
 
-	// Add plugins
-	for _, plugin := range plugins {
-		b.AddPlugin(plugin)
-	}
+	// Extract the vector components if present and add them to the agent
+	vectorDB := vectorBuilder.GetVectorDB()
+	embeddingGenerator := vectorBuilder.GetEmbeddingGenerator()
 
-	agent, err := b.Build()
+	agentBuilder.SetVectorDB(vectorDB)
+	agentBuilder.SetEmbeddingGenerator(embeddingGenerator)
+
+	agent, err := agentBuilder.Build()
+
 	if err != nil {
 		return fmt.Errorf("failed to build agent: %w", err)
 	}
 
-	s.agents[name] = agent
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.agents[agentName] = agent
 	return nil
 }
 
 // RegisterAgent registers a pre-built agent with the given name.
-func (s *Server) RegisterAgent(name string, agent *agents.Agent) {
+func (s *Server) RegisterAgent(name string, agent core.SubAgent) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.agents[name] = agent
 }
 
 // GetAgent retrieves an agent by name. Returns nil if not found.
-func (s *Server) GetAgent(name string) *agents.Agent {
+func (s *Server) GetAgent(name string) core.SubAgent {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.agents[name]
@@ -160,6 +192,7 @@ func (s *Server) handleListAgents(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleChat handles POST requests to /api/server/{agentname}/chat
+// handleChat handles POST requests to /api/server/{agentname}/chat
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	// Only allow POST
 	if r.Method != http.MethodPost {
@@ -169,7 +202,8 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	// Extract agent name from URL path
 	// Expected path: /api/server/{agentname}/chat
-	pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
+	path := strings.Trim(r.URL.Path, "/")
+	pathParts := strings.Split(path, "/")
 	if len(pathParts) != 4 || pathParts[0] != "api" || pathParts[1] != "server" || pathParts[3] != "chat" {
 		http.Error(w, "Invalid path. Expected: /api/server/{agentname}/chat", http.StatusBadRequest)
 		return
@@ -261,7 +295,10 @@ func (s *Server) Start(port string) error {
 // Shutdown gracefully shuts down the HTTP server.
 func (s *Server) Shutdown() error {
 	if s.httpServer != nil {
-		return s.httpServer.Close()
+		// Use a context with timeout for graceful shutdown
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return s.httpServer.Shutdown(ctx)
 	}
 	return nil
 }

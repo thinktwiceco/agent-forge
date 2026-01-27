@@ -15,6 +15,10 @@ func (v *Vector) delete(args map[string]any) llms.ToolReturn {
 		return core.NewErrorResponse("document_id parameter is required for delete action and must be a non-empty string")
 	}
 
+	if v.vectorDB == nil {
+		return core.NewErrorResponse("vector database not configured for vector tool")
+	}
+
 	// Delete the document
 	err := v.vectorDB.Delete(documentID)
 	if err != nil {

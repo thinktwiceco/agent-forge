@@ -2,11 +2,27 @@ package builder
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/thinktwice/agentForge/src/agents"
 	"github.com/thinktwice/agentForge/src/core"
 	"github.com/thinktwice/agentForge/src/llms"
+	"gopkg.in/yaml.v3"
 )
+
+type Config struct {
+	Agent struct {
+		Name         string              `yaml:"name"`
+		SystemPrompt string              `yaml:"system_prompt"`
+		Model        string              `yaml:"model"`
+		WorkingDir   string              `yaml:"working_dir"`
+		Persistence  string              `yaml:"persistence"`
+		Tools        []Tool              `yaml:"tools"`
+		Subagents    map[Subagent]string `yaml:"subagents"`
+		Plugins      []Plugin            `yaml:"plugins"`
+	} `yaml:"agent"`
+	VectorStorage *VectorStorageConfig `yaml:"vector-storage,omitempty"`
+}
 
 type AgentBuilder struct {
 	name               string
@@ -15,10 +31,10 @@ type AgentBuilder struct {
 	Subagents          map[LLM]Subagent
 	plugins            []Plugin
 	llmEngine          llms.LLMEngine
-	vectorDB           core.VectorDB
-	embeddingGenerator core.EmbeddingGenerator
 	workingDir         string
 	persistence        string
+	vectorDB           core.VectorDB
+	embeddingGenerator core.EmbeddingGenerator
 }
 
 // Public API methods
@@ -33,9 +49,47 @@ func NewAgentBuilder(name string, persistence string) *AgentBuilder {
 	}
 }
 
+func NewAgentBuilderFromConfig(configPath string) (*AgentBuilder, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	b := NewAgentBuilder(cfg.Agent.Name, cfg.Agent.Persistence)
+	if cfg.Agent.SystemPrompt != "" {
+		b.SetSystemPrompt(cfg.Agent.SystemPrompt)
+	}
+	if cfg.Agent.Model != "" {
+		b.SetModel(cfg.Agent.Model)
+	}
+	if cfg.Agent.WorkingDir != "" {
+		b.SetWorkingDir(cfg.Agent.WorkingDir)
+	}
+	if len(cfg.Agent.Tools) > 0 {
+		b.AddTools(cfg.Agent.Tools...)
+	}
+	for sub, model := range cfg.Agent.Subagents {
+		b.AddSubagent(sub, model)
+	}
+	for _, plugin := range cfg.Agent.Plugins {
+		b.AddPlugin(plugin)
+	}
+
+	return b, nil
+}
+
 func (b *AgentBuilder) SetSystemPrompt(prompt string) *AgentBuilder {
 	b.systemPrompt = prompt
 	return b
+}
+
+func (b *AgentBuilder) GetName() string {
+	return b.name
 }
 
 func (b *AgentBuilder) AddTools(tools ...Tool) *AgentBuilder {
@@ -150,14 +204,16 @@ func (b *AgentBuilder) createLLMEngine(l LLM) (llms.LLMEngine, error) {
 	return mmEngine.MainModel(), nil
 }
 
-func (b *AgentBuilder) buildSubagents() ([]*core.SubAgent, error) {
-	subagents := []*core.SubAgent{}
+func (b *AgentBuilder) buildSubagents() ([]core.SubAgent, error) {
+	subagents := []core.SubAgent{}
 	for llm, subagent := range b.Subagents {
 		llmEngine, err := b.createLLMEngine(llm)
 		if err != nil {
 			return nil, err
 		}
+
 		subagent, err := subagent.getSubagent(llmEngine, b.vectorDB, b.embeddingGenerator, b.workingDir)
+
 		if err != nil {
 			return nil, err
 		}
