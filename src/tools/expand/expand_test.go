@@ -49,7 +49,7 @@ func createAgentContextWithTools(tools []llms.Tool) map[string]any {
 }
 
 // createAgentContextWithSubAgents creates an agent context map with sub-agents
-func createAgentContextWithSubAgents(subAgents []*core.SubAgent) map[string]any {
+func createAgentContextWithSubAgents(subAgents []core.SubAgent) map[string]any {
 	return map[string]any{
 		"subAgents": subAgents,
 	}
@@ -195,9 +195,9 @@ func TestExpandTool_ExpandAgent(t *testing.T) {
 		"Check agent configuration",
 	)
 
-	// Convert to pointer to interface, similar to AgentAsSubAgent()
+	// Convert to interface直接
 	var sa core.SubAgent = mockAgent
-	agentContext := createAgentContextWithSubAgents([]*core.SubAgent{&sa})
+	agentContext := createAgentContextWithSubAgents([]core.SubAgent{sa})
 
 	args := map[string]any{
 		"subject_type": "agent",
@@ -246,7 +246,7 @@ func TestExpandTool_NotFound(t *testing.T) {
 			name:         "agent not found",
 			subjectType:  "agent",
 			subjectName:  "nonexistent-agent",
-			agentContext: createAgentContextWithSubAgents([]*core.SubAgent{}),
+			agentContext: createAgentContextWithSubAgents([]core.SubAgent{}),
 		},
 	}
 
