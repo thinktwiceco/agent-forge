@@ -1,31 +1,36 @@
-"""Main client class for ThinkTwice SDK."""
+"""Main client class for Agent Forge SDK."""
+
+from __future__ import annotations
 
 import json
-from typing import Iterator, List, Optional
+from typing import TYPE_CHECKING
 
 import requests
 
-from thinktwice_sdk.constants import StatusError
-from thinktwice_sdk.exceptions import (
+from agentforge_sdk.constants import StatusError
+from agentforge_sdk.exceptions import (
     AgentNotFoundError,
     APIError,
     ServerNotRunningError,
 )
-from thinktwice_sdk.models import ChunkResponse
-from thinktwice_sdk.server_manager import ServerManager
+from agentforge_sdk.models import ChunkResponse
+from agentforge_sdk.server_manager import ServerManager
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
-class ThinkTwiceClient:
-    """Client for interacting with the ThinkTwice Agent API server."""
+class AgentForgeClient:
+    """Client for interacting with the Agent Forge API server."""
 
     def __init__(
         self,
         base_url: str = "http://localhost:8080",
-        server_path: Optional[str] = None,
+        server_path: str | None = None,
         auto_start: bool = True,
         port: int = 8080,
     ):
-        """Initialize ThinkTwice client.
+        """Initialize Agent Forge client.
 
         Args:
             base_url: Base URL of the server (default: http://localhost:8080).
@@ -35,7 +40,7 @@ class ThinkTwiceClient:
         """
         self.base_url = base_url.rstrip("/")
         self.auto_start = auto_start
-        self.server_manager: Optional[ServerManager] = None
+        self.server_manager: ServerManager | None = None
 
         # Only create server manager if server_path is provided or auto_start is enabled
         if server_path is not None or auto_start:
@@ -52,7 +57,7 @@ class ThinkTwiceClient:
             if auto_start and not self.server_manager.is_running():
                 self.server_manager.start()
 
-    def list_agents(self) -> List[str]:
+    def list_agents(self) -> list[str]:
         """List all available agents.
 
         Returns:
@@ -113,7 +118,7 @@ class ThinkTwiceClient:
                     # Stop on error status
                     if chunk.status == StatusError:
                         break
-                except json.JSONDecodeError as e:
+                except json.JSONDecodeError:
                     # Invalid JSON, skip this line
                     continue
 
@@ -159,7 +164,7 @@ class ThinkTwiceClient:
             # No server manager, assume server is managed externally
             # Just check if it's reachable
             try:
-                response = requests.get(f"{self.base_url}/api/server/agents", timeout=2)
+                response = requests.get(f"{self.base_url}/health", timeout=2)
                 response.raise_for_status()
             except requests.exceptions.RequestException:
                 raise ServerNotRunningError(

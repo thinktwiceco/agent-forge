@@ -1,10 +1,12 @@
-"""Data models for ThinkTwice SDK.
+"""Data models for Agent Forge SDK.
 
 These models match the Go structures in src/core/response.go and src/llms/models.go.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -16,7 +18,7 @@ class ToolCall:
 
     id: str  # Tool call ID
     name: str  # Tool name
-    arguments: Dict[str, Any]  # Tool arguments
+    arguments: dict[str, Any]  # Tool arguments
 
 
 @dataclass
@@ -47,17 +49,17 @@ class ChunkResponse:
     full_content: str = ""  # Accumulated full content
     status: str = ""  # Status: see constants.py Status* constants
     type: str = ""  # Response type: see constants.py Type* constants
-    tool_calls: Optional[List[ToolCall]] = None  # Tool calls (when Type is "tool-call")
-    tool_executing: Optional[ToolCall] = None  # Tool being executed (when Status is "tool-executing")
-    tool_results: Optional[List[ToolResult]] = None  # Tool execution results (when Status is "tool-result")
-    prompt_tokens: Optional[int] = None  # Input tokens consumed
-    completion_tokens: Optional[int] = None  # Output tokens generated
-    total_tokens: Optional[int] = None  # Total tokens used
+    tool_calls: list[ToolCall] | None = None  # Tool calls (when Type is "tool-call")
+    tool_executing: ToolCall | None = None  # Tool being executed (when Status is "tool-executing")
+    tool_results: list[ToolResult] | None = None  # Tool execution results (when Status is "tool-result")
+    prompt_tokens: int | None = None  # Input tokens consumed
+    completion_tokens: int | None = None  # Output tokens generated
+    total_tokens: int | None = None  # Total tokens used
     agent_name: str = ""  # Name of the agent producing this chunk
     trace: str = ""  # Trace information (e.g., "thinking", "response")
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ChunkResponse":
+    def from_dict(cls, data: dict[str, Any]) -> ChunkResponse:
         """Create ChunkResponse from dictionary (e.g., from JSON)."""
         # Handle tool_calls
         tool_calls = None

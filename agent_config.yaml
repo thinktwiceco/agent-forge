@@ -11,3 +11,8 @@ agent:
     reasoning: "deepseek::deepseek-reasoner"
   plugins:
     - "logger"
+vector-storage:
+  vector_db: "sqlite"
+  embedding_model: "openai::text-embedding-3-small"
+  sqlite:
+    db_path: "/home/verte/Desktop/sandbox/vector_db/chroma.db"

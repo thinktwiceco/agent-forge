@@ -1,16 +1,18 @@
-"""Custom exceptions for ThinkTwice SDK."""
+"""Custom exceptions for Agent Forge SDK."""
+
+from __future__ import annotations
 
 
-class ThinkTwiceError(Exception):
-    """Base exception for all ThinkTwice SDK errors."""
+class AgentForgeError(Exception):
+    """Base exception for all Agent Forge SDK errors."""
 
     pass
 
 
-class APIError(ThinkTwiceError):
+class APIError(AgentForgeError):
     """Raised when an API request fails."""
 
-    def __init__(self, message: str, status_code: int = None, response_text: str = None):
+    def __init__(self, message: str, status_code: int | None = None, response_text: str | None = None):
         super().__init__(message)
         self.status_code = status_code
         self.response_text = response_text
@@ -24,7 +26,7 @@ class AgentNotFoundError(APIError):
         self.agent_name = agent_name
 
 
-class ServerError(ThinkTwiceError):
+class ServerError(AgentForgeError):
     """Raised when server operations fail."""
 
     pass
@@ -40,7 +42,7 @@ class ServerNotRunningError(ServerError):
 class ServerStartError(ServerError):
     """Raised when server fails to start."""
 
-    def __init__(self, message: str, exit_code: int = None):
+    def __init__(self, message: str, exit_code: int | None = None):
         super().__init__(message)
         self.exit_code = exit_code
 

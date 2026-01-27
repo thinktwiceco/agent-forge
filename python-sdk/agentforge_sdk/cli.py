@@ -79,7 +79,7 @@ def all_checks() -> int:
 def main() -> None:
     """Main CLI entry point."""
     if len(sys.argv) < 2:
-        print("Usage: thinktwice-sdk <command>")
+        print("Usage: agent-forge-sdk <command>")
         print("\nAvailable commands:")
         print("  test        Run tests")
         print("  test-cov    Run tests with coverage")

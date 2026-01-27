@@ -1,4 +1,4 @@
-"""Constants for ThinkTwice SDK.
+"""Constants for Agent Forge SDK.
 
 These constants match the Go implementation in src/llms/constants.go.
 """

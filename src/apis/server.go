@@ -164,6 +164,12 @@ func (s *Server) GetAgent(name string) core.SubAgent {
 	return s.agents[name]
 }
 
+// handleHealth handles requests to /health
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
 // handleListAgents handles GET requests to /api/server/agents
 func (s *Server) handleListAgents(w http.ResponseWriter, r *http.Request) {
 	// Only allow GET
@@ -283,6 +289,7 @@ func (s *Server) Start(port string) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/server/agents", s.handleListAgents)
 	mux.HandleFunc("/api/server/", s.handleChat)
+	mux.HandleFunc("/health", s.handleHealth)
 
 	s.httpServer = &http.Server{
 		Addr:    ":" + port,

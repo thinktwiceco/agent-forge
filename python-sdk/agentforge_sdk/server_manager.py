@@ -1,7 +1,9 @@
-"""Server lifecycle management for ThinkTwice SDK.
+"""Server lifecycle management for Agent Forge SDK.
 
 Handles starting, stopping, and monitoring the Go server process as a daemon.
 """
+
+from __future__ import annotations
 
 import os
 import platform
@@ -11,14 +13,11 @@ import tempfile
 import time
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional
 
 import requests
 
-from thinktwice_sdk.exceptions import (
+from agentforge_sdk.exceptions import (
     BinaryNotFoundError,
-    ServerError,
-    ServerNotRunningError,
     ServerStartError,
     ServerStopError,
 )
@@ -35,9 +34,9 @@ class ServerStatus(Enum):
 
 
 class ServerManager:
-    """Manages the lifecycle of the ThinkTwice server process."""
+    """Manages the lifecycle of the Agent Forge server process."""
 
-    def __init__(self, server_path: Optional[str] = None, port: int = 8080):
+    def __init__(self, server_path: str | None = None, port: int = 8080):
         """Initialize server manager.
 
         Args:
@@ -47,9 +46,9 @@ class ServerManager:
         self.port = port
         self.base_url = f"http://localhost:{port}"
         self.server_path = server_path or self._detect_binary()
-        self.pid_file = Path(tempfile.gettempdir()) / f"thinktwice-server-{port}.pid"
-        self.log_file = Path(tempfile.gettempdir()) / f"thinktwice-server-{port}.log"
-        self._process: Optional[subprocess.Popen] = None
+        self.pid_file = Path(tempfile.gettempdir()) / f"agent-forge-server-{port}.pid"
+        self.log_file = Path(tempfile.gettempdir()) / f"agent-forge-server-{port}.log"
+        self._process: subprocess.Popen | None = None
 
     def _detect_binary(self) -> str:
         """Detect the appropriate server binary for the current platform."""
@@ -59,19 +58,19 @@ class ServerManager:
         # Map platform to binary name
         if system == "linux":
             if machine in ("x86_64", "amd64"):
-                binary_name = "thinktwice-server-linux-amd64"
+                binary_name = "agent-forge-server-linux-amd64"
             else:
                 raise BinaryNotFoundError(system, machine)
         elif system == "darwin":
             if machine in ("arm64", "aarch64"):
-                binary_name = "thinktwice-server-darwin-arm64"
+                binary_name = "agent-forge-server-darwin-arm64"
             elif machine in ("x86_64", "amd64"):
-                binary_name = "thinktwice-server-darwin-amd64"
+                binary_name = "agent-forge-server-darwin-amd64"
             else:
                 raise BinaryNotFoundError(system, machine)
         elif system == "windows":
             if machine in ("x86_64", "amd64"):
-                binary_name = "thinktwice-server-windows-amd64.exe"
+                binary_name = "agent-forge-server-windows-amd64.exe"
             else:
                 raise BinaryNotFoundError(system, machine)
         else:
@@ -86,7 +85,7 @@ class ServerManager:
 
         return str(binary_path)
 
-    def _get_pid(self) -> Optional[int]:
+    def _get_pid(self) -> int | None:
         """Get the PID from the PID file."""
         if not self.pid_file.exists():
             return None
@@ -123,9 +122,9 @@ class ServerManager:
             self.pid_file.unlink()
 
     def _check_health(self, timeout: float = 1.0) -> bool:
-        """Check if server is healthy by making a request to /api/server/agents."""
+        """Check if server is healthy by making a request to /health."""
         try:
-            response = requests.get(f"{self.base_url}/api/server/agents", timeout=timeout)
+            response = requests.get(f"{self.base_url}/health", timeout=timeout)
             return response.status_code == 200
         except (requests.RequestException, requests.Timeout):
             return False
@@ -284,7 +283,7 @@ class ServerManager:
         else:
             return ServerStatus.STOPPED
 
-    def get_logs(self, lines: int = 100) -> List[str]:
+    def get_logs(self, lines: int = 100) -> list[str]:
         """Get recent server logs.
 
         Args:
