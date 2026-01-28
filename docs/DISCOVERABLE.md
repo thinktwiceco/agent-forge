@@ -39,7 +39,7 @@ config := agents.AgentConfig{
     SystemPrompt: "You are a helpful assistant",
 }
 
-agent := agents.NewAgent(config)
+agent := agents.NewAgent(&config)
 
 // Access descriptions
 basic := agent.BasicDescription()       // Returns Description field

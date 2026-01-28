@@ -44,12 +44,18 @@ func (v *Vector) search(args map[string]any) llms.ToolReturn {
 	}
 
 	// Generate embedding for query
+	if v.embeddingGenerator == nil {
+		return core.NewErrorResponse("embedding generator not configured for vector tool")
+	}
 	queryEmbedding, _, err := v.embeddingGenerator.GenerateEmbedding(query)
 	if err != nil {
 		return core.NewErrorResponse(fmt.Sprintf("failed to generate query embedding: %v", err))
 	}
 
 	// Perform search
+	if v.vectorDB == nil {
+		return core.NewErrorResponse("vector database not configured for vector tool")
+	}
 	results, err := v.vectorDB.Search(queryEmbedding, topK, filters)
 	if err != nil {
 		return core.NewErrorResponse(fmt.Sprintf("failed to search: %v", err))

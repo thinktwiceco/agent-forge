@@ -128,7 +128,7 @@ func main() {
     })
     
     // Chat with the agent
-    responseCh := agent.ChatStream("Hello! How can you help me?")
+    responseCh := agent.ChatStream("Hello! How can you help me?", "")
     
     // Process streaming response
     for chunk := range responseCh.Start() {
@@ -379,14 +379,44 @@ for chunk := range responseCh.Start() {
 
 ### Conversation Persistence
 
-Enable conversation history storage:
+Enable conversation history storage to maintain context across sessions. The system supports multiple concurrent conversations per agent.
+
+#### Go SDK
 
 ```go
 agent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine:   llm,
     AgentName:   "persistent-agent",
-    Persistence: "json",  // Stores history as JSON files
+    Persistence: "json",  // Stores history as JSON files in data/conversations/
 })
+
+// Start a new conversation (pass empty string as chatId)
+// Returns the responses and the generated chatId
+responseCh := agent.ChatStream("Hello!", "")
+chatId := responseCh.ChatId() // Save this for later!
+
+// Continue an existing conversation
+// Pass the chatId to resume context
+responseCh = agent.ChatStream("Continue...", chatId)
+```
+
+#### REST API
+
+**Start New Conversation:**
+```bash
+POST /api/server/{agentName}/chat
+{
+    "message": "Hello!"
+}
+# Response includes "chatId" in every chunk
+```
+
+**Resume Conversation:**
+```bash
+POST /api/server/{agentName}/chat?conversationId={uuid}
+{
+    "message": "Continue..."
+}
 ```
 
 ### Hook System
@@ -472,7 +502,7 @@ func main() {
     agent.AddSystemAgent(reasoningAgent)
     
     // Chat with the agent
-    responseCh := agent.ChatStream("What is 15 multiplied by 23?")
+    responseCh := agent.ChatStream("What is 15 multiplied by 23?", "")
     
     for chunk := range responseCh.Start() {
         if chunk.Content != "" {
@@ -505,6 +535,14 @@ src/
     ├── logger/      # Logger plugin
     └── todo/        # Todo plugin
 ```
+
+## Python SDK Usage
+
+The project includes a Python SDK for interacting with the AgentForge server.
+
+- **Documentation**: [Python SDK README](python-sdk/README.md)
+- **Build Script**: Use `scripts/build-python-sdk.sh` to compile the required Go server binaries for the SDK.
+
 
 ## Contributing
 

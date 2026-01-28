@@ -86,10 +86,10 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 	// Use agent name/trace from extended chunk if available, otherwise use agent's name/trace
 	agentName := extendedChunk.AgentName
 	trace := extendedChunk.Trace
-	if agentName == "" {
+	if agentName == "" && a != nil {
 		agentName = a.Name()
 	}
-	if trace == "" {
+	if trace == "" && a != nil {
 		trace = a.Trace()
 	}
 

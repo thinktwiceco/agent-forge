@@ -25,9 +25,9 @@ type OnToolExecutionHook func(a *Agent, toolResult *llms.ToolResult) error
 
 type OnNewUserMessageHook func(a *Agent, message string) error
 
-type OnAddSystemAgentHook func(a *Agent, subAgent *core.SubAgent) error
+type OnAddSystemAgentHook func(a *Agent, subAgent core.SubAgent) error
 
-type OnAddedSystemAgentHook func(a *Agent, subAgent *core.SubAgent) error
+type OnAddedSystemAgentHook func(a *Agent, subAgent core.SubAgent) error
 
 type OnNewAssistantMessageHook func(a *Agent, message string, promptTokens, completionTokens, totalTokens int) error
 
@@ -135,7 +135,7 @@ func (ah *AgentHooks) toolExecutionEvent(a *Agent, toolResult *llms.ToolResult) 
 	return errors
 }
 
-func (ah *AgentHooks) addSystemAgentEvent(a *Agent, subAgent *core.SubAgent) []error {
+func (ah *AgentHooks) addSystemAgentEvent(a *Agent, subAgent core.SubAgent) []error {
 	agentforge.Debug("Triggering addSystemAgentEvent for agent %s", a.Name())
 	var errors []error
 	for _, hook := range ah.onAddSystemAgent {
@@ -146,7 +146,7 @@ func (ah *AgentHooks) addSystemAgentEvent(a *Agent, subAgent *core.SubAgent) []e
 	return errors
 }
 
-func (ah *AgentHooks) addedSystemAgentEvent(a *Agent, subAgent *core.SubAgent) []error {
+func (ah *AgentHooks) addedSystemAgentEvent(a *Agent, subAgent core.SubAgent) []error {
 	agentforge.Debug("Triggering addedSystemAgentEvent for agent %s", a.Name())
 	var errors []error
 	for _, hook := range ah.onAddedSystemAgent {

@@ -68,6 +68,10 @@ func (v *Vector) listDocuments(args map[string]any) llms.ToolReturn {
 		Filters: filters,
 	}
 
+	if v.vectorDB == nil {
+		return core.NewErrorResponse("vector database not configured for vector tool")
+	}
+
 	// List documents
 	documents, total, err := v.vectorDB.ListDocuments(opts)
 	if err != nil {

@@ -23,8 +23,8 @@ func (d *Delegate) delegate(ctx map[string]any, subAgentName string, message str
 	// Find the sub agent
 	var assignedSubAgent core.SubAgent
 	for _, subAgent := range d.subAgents {
-		if subAgent != nil && (*subAgent).Name() == subAgentName {
-			assignedSubAgent = *subAgent
+		if subAgent != nil && subAgent.Name() == subAgentName {
+			assignedSubAgent = subAgent
 			break
 		}
 	}
@@ -38,7 +38,7 @@ func (d *Delegate) delegate(ctx map[string]any, subAgentName string, message str
 	agentforge.Info("[%s] ➡️ [%s] ➡️ \n%s", parentAgentName, subAgentName, message)
 
 	// Execute delegation by calling sub agent's ChatStream
-	delegateResponseCh := assignedSubAgent.ChatStream(message)
+	delegateResponseCh := assignedSubAgent.ChatStream(message, "")
 
 	// Accumulate the full response
 	var fullResponse string

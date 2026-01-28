@@ -160,7 +160,7 @@ Troubleshooting:
 	return template
 }
 
-func ReasoningAgent(llmEngine llms.LLMEngine) *core.SubAgent {
+func ReasoningAgent(llmEngine llms.LLMEngine) core.SubAgent {
 	raTemplate := createReasoningAgentTemplate()
 	raConfig := raTemplate.ToAgentConfig(llmEngine)
 	ra := NewAgent(&raConfig)

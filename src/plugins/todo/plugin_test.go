@@ -155,7 +155,7 @@ func TestTodoPlugin_GetTodoItem(t *testing.T) {
 		t.Fatal("Expected to find todo item by ID")
 	}
 
-	if found.Title != "Test Todo" {
+	if found != nil && found.Title != "Test Todo" {
 		t.Errorf("Expected title 'Test Todo', got '%s'", found.Title)
 	}
 
@@ -180,7 +180,7 @@ func TestTodoPlugin_GetTodoItemByTitle(t *testing.T) {
 		t.Fatal("Expected to find todo item by title")
 	}
 
-	if found.Description != "Description" {
+	if found != nil && found.Description != "Description" {
 		t.Errorf("Expected description 'Description', got '%s'", found.Description)
 	}
 
@@ -876,7 +876,7 @@ func TestNewTodoPlugin(t *testing.T) {
 		t.Fatal("Expected non-nil plugin")
 	}
 
-	if plugin.onTodoUpdate == nil {
+	if plugin != nil && plugin.onTodoUpdate == nil {
 		t.Error("Expected callback to be set")
 	}
 
@@ -886,7 +886,7 @@ func TestNewTodoPlugin(t *testing.T) {
 		t.Fatal("Expected non-nil plugin")
 	}
 
-	if plugin2.onTodoUpdate != nil {
+	if plugin2 != nil && plugin2.onTodoUpdate != nil {
 		t.Error("Expected nil callback when passed nil")
 	}
 

@@ -70,7 +70,7 @@ type AgentConfig struct {
 	Persistence string
 
 	// SubAgents is the list of sub-agents available for delegation
-	SubAgents []*core.SubAgent
+	SubAgents []core.SubAgent
 
 	// Plugins is the list of plugins to use for the agent
 	Plugins []core.Plugin
@@ -105,7 +105,7 @@ func (c *AgentConfig) validate() error {
 	}
 
 	if c.SubAgents == nil {
-		c.SubAgents = []*core.SubAgent{}
+		c.SubAgents = []core.SubAgent{}
 	}
 
 	return nil

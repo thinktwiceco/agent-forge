@@ -191,7 +191,7 @@ Troubleshooting:
 //
 // Returns:
 //   - *core.SubAgent: The Vector agent as a sub-agent
-func VectorAgent(llmEngine llms.LLMEngine, vectorDB core.VectorDB, embeddingGenerator core.EmbeddingGenerator) *core.SubAgent {
+func VectorAgent(llmEngine llms.LLMEngine, vectorDB core.VectorDB, embeddingGenerator core.EmbeddingGenerator) core.SubAgent {
 	vectorTemplate := createVectorAgentTemplate()
 	vectorConfig := vectorTemplate.ToAgentConfig(llmEngine)
 

@@ -52,6 +52,14 @@ func (v *Vector) indexFile(args map[string]any) llms.ToolReturn {
 		documentID = uuid.New().String()
 	}
 
+	if v.embeddingGenerator == nil {
+		return core.NewErrorResponse("embedding generator not configured for vector tool")
+	}
+
+	if v.vectorDB == nil {
+		return core.NewErrorResponse("vector database not configured for vector tool")
+	}
+
 	// Chunk the text if it's too large
 	chunks := chunkText(text)
 

@@ -10,7 +10,7 @@ import (
 // ===== History Management =====
 // ==============================
 
-func (a *Agent) ensureHistory() {
+func (a *Agent) ensureHistory(chatId string) {
 	if a.history == nil {
 		a.history = &History{}
 
@@ -22,7 +22,7 @@ func (a *Agent) ensureHistory() {
 			}
 		}
 	}
-	a.history.get()
+	a.history.get(chatId)
 }
 
 // handleNewAssistantMessage handles new assistant messages.
@@ -30,13 +30,12 @@ func (a *Agent) ensureHistory() {
 //
 //nolint:unused // Reserved for future use
 func (a *Agent) handleNewAssistantMessage(message string) {
-	a.ensureHistory()
+	a.ensureHistory("")
 	a.history.addAssistantMessage(message, 0, 0, 0)
 	a.history.save()
 }
 
 func (a *Agent) handleSystemPromptInjection() []*llms.UnifiedMessage {
 	a.history.addSystemMessage(a.systemPrompt)
-	a.history.save()
 	return a.history.History()
 }

@@ -18,7 +18,7 @@ jobs:
     permissions:
       contents: write
       issues: read
-      pull-requests: read
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -68,14 +68,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          cache: false
 
       - name: Download dependencies
         run: go mod download
@@ -115,44 +108,11 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@v4
+        uses: metcalfc/changelog-generator@v4
         with:
-          fromTag: ${{ steps.previous_tag.outputs.tag }}
-          toTag: ${{ steps.version.outputs.version_tag }}
-          ignorePreReleases: false
-          configuration: |
-            {
-              "categories": [
-                {
-                  "title": "### Added",
-                  "labels": ["feature", "enhancement", "feat"]
-                },
-                {
-                  "title": "### Changed",
-                  "labels": ["change", "changed", "chore"]
-                },
-                {
-                  "title": "### Deprecated",
-                  "labels": ["deprecated"]
-                },
-                {
-                  "title": "### Removed",
-                  "labels": ["removed", "remove"]
-                },
-                {
-                  "title": "### Fixed",
-                  "labels": ["bug", "fix", "bugfix"]
-                },
-                {
-                  "title": "### Security",
-                  "labels": ["security"]
-                }
-              ],
-              "ignore_labels": ["ignore", "skip-changelog"],
-              "sort": "ASC"
-            }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          myToken: ${{ secrets.GH_PAT }}
+          base-ref: ${{ steps.previous_tag.outputs.tag }}
+          head-ref: ${{ steps.version.outputs.version_tag }}
 
       - name: Update CHANGELOG.md
         run: |
@@ -203,17 +163,16 @@ jobs:
           echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Commit changelog update
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add CHANGELOG.md
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore: update changelog for v${{ steps.version.outputs.version }}"
-            git push
-          fi
+      - name: Create Pull Request for Changelog
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GH_PAT }}
+          commit-message: "chore: update changelog for v${{ steps.version.outputs.version }} [skip ci]"
+          title: "chore: update changelog for v${{ steps.version.outputs.version }} [skip ci]"
+          body: "Automated changelog update for version v${{ steps.version.outputs.version }} triggered by tag ${{ steps.version.outputs.version_tag }}"
+          branch: "changelog-v${{ steps.version.outputs.version }}"
+          base: ${{ github.event.repository.default_branch }}
+          delete-branch: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1

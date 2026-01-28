@@ -9,6 +9,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.33
 	github.com/milvus-io/milvus/client/v2 v2.6.2
 	github.com/openai/openai-go/v3 v3.8.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -126,7 +127,6 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apimachinery v0.32.3 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )

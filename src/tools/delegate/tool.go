@@ -9,11 +9,11 @@ const DELEGATE_TOOL = "delegate"
 
 // Delegate represents a delegation tool with sub agents.
 type Delegate struct {
-	subAgents []*core.SubAgent
+	subAgents []core.SubAgent
 }
 
 // NewDelegateTool creates a new DelegateTool with the given sub agents.
-func NewDelegateTool(subAgents []*core.SubAgent) llms.Tool {
+func NewDelegateTool(subAgents []core.SubAgent) llms.Tool {
 	delegate := &Delegate{subAgents: subAgents}
 
 	return &core.Tool{

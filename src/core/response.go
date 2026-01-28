@@ -26,6 +26,7 @@ type ExtendedChunkResponse struct {
 	TotalTokens      int               `json:"totalTokens,omitempty"`      // Total tokens used
 	AgentName        string            `json:"agentName"`                  // Name of the agent producing this chunk
 	Trace            string            `json:"trace"`                      // Trace information (e.g., "thinking", "response")
+	ChatId           string            `json:"chatId"`                     // Conversation identifier
 }
 
 // ChunkReadHook is a callback function called when a chunk is read from the channel
@@ -42,6 +43,7 @@ type ResponseCh struct {
 
 	agentName   string        // Name of the agent associated with this response channel
 	trace       string        // Trace information for this response channel
+	chatId      string        // Conversation identifier
 	onChunkRead ChunkReadHook // Hook called when chunks are read from the channel
 
 	started bool
@@ -54,16 +56,18 @@ type ResponseCh struct {
 // Parameters:
 //   - agentName: Name of the agent associated with this response channel
 //   - trace: Optional trace information (e.g., "thinking", "response")
+//   - chatId: Conversation identifier (may be empty for new conversations)
 //   - onChunkRead: Optional hook function called when chunks are read from the channel
 //
 // Returns:
 //   - *ResponseCh: A new ResponseCh instance
-func NewResponseCh(agentName string, trace string, onChunkRead ChunkReadHook) *ResponseCh {
+func NewResponseCh(agentName string, trace string, chatId string, onChunkRead ChunkReadHook) *ResponseCh {
 	return &ResponseCh{
 		Response:    make(chan []byte, 10), // Buffered channel
 		Error:       make(chan error, 1),   // Buffered channel for errors
 		agentName:   agentName,
 		trace:       trace,
+		chatId:      chatId,
 		onChunkRead: onChunkRead,
 		started:     false,
 	}
@@ -90,6 +94,9 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 	go func() {
 		defer close(chunkChan)
 
+		// Local variable for error channel to allow disabling it when closed
+		errorChan := arc.Error
+
 		for {
 			select {
 			case chunkBytes, ok := <-arc.Response:
@@ -112,13 +119,18 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 					continue
 				}
 
-				// Only set AgentName and Trace if they're not already set
+				// Only set AgentName, Trace, and ChatId if they're not already set
 				// (they might be set if this chunk came from a delegated agent)
 				if extendedChunk.AgentName == "" {
 					extendedChunk.AgentName = arc.agentName
 				}
 				if extendedChunk.Trace == "" {
 					extendedChunk.Trace = arc.trace
+				}
+				if extendedChunk.ChatId == "" {
+					arc.mu.Lock()
+					extendedChunk.ChatId = arc.chatId
+					arc.mu.Unlock()
 				}
 
 				// Trigger hook when chunk is read from channel
@@ -130,8 +142,17 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 				// Send chunk
 				chunkChan <- extendedChunk
 
-			case err := <-arc.Error:
+			case err, ok := <-errorChan:
+				if !ok {
+					// Error channel closed without error.
+					// Disable this case to continue draining Response channel.
+					errorChan = nil
+					continue
+				}
 				if err != nil {
+					arc.mu.Lock()
+					chatId := arc.chatId
+					arc.mu.Unlock()
 					// Send error as extended chunk
 					chunkChan <- ExtendedChunkResponse{
 						Content:   err.Error(),
@@ -139,11 +160,10 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 						Type:      llms.TypeContent, // Error chunks use TypeContent
 						AgentName: arc.agentName,
 						Trace:     arc.trace,
+						ChatId:    chatId,
 					}
 					return
 				}
-				// Error channel closed without error, stream is complete
-				return
 			}
 		}
 	}()
@@ -208,4 +228,12 @@ func (arc *ResponseCh) TrySend(chunkBytes []byte) bool {
 	}()
 
 	return sent
+}
+
+// SetChatId updates the chatId for this response channel.
+// This is used when a chatId is generated during the conversation save process.
+func (arc *ResponseCh) SetChatId(chatId string) {
+	arc.mu.Lock()
+	defer arc.mu.Unlock()
+	arc.chatId = chatId
 }

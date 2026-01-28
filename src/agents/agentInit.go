@@ -56,7 +56,7 @@ func (a *Agent) setResponseCh() {
 		}
 		return nil
 	}
-	a.responseCh = core.NewResponseCh(a.config.AgentName, a.config.Trace, onChunkRead)
+	a.responseCh = core.NewResponseCh(a.config.AgentName, a.config.Trace, "", onChunkRead)
 }
 
 func (a *Agent) initSystemTools() {
@@ -82,7 +82,7 @@ func (a *Agent) initSystemTools() {
 //
 //nolint:unused // Reserved for backward compatibility
 func (a *Agent) initResponseCh() {
-	a.responseCh = core.NewResponseCh(a.Name(), a.Trace(), nil)
+	a.responseCh = core.NewResponseCh(a.Name(), a.Trace(), "", nil)
 	a.responseCh.Start()
 }
 
@@ -135,9 +135,8 @@ func (a *Agent) initAgentContext() {
 	}
 }
 
-// addSystemAgents adds system agents based on configs
 func (a *Agent) addSystemAgents() {
-	var systemAgents []*core.SubAgent
+	var systemAgents []core.SubAgent
 
 	if a.config.Reasoning {
 		// Create reasoning agent from template

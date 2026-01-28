@@ -9,10 +9,15 @@ type History struct {
 	history          []*llms.UnifiedMessage
 	hasSystemMessage bool
 	persistence      persistence.Persistence
+	chatId           string
 }
 
 func (h *History) History() []*llms.UnifiedMessage {
 	return h.history
+}
+
+func (h *History) ChatId() string {
+	return h.chatId
 }
 
 func (h *History) addUserMessage(message string) {
@@ -39,7 +44,7 @@ func (h *History) addToolMessage(toolCallID, result string, ephemeral bool) {
 	h.history = append(h.history, llms.ToolMessage(toolCallID, result, ephemeral))
 }
 
-func (h *History) save() {
+func (h *History) save() string {
 	if h.persistence != nil {
 		// Cleanup the history to remove ephemeral messages
 		for _, message := range h.history {
@@ -47,14 +52,14 @@ func (h *History) save() {
 				message.SetContent("[Tool Call Executed]")
 			}
 		}
-		h.persistence.SaveHystory(h.history)
+		h.chatId = h.persistence.SaveHistory(h.chatId, h.history)
 	}
+	return h.chatId
 }
 
-func (h *History) get() {
-	var limit = 0
-	var offset = 0
+func (h *History) get(chatId string) {
+	h.chatId = chatId
 	if h.persistence != nil {
-		h.history = h.persistence.GetHystory(limit, offset)
+		h.history = h.persistence.GetHistory(chatId, 0, 0)
 	}
 }

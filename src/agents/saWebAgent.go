@@ -236,7 +236,7 @@ Troubleshooting:
 //
 // Returns:
 //   - *core.SubAgent: The Web agent as a sub-agent
-func WebAgent(llmEngine llms.LLMEngine, workingDir string) *core.SubAgent {
+func WebAgent(llmEngine llms.LLMEngine, workingDir string) core.SubAgent {
 	webTemplate := createWebAgentTemplate()
 	webConfig := webTemplate.ToAgentConfig(llmEngine)
 

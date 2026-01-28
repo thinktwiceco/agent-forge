@@ -29,6 +29,9 @@ func (a *Agent) executeChatWithTools() error {
 		var completedChunkBytes []byte // Store completed chunk to forward later if needed
 		var promptTokens, completionTokens, totalTokens int
 
+		// Local variable for error channel to allow disabling it when closed
+		llmErrorCh := llmResponseCh.Error
+
 		// Process streaming response
 		agentforge.Debug("Waiting for LLM response chunks...")
 		for {
@@ -93,14 +96,20 @@ func (a *Agent) executeChatWithTools() error {
 					return nil
 				}
 
-			case err := <-llmResponseCh.Error:
+			case err, ok := <-llmErrorCh:
+				if !ok {
+					// Error channel closed without error.
+					// Disable this case to continue draining Response channel.
+					llmErrorCh = nil
+					continue
+				}
 				if err != nil {
 					agentforge.Debug("LLM stream error received: %v", err)
 					return fmt.Errorf("llm stream error: %w", err)
 				}
-				// Error channel closed without error, continue processing
-				agentforge.Debug("LLM stream error channel closed (no error), going to processToolCalls")
-				goto processToolCalls
+				// Should not be reached if err is nil and ok is true,
+				// but strictly speaking nil error on open channel is possible?
+				// Usually Error chan sends only errors.
 			}
 		}
 
@@ -113,7 +122,7 @@ func (a *Agent) executeChatWithTools() error {
 				// Stream ended without StatusCompleted chunk - this should never happen
 				// Create a completion chunk with accumulated content
 				if fullContent == "" {
-					panic("LLM stream ended without content and without StatusCompleted chunk")
+					return fmt.Errorf("LLM stream ended without content and without StatusCompleted chunk")
 				}
 				agentforge.Debug("WARNING: Stream ended without StatusCompleted chunk, creating one")
 				completionChunk := llms.ChunkResponse{
@@ -129,7 +138,7 @@ func (a *Agent) executeChatWithTools() error {
 				var err error
 				completedChunkBytes, err = json.Marshal(completionChunk)
 				if err != nil {
-					panic(fmt.Sprintf("Failed to marshal completion chunk: %v", err))
+					return fmt.Errorf("failed to marshal completion chunk: %v", err)
 				}
 			}
 
@@ -142,7 +151,7 @@ func (a *Agent) executeChatWithTools() error {
 
 			// Save the message to history with token usage
 			if fullContent == "" {
-				panic("Attempting to save empty message to history")
+				return fmt.Errorf("attempting to save empty message to history")
 			}
 
 			a.history.addAssistantMessage(fullContent, promptTokens, completionTokens, totalTokens)

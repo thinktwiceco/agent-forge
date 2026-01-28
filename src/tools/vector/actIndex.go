@@ -38,6 +38,9 @@ func (v *Vector) index(args map[string]any) llms.ToolReturn {
 
 	if len(chunks) == 1 {
 		// Single chunk - index normally
+		if v.embeddingGenerator == nil {
+			return core.NewErrorResponse("embedding generator not configured for vector tool")
+		}
 		embedding, modelName, err := v.embeddingGenerator.GenerateEmbedding(text)
 		if err != nil {
 			return core.NewErrorResponse(fmt.Sprintf("failed to generate embedding: %v", err))
@@ -47,6 +50,9 @@ func (v *Vector) index(args map[string]any) llms.ToolReturn {
 		metadata["_embedding_model"] = modelName
 
 		// Index the document
+		if v.vectorDB == nil {
+			return core.NewErrorResponse("vector database not configured for vector tool")
+		}
 		resultID, err := v.vectorDB.Index(embedding, text, metadata, modelName)
 		if err != nil {
 			return core.NewErrorResponse(fmt.Sprintf("failed to index document: %v", err))

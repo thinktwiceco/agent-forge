@@ -9,7 +9,7 @@ import (
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
-var handleNewSystemAgentAdded = OnAddedSystemAgentHook(func(a *Agent, subAgent *core.SubAgent) error {
+var handleNewSystemAgentAdded = OnAddedSystemAgentHook(func(a *Agent, subAgent core.SubAgent) error {
 	if subAgent == nil {
 		return errors.New("sub agent is nil")
 	}

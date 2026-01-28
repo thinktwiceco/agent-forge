@@ -185,7 +185,7 @@ Troubleshooting:
 //
 // Returns:
 //   - *core.SubAgent: The Coding agent as a sub-agent
-func CodingAgent(codingllmEngine llms.LLMEngine, root string) *core.SubAgent {
+func CodingAgent(codingllmEngine llms.LLMEngine, root string) core.SubAgent {
 	codingTemplate := createCodingAgentTemplate()
 	codingConfig := codingTemplate.ToAgentConfig(codingllmEngine)
 
