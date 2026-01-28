@@ -1,4 +1,6 @@
-# AGENT STEPS TO CREATE A PULL REQUEST
+---
+description: CREATE PULL REQUEST
+---
 
 Analyze current changes and create a GitHub PR with appropriate description and labels.
 

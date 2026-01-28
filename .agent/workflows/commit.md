@@ -1,4 +1,6 @@
-# AGENT STEPS TO COMMIT CHANGES
+---
+description: AGENT STEPS TO COMMIT CHANGES
+---
 
 Commit the current changes following Conventional Commits specification.
 
