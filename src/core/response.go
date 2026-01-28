@@ -94,6 +94,9 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 	go func() {
 		defer close(chunkChan)
 
+		// Local variable for error channel to allow disabling it when closed
+		errorChan := arc.Error
+
 		for {
 			select {
 			case chunkBytes, ok := <-arc.Response:
@@ -139,7 +142,13 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 				// Send chunk
 				chunkChan <- extendedChunk
 
-			case err := <-arc.Error:
+			case err, ok := <-errorChan:
+				if !ok {
+					// Error channel closed without error.
+					// Disable this case to continue draining Response channel.
+					errorChan = nil
+					continue
+				}
 				if err != nil {
 					arc.mu.Lock()
 					chatId := arc.chatId
@@ -155,8 +164,6 @@ func (arc *ResponseCh) Start() <-chan ExtendedChunkResponse {
 					}
 					return
 				}
-				// Error channel closed without error, stream is complete
-				return
 			}
 		}
 	}()
