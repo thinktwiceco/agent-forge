@@ -136,35 +136,6 @@ jobs:
             ### Fixed
             ### Security
 
-      - name: Update CHANGELOG.md
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          DATE="${{ steps.release_date.outputs.date }}"
-          CHANGELOG_CONTENT="${{ steps.changelog.outputs.changelog }}"
-          
-          # Create version header
-          VERSION_HEADER="## [$VERSION] - $DATE"
-          
-          # Create temporary file with new version section
-          {
-            echo "## [Unreleased]"
-            echo ""
-            echo "$VERSION_HEADER"
-            echo "$CHANGELOG_CONTENT"
-            echo ""
-          } > /tmp/new_changelog_section.txt
-          
-          # Prepend to CHANGELOG.md
-          if [ -f "CHANGELOG.md" ]; then
-            # Remove existing unreleased section if present
-            sed -i '/^## \[Unreleased\]/,/^## \[/{ /^## \[Unreleased\]/!{ /^## \[/!d; }; }' CHANGELOG.md || true
-            # Prepend new version section
-            cat /tmp/new_changelog_section.txt CHANGELOG.md > /tmp/changelog.tmp && mv /tmp/changelog.tmp CHANGELOG.md
-          else
-            # Create new CHANGELOG.md
-            cat /tmp/new_changelog_section.txt > CHANGELOG.md
-          fi
-
       - name: Extract changelog section
         id: extract_changelog
         run: |
