@@ -117,34 +117,33 @@ jobs:
               "categories": [
                 {
                   "title": "### Added",
-                  "labels": ["feature", "enhancement", "feat"]
+                  "labels": ["feature", "enhancement", "feat", "type:feature"]
                 },
                 {
                   "title": "### Changed",
-                  "labels": ["change", "changed", "chore"]
-                },
-                {
-                  "title": "### Deprecated",
-                  "labels": ["deprecated"]
-                },
-                {
-                  "title": "### Removed",
-                  "labels": ["removed", "remove"]
+                  "labels": ["change", "changed", "chore", "type:chore", "type:refactor", "refactor"]
                 },
                 {
                   "title": "### Fixed",
-                  "labels": ["bug", "fix", "bugfix"]
+                  "labels": ["bug", "fix", "bugfix", "type:bugfix"]
                 },
                 {
-                  "title": "### Security",
-                  "labels": ["security"]
+                  "title": "### Documentation",
+                  "labels": ["docs", "documentation", "type:documentation"]
+                },
+                {
+                  "title": "### Performance",
+                  "labels": ["perf", "performance", "type:performance"]
                 }
               ],
+              "uncategorized": {
+                "title": "### Other Changes"
+              },
               "ignore_labels": ["ignore", "skip-changelog"],
               "sort": "ASC"
             }
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
 
       - name: Update CHANGELOG.md
         run: |
