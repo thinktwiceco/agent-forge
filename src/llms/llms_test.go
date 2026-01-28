@@ -104,11 +104,7 @@ func TestOpenAILLMBuilder_SettersAndBuild(t *testing.T) {
 	// However, we can set everything explicitly to avoid defaults logic
 
 	defer func() {
-		if r := recover(); r != nil {
-			// If it panics due to config not loaded, we might need to mock config or handle it
-			// But creating a config file might be needed if it fails.
-			// Let's try to set all fields so validate() passes without config
-		}
+		_ = recover()
 	}()
 
 	b := NewOpenAILLMBuilder("openai")

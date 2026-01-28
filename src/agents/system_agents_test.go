@@ -13,7 +13,7 @@ func TestOsAgent_Constructor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	agent := OsAgent(mockLLM, tmpDir)
 
@@ -40,7 +40,7 @@ func TestGitAgent_Constructor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	agent := GitAgent(mockLLM, tmpDir)
 
@@ -63,7 +63,7 @@ func TestWebAgent_Constructor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	agent := WebAgent(mockLLM, tmpDir)
 
@@ -86,7 +86,7 @@ func TestCodingAgent_Constructor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	agent := CodingAgent(mockLLM, tmpDir)
 

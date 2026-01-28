@@ -76,10 +76,7 @@ func TestChunkText_SplittingLogic(t *testing.T) {
 	if len(chunks) <= 1 {
 		// If it wasn't split, maybe limit is huge?
 		// If so, pass, but usually it's ~4000.
-		if len(input) > 5000 {
-			// 10000 chars should definitely split if limit is 4000
-			// If limit is larger, this test assumption fails.
-		}
+		_ = input // Assumption: 10000 chars should split if limit fits in 4000
 	}
 
 	for i, chunk := range chunks {

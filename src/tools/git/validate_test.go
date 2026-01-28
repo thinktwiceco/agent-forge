@@ -33,7 +33,7 @@ func TestGit_ValidatePath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	git := &Git{root: tmpDir}
 
@@ -63,7 +63,7 @@ func TestGit_ValidateGitRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Case 1: Not a git repo
 	git := &Git{root: tmpDir}

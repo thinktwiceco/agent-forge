@@ -148,9 +148,7 @@ func TestAgent_ChatWithTools(t *testing.T) {
 	// Trigger the chat
 	err := agent.executeChatWithTools()
 
-	if err != nil {
-		// Log but don't fail immediately unless strict
-	}
+	_ = err // Ignore error in this test context as we consume output in goroutine
 
 	// Assert tool was called
 	if !mockTool.Called {

@@ -28,10 +28,11 @@ func TestAgent_ChatStream_Unit(t *testing.T) {
 	var sawCompleted bool
 
 	for chunk := range responseCh.Start() {
-		if chunk.Status == llms.StatusStreaming {
+		switch chunk.Status {
+		case llms.StatusStreaming:
 			receivedContent += chunk.Content
 			sawStreaming = true
-		} else if chunk.Status == llms.StatusCompleted {
+		case llms.StatusCompleted:
 			sawCompleted = true
 		}
 	}

@@ -93,11 +93,7 @@ func TestLoggerPlugin_HandleNewChunk(t *testing.T) {
 		t.Errorf("Handler failed: %v", err)
 	}
 	output = buf.String()
-	if strings.Contains(output, "TestAgent") {
-		// Actually, header logic: if agentName != currentAgent || trace != currentTrace
-		// They are same, so no header.
-		// NOTE: "test content" might still be printed if it's content type
-	}
+	_ = output // Output should not contain TestAgent due to header logic
 	// "TestAgent" appears in header label. Content just prints.
 	// Color codes might make string matching tricky, assume simple contains works.
 
