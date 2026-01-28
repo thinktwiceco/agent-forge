@@ -67,7 +67,7 @@ func (m *mockDiscoverableAgent) Name() string {
 	return m.name
 }
 
-func (m *mockDiscoverableAgent) ChatStream(message string) *core.ResponseCh {
+func (m *mockDiscoverableAgent) ChatStream(message string, chatId string) *core.ResponseCh {
 	return nil // Not needed for this test
 }
 

@@ -5,58 +5,81 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/google/uuid"
 	agentforge "github.com/thinktwice/agentForge/src"
 	"github.com/thinktwice/agentForge/src/llms"
 )
 
 // JSONPersistence implements the Persistence interface using JSON file storage
+// with directory-based organization for multiple conversations
 type JSONPersistence struct {
-	filePath string
+	baseDir string
 }
 
-// NewJSONPersistence creates a new JSONPersistence instance with the specified file path
-func NewJSONPersistence(filePath string) *JSONPersistence {
+// NewJSONPersistence creates a new JSONPersistence instance with the specified base directory
+// Conversations will be stored as {baseDir}/{chatId}.json
+func NewJSONPersistence(baseDir string) *JSONPersistence {
 	return &JSONPersistence{
-		filePath: filePath,
+		baseDir: baseDir,
 	}
 }
 
-// SaveHystory saves the conversation history to a JSON file
-func (jp *JSONPersistence) SaveHystory(history []*llms.UnifiedMessage) {
+// SaveHistory saves the conversation history to a JSON file
+// If chatId is empty, a new UUID is generated
+// Returns the chatId (newly generated or the one provided)
+func (jp *JSONPersistence) SaveHistory(chatId string, history []*llms.UnifiedMessage) string {
+	// Generate chatId if not provided
+	if chatId == "" {
+		chatId = uuid.New().String()
+		agentforge.Debug("Generated new chatId: %s", chatId)
+	}
+
+	// Construct file path
+	filePath := filepath.Join(jp.baseDir, chatId+".json")
+
 	// Marshal to JSON with indentation for readability
 	data, err := json.MarshalIndent(history, "", "  ")
 	if err != nil {
 		agentforge.Error("Failed to marshal history to JSON: %v", err)
-		return
+		return chatId
 	}
 
 	// Ensure directory exists
-	dir := filepath.Dir(jp.filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(jp.baseDir, 0755); err != nil {
 		agentforge.Error("Failed to create directory for history file: %v", err)
-		return
+		return chatId
 	}
 
 	// Write to file
-	if err := os.WriteFile(jp.filePath, data, 0644); err != nil {
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		agentforge.Error("Failed to write history to file: %v", err)
-		return
+		return chatId
 	}
 
-	agentforge.Debug("Successfully saved history to %s", jp.filePath)
+	agentforge.Debug("Successfully saved history to %s", filePath)
+	return chatId
 }
 
-// GetHystory retrieves the conversation history from the JSON file
+// GetHistory retrieves the conversation history from the JSON file for a specific chatId
 // If limit == 0 and offset == 0, returns all messages
 // Otherwise applies standard pagination (offset = start index, limit = page size)
-func (jp *JSONPersistence) GetHystory(limit, offset int) []*llms.UnifiedMessage {
+func (jp *JSONPersistence) GetHistory(chatId string, limit, offset int) []*llms.UnifiedMessage {
+	// Empty chatId means new conversation - return empty history
+	if chatId == "" {
+		agentforge.Debug("Empty chatId provided, returning empty history for new conversation")
+		return []*llms.UnifiedMessage{}
+	}
+
+	// Construct file path
+	filePath := filepath.Join(jp.baseDir, chatId+".json")
+
 	// Read file
 	var messages []*llms.UnifiedMessage
 
-	data, err := os.ReadFile(jp.filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			agentforge.Warn("History file does not exist: %s", jp.filePath)
+			agentforge.Debug("History file does not exist for chatId %s: %s", chatId, filePath)
 			return []*llms.UnifiedMessage{}
 		}
 		agentforge.Error("Failed to read history file: %v", err)
@@ -72,6 +95,7 @@ func (jp *JSONPersistence) GetHystory(limit, offset int) []*llms.UnifiedMessage 
 	// Apply pagination
 	if limit == 0 && offset == 0 {
 		// Return all messages
+		agentforge.Debug("Retrieved %d messages for chatId %s", len(messages), chatId)
 		return messages
 	}
 
@@ -100,6 +124,6 @@ func (jp *JSONPersistence) GetHystory(limit, offset int) []*llms.UnifiedMessage 
 		end = len(messages)
 	}
 
-	agentforge.Debug("Retrieved %d messages from history (offset: %d, limit: %d)", end-start, offset, limit)
+	agentforge.Debug("Retrieved %d messages from history (chatId: %s, offset: %d, limit: %d)", end-start, chatId, offset, limit)
 	return messages[start:end]
 }

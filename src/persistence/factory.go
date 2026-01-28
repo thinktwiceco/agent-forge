@@ -1,10 +1,6 @@
 package persistence
 
-import (
-	"fmt"
-	"math/rand"
-	"time"
-)
+import "path/filepath"
 
 // NewPersistence creates and returns a Persistence implementation based on the persistence type
 // Parameters:
@@ -20,10 +16,9 @@ func NewPersistence(agentName, persistenceType string) Persistence {
 
 	switch persistenceType {
 	case "json":
-		// Generate unique file path
-		uniqueID := fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Int63())
-		filePath := fmt.Sprintf("./history/%s-%s.json", agentName, uniqueID)
-		return NewJSONPersistence(filePath)
+		// Create base directory for this agent's conversations
+		baseDir := filepath.Join("data", "conversations", agentName)
+		return NewJSONPersistence(baseDir)
 	default:
 		// Unknown persistence type, return nil
 		return nil

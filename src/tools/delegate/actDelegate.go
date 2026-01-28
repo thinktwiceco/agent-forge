@@ -38,7 +38,7 @@ func (d *Delegate) delegate(ctx map[string]any, subAgentName string, message str
 	agentforge.Info("[%s] ➡️ [%s] ➡️ \n%s", parentAgentName, subAgentName, message)
 
 	// Execute delegation by calling sub agent's ChatStream
-	delegateResponseCh := assignedSubAgent.ChatStream(message)
+	delegateResponseCh := assignedSubAgent.ChatStream(message, "")
 
 	// Accumulate the full response
 	var fullResponse string

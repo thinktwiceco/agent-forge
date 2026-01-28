@@ -46,7 +46,7 @@ type ChunkResponse struct {
 //
 // This struct provides a channel-based API for receiving streaming responses
 // from the agent. The Start() method returns a channel that can be ranged over.
-type responseCh struct {
+type ResponseCh struct {
 	Response chan []byte // Channel for JSON-serialized ChunkResponse
 	Error    chan error  // Channel for errors
 
@@ -56,8 +56,8 @@ type responseCh struct {
 }
 
 // NewResponseCh creates a new ResponseCh instance.
-func newResponseCh() *responseCh {
-	return &responseCh{
+func NewResponseCh() *ResponseCh {
+	return &ResponseCh{
 		Response: make(chan []byte, 10), // Buffered channel
 		Error:    make(chan error, 1),   // Buffered channel for errors
 		started:  false,
@@ -79,7 +79,7 @@ func newResponseCh() *responseCh {
 //
 // Returns:
 //   - <-chan ChunkResponse: A receive-only channel of ChunkResponse that can be ranged over
-func (rc *responseCh) Start() <-chan ChunkResponse {
+func (rc *ResponseCh) Start() <-chan ChunkResponse {
 	chunkChan := make(chan ChunkResponse)
 
 	go func() {
@@ -134,7 +134,7 @@ func (rc *responseCh) Start() <-chan ChunkResponse {
 //
 // This should be called when done listening to clean up resources.
 // Safe to call multiple times - will only close channels once.
-func (rc *responseCh) Close() {
+func (rc *ResponseCh) Close() {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 

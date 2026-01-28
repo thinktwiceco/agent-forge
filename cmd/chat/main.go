@@ -144,7 +144,7 @@ func initializeAgent() (*agents.Agent, error) {
 // All chunks are formatted by the logger plugin hook when read from the channel
 func processResponse(agent *agents.Agent, message string) error {
 	// Get response channel
-	responseCh := agent.ChatStream(message)
+	responseCh := agent.ChatStream(message, "")
 
 	// Process streaming response
 	for chunk := range responseCh.Start() {

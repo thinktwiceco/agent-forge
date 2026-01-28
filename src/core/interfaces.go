@@ -12,7 +12,7 @@ type SubAgent interface {
 	agentforge.Discoverable
 	// ChatStream initiates a streaming chat interaction with the agent
 	// Returns a ResponseCh that can be used to consume streaming responses
-	ChatStream(message string) *ResponseCh
+	ChatStream(message string, chatId string) *ResponseCh
 
 	// Name returns the unique identifier of the agent
 	Name() string

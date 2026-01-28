@@ -106,11 +106,12 @@ func NewAgent(config *AgentConfig) *Agent {
 //
 // Parameters:
 //   - message: The user message to send
+//   - chatId: The conversation ID (empty string for new conversations)
 //
 // Returns:
 //   - *core.ResponseCh: Response channel that can be used to receive streaming chunks
-func (a *Agent) ChatStream(message string) *core.ResponseCh {
-	a.ensureHistory()
+func (a *Agent) ChatStream(message string, chatId string) *core.ResponseCh {
+	a.ensureHistory(chatId)
 	a.handleSystemPromptInjection()
 	a.history.addUserMessage(message)
 	errs := a.hooks.newUserMessageEvent(a, message)
@@ -128,7 +129,7 @@ func (a *Agent) ChatStream(message string) *core.ResponseCh {
 		}
 		return nil
 	}
-	responseCh := core.NewResponseCh(a.config.AgentName, a.config.Trace, onChunkRead)
+	responseCh := core.NewResponseCh(a.config.AgentName, a.config.Trace, chatId, onChunkRead)
 
 	// Store the response channel temporarily for use in executeChatWithTools
 	oldResponseCh := a.responseCh
@@ -145,7 +146,10 @@ func (a *Agent) ChatStream(message string) *core.ResponseCh {
 		if err := a.executeChatWithTools(); err != nil {
 			responseCh.Error <- err
 		}
-		a.history.save()
+		// Save history and get the final chatId (generated if it was empty)
+		finalChatId := a.history.save()
+		// Update the response channel's chatId in case it was newly generated
+		responseCh.SetChatId(finalChatId)
 	}()
 
 	return responseCh

@@ -58,9 +58,9 @@ func newOpenAILLM(ctx context.Context, baseURL, model, apiKey, provider string) 
 //   - tools: Optional tools available for this request (can be nil or empty)
 //
 // Returns:
-//   - *responseCh: responseCh instance with channels for streaming
-func (a *openAILLM) ChatStream(messages []*UnifiedMessage, tools []Tool) *responseCh {
-	responseCh := newResponseCh()
+//   - *ResponseCh: ResponseCh instance with channels for streaming
+func (a *openAILLM) ChatStream(messages []*UnifiedMessage, tools []Tool) *ResponseCh {
+	responseCh := NewResponseCh()
 
 	// Start streaming in a goroutine
 	go a.streamResponse(messages, tools, responseCh)
@@ -133,7 +133,7 @@ func toOpenAIMessages(messages []*UnifiedMessage) ([]openai.ChatCompletionMessag
 }
 
 // streamResponse handles the actual streaming from OpenAI API.
-func (a *openAILLM) streamResponse(messages []*UnifiedMessage, tools []Tool, responseCh *responseCh) {
+func (a *openAILLM) streamResponse(messages []*UnifiedMessage, tools []Tool, responseCh *ResponseCh) {
 	defer responseCh.Close()
 
 	// Build messages

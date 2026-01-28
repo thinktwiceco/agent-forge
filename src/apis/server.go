@@ -38,66 +38,6 @@ func NewServer() *Server {
 	}
 }
 
-// InitializeAgent builds and registers an agent using the agent builder.
-// This method is similar to cmd/chat/main.go's initializeAgent() function.
-//
-// Parameters:
-//   - name: The name to register the agent under
-//   - agentName: The agent's internal name (used in builder)
-//   - model: The LLM model string (e.g., "openai::gpt-4")
-//   - workingDir: Working directory for the agent
-//   - tools: List of tools to add to the agent
-//   - subagents: Map of subagent types to their model strings
-//   - plugins: List of plugins to add
-//
-// Returns:
-//   - error: Any error that occurred during agent initialization
-// func (s *Server) InitializeAgent(
-// 	name string,
-// 	agentName string,
-// 	model string,
-// 	workingDir string,
-// 	tools []builder.Tool,
-// 	subagents map[builder.Subagent]string,
-// 	plugins []builder.Plugin,
-// ) error {
-
-// 	agentBuilder := builder.NewAgentBuilder(agentName, "json")
-
-// 	// Add tools
-// 	if len(tools) > 0 {
-// 		agentBuilder.AddTools(tools...)
-// 	}
-
-// 	// Set model
-// 	if model != "" {
-// 		agentBuilder.SetModel(model)
-// 	}
-
-// 	// Set working directory
-// 	if workingDir != "" {
-// 		agentBuilder.SetWorkingDir(workingDir)
-// 	}
-
-// 	// Add subagents
-// 	for subagent, subagentModel := range subagents {
-// 		agentBuilder.AddSubagent(subagent, subagentModel)
-// 	}
-
-// 	// Add plugins
-// 	for _, plugin := range plugins {
-// 		agentBuilder.AddPlugin(plugin)
-// 	}
-
-// 	agent, err := agentBuilder.Build()
-// 	if err != nil {
-// 		return fmt.Errorf("failed to build agent: %w", err)
-// 	}
-
-// 	s.agents[name] = agent
-// 	return nil
-// }
-
 // InitializeAgentFromConfig builds and registers an agent using a configuration file.
 func (s *Server) InitializeAgentFromConfig(name string, configPath string) error {
 
@@ -237,13 +177,16 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Extract optional conversationId query parameter
+	conversationId := r.URL.Query().Get("conversationId")
+
 	// Set headers for streaming JSON (NDJSON format)
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
 
-	// Get response channel from agent
-	responseCh := agent.ChatStream(req.Message)
+	// Get response channel from agent with conversationId
+	responseCh := agent.ChatStream(req.Message, conversationId)
 
 	// Stream chunks as NDJSON (one JSON object per line)
 	encoder := json.NewEncoder(w)
@@ -257,6 +200,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 				Type:      llms.TypeContent,
 				AgentName: chunk.AgentName,
 				Trace:     chunk.Trace,
+				ChatId:    chunk.ChatId,
 			}
 			if err := encoder.Encode(errorChunk); err != nil {
 				// If encoding fails, we can't send error response

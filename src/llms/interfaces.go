@@ -57,7 +57,7 @@ type LLMEngine interface {
 	//
 	// Returns:
 	//   - *responseCh: responseCh instance with channels for streaming
-	ChatStream(messages []*UnifiedMessage, tools []Tool) *responseCh
+	ChatStream(messages []*UnifiedMessage, tools []Tool) *ResponseCh
 	Model() string
 	Provider() string
 }
