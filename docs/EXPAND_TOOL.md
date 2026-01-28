@@ -118,7 +118,7 @@ result := expandTool.Call(agentContext, map[string]any{
 ### Adding to an Agent
 
 ```go
-agent := agents.NewAgent(agents.AgentConfig{
+agent := agents.NewAgent(&agents.AgentConfig{
     LLMEngine: llm,
     AgentName: "my-agent",
     Tools: []llms.Tool{
