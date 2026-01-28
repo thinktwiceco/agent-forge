@@ -212,7 +212,7 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore: update changelog for v${{ steps.version.outputs.version }}"
-            git push
+            git push origin HEAD:${{ github.event.repository.default_branch }}
           fi
 
       - name: Create GitHub Release
