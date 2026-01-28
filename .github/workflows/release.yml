@@ -68,6 +68,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+          cache: false
 
       - name: Download dependencies
         run: go mod download
@@ -110,31 +111,37 @@ jobs:
         uses: metcalfc/changelog-generator@v4
         with:
           myToken: ${{ secrets.GH_PAT }}
-          path: CHANGELOG.md
-          version: ${{ steps.version.outputs.version }}
-          versionDate: ${{ steps.release_date.outputs.date }}
-          headingText: '##'
-          ignoreAuthor: true
-          sort: 'ASC'
-          tagPrefix: 'v'
-          unreleased: true
-          outputFile: CHANGELOG.md
-          breakingChangeText: '### Breaking Changes'
-          closedIssuePrefix: 'Closes'
-          closedIssueSuffix: ''
-          closedIssueText: 'Closes'
-          useCommitBody: true
-          useCommitFooter: true
-          useIssues: true
-          usePR: true
-          useSections: true
-          sections: |
-            ### Added
-            ### Changed
-            ### Deprecated
-            ### Removed
-            ### Fixed
-            ### Security
+          base-ref: ${{ steps.previous_tag.outputs.tag }}
+          head-ref: ${{ steps.version.outputs.version_tag }}
+
+      - name: Update CHANGELOG.md
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DATE="${{ steps.release_date.outputs.date }}"
+          CHANGELOG_CONTENT="${{ steps.changelog.outputs.changelog }}"
+          
+          # Create version header
+          VERSION_HEADER="## [$VERSION] - $DATE"
+          
+          # Create temporary file with new version section
+          {
+            echo "## [Unreleased]"
+            echo ""
+            echo "$VERSION_HEADER"
+            echo "$CHANGELOG_CONTENT"
+            echo ""
+          } > /tmp/new_changelog_section.txt
+          
+          # Prepend to CHANGELOG.md
+          if [ -f "CHANGELOG.md" ]; then
+            # Remove existing unreleased section if present
+            sed -i '/^## \[Unreleased\]/,/^## \[/{ /^## \[Unreleased\]/!{ /^## \[/!d; }; }' CHANGELOG.md || true
+            # Prepend new version section
+            cat /tmp/new_changelog_section.txt CHANGELOG.md > /tmp/changelog.tmp && mv /tmp/changelog.tmp CHANGELOG.md
+          else
+            # Create new CHANGELOG.md
+            cat /tmp/new_changelog_section.txt > CHANGELOG.md
+          fi
 
       - name: Extract changelog section
         id: extract_changelog
