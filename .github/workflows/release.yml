@@ -107,43 +107,34 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@v4
+        uses: metcalfc/changelog-generator@v4
         with:
-          fromTag: ${{ steps.previous_tag.outputs.tag }}
-          toTag: ${{ steps.version.outputs.version_tag }}
-          ignorePreReleases: false
-          configuration: |
-            {
-              "categories": [
-                {
-                  "title": "### Added",
-                  "labels": ["feature", "enhancement", "feat", "type:feature"]
-                },
-                {
-                  "title": "### Changed",
-                  "labels": ["change", "changed", "chore", "type:chore", "type:refactor", "refactor"]
-                },
-                {
-                  "title": "### Fixed",
-                  "labels": ["bug", "fix", "bugfix", "type:bugfix"]
-                },
-                {
-                  "title": "### Documentation",
-                  "labels": ["docs", "documentation", "type:documentation"]
-                },
-                {
-                  "title": "### Performance",
-                  "labels": ["perf", "performance", "type:performance"]
-                }
-              ],
-              "uncategorized": {
-                "title": "### Other Changes"
-              },
-              "ignore_labels": ["ignore", "skip-changelog"],
-              "sort": "ASC"
-            }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          myToken: ${{ secrets.GH_PAT }}
+          path: CHANGELOG.md
+          version: ${{ steps.version.outputs.version }}
+          versionDate: ${{ steps.release_date.outputs.date }}
+          headingText: '##'
+          ignoreAuthor: true
+          sort: 'ASC'
+          tagPrefix: 'v'
+          unreleased: true
+          outputFile: CHANGELOG.md
+          breakingChangeText: '### Breaking Changes'
+          closedIssuePrefix: 'Closes'
+          closedIssueSuffix: ''
+          closedIssueText: 'Closes'
+          useCommitBody: true
+          useCommitFooter: true
+          useIssues: true
+          usePR: true
+          useSections: true
+          sections: |
+            ### Added
+            ### Changed
+            ### Deprecated
+            ### Removed
+            ### Fixed
+            ### Security
 
       - name: Update CHANGELOG.md
         run: |
