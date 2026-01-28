@@ -198,8 +198,8 @@ jobs:
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GH_PAT }}
-          commit-message: "chore: update changelog for v${{ steps.version.outputs.version }}"
-          title: "chore: update changelog for v${{ steps.version.outputs.version }}"
+          commit-message: "chore: update changelog for v${{ steps.version.outputs.version }} [skip ci]"
+          title: "chore: update changelog for v${{ steps.version.outputs.version }} [skip ci]"
           body: "Automated changelog update for version v${{ steps.version.outputs.version }} triggered by tag ${{ steps.version.outputs.version_tag }}"
           branch: "changelog-v${{ steps.version.outputs.version }}"
           base: ${{ github.event.repository.default_branch }}

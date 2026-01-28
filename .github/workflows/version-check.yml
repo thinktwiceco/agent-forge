@@ -3,6 +3,8 @@ name: Version Check
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths-ignore:
+      - 'CHANGELOG.md'
 
 jobs:
   version-check:
