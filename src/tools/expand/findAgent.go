@@ -1,8 +1,8 @@
 package expand
 
 import (
-	agentforge "github.com/thinktwice/agentForge/src"
-	"github.com/thinktwice/agentForge/src/core"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
+	"github.com/thinktwiceco/agent-forge/src/core"
 )
 
 // SubAgentDiscoverable wraps a core.SubAgent to provide Discoverable interface access.

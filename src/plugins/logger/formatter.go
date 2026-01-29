@@ -3,7 +3,7 @@ package logger
 import (
 	"strings"
 
-	"github.com/thinktwice/agentForge/src/agents"
+	"github.com/thinktwiceco/agent-forge/src/agents"
 )
 
 // ColorRule defines a rule for applying colors based on agent name and trace patterns

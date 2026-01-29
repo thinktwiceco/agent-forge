@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	agentforge "github.com/thinktwice/agentForge/src"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
 )
 
 type OpenAILLMBuilder struct {

@@ -3,7 +3,7 @@ package core
 import (
 	"fmt"
 
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // Hooks provides external validation hooks for tool execution

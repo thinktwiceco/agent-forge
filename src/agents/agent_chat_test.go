@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/mocks"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/mocks"
 )
 
 // MockTool implements llms.Tool for testing

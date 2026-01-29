@@ -7,7 +7,7 @@ Configurable output formatting for agent streaming responses with color and labe
 Add the logger plugin to your agent configuration:
 
 ```go
-import "github.com/thinktwice/agentForge/src/plugins/logger"
+import "github.com/thinktwiceco/agent-forge/src/plugins/logger"
 
 // Create plugin with default rules
 loggerPlugin := logger.NewPlugin(

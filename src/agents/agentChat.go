@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	agentforge "github.com/thinktwice/agentForge/src"
-	"github.com/thinktwice/agentForge/src/llms"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // ===== Core Chat Execution =====

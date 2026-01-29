@@ -3,9 +3,9 @@ package agents
 import (
 	"fmt"
 
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/tools/git"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/tools/git"
 )
 
 // GitAgentTemplate defines the system agent template for Git version control operations.

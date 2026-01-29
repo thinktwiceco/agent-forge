@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/integrations"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/integrations"
 )
 
 // VectorDBType represents the type of vector database to use

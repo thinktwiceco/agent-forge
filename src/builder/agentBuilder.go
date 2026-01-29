@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/thinktwice/agentForge/src/agents"
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/agents"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 	"gopkg.in/yaml.v3"
 )
 

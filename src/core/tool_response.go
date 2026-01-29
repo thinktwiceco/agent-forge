@@ -1,6 +1,6 @@
 package core
 
-import "github.com/thinktwice/agentForge/src/llms"
+import "github.com/thinktwiceco/agent-forge/src/llms"
 
 // ToolResponse implements llms.ToolReturn interface
 type ToolResponse struct {

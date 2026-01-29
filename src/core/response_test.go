@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 func TestResponseCh_Lifecycle(t *testing.T) {

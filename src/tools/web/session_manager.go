@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/chromedp/chromedp"
-	agentforge "github.com/thinktwice/agentForge/src"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
 )
 
 const (

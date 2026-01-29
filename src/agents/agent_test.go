@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/mocks"
+	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/mocks"
 )
 
 // TestAgent_ChatStream_Unit tests the agent ChatStream with a mock LLM.
