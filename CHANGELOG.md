@@ -1,5 +1,3 @@
-## [Unreleased]
-
 ## [0.3.1] - 2026-01-29
 
 ### Fixed
@@ -35,8 +33,7 @@
 - [ac151fb](http://github.com/thinktwiceco/agent-forge/commit/ac151fb9dff1c0648ff91aee5c5514776fbaeeb9) - feat(core): support agent config files and add python sdk playground
 
 
-## [Unreleased]
-## [0.1.0] - 2026-01-21
+# [0.1.0] - 2026-01-21
 - no changes
 
 # Changelog
@@ -46,7 +43,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
 ## [0.1.0] - 2024-01-XX
 
 ### Added
