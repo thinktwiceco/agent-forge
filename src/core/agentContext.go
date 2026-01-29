@@ -3,7 +3,7 @@ package core
 import (
 	"fmt"
 
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // AgentContext holds static agent context information that is built once

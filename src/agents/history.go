@@ -1,8 +1,8 @@
 package agents
 
 import (
-	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/persistence"
+	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/persistence"
 )
 
 type History struct {

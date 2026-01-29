@@ -1,8 +1,8 @@
 package meta
 
 import (
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // getAgentName retrieves the agent's name from the agent context.

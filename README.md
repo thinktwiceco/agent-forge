@@ -48,7 +48,7 @@ A powerful Go framework for building intelligent agents with LLM integration, to
 ## Installation
 
 ```bash
-go get github.com/thinktwice/agentForge
+go get github.com/thinktwiceco/agent-forge
 ```
 
 ## Development
@@ -102,8 +102,8 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/thinktwice/agentForge/src/agents"
-    "github.com/thinktwice/agentForge/src/llms"
+    "github.com/thinktwiceco/agent-forge/src/agents"
+    "github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 func main() {
@@ -171,7 +171,7 @@ agent.AddSystemAgent(reasoningAgent)
 Tools extend agent capabilities:
 
 ```go
-import "github.com/thinktwice/agentForge/src/core"
+import "github.com/thinktwiceco/agent-forge/src/core"
 
 calculatorTool := &core.Tool{
     Name:        "calculate",
@@ -455,9 +455,9 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/thinktwice/agentForge/src/agents"
-    "github.com/thinktwice/agentForge/src/core"
-    "github.com/thinktwice/agentForge/src/llms"
+    "github.com/thinktwiceco/agent-forge/src/agents"
+    "github.com/thinktwiceco/agent-forge/src/core"
+    "github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 func main() {

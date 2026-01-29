@@ -1,8 +1,8 @@
 package agents
 
 import (
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // ReasoningAgentTemplate defines the system agent template for general-purpose reasoning.

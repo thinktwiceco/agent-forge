@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/thinktwice/agentForge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/core"
 )
 
 // SQLiteDB implements the core.VectorDB interface using SQLite as the backend.

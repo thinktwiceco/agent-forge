@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/chromedp/chromedp"
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // click handles the click action for the web browser tool.

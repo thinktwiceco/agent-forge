@@ -3,8 +3,8 @@ package agents
 import (
 	"testing"
 
-	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/mocks" // Using mocks package if available/needed
+	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/mocks" // Using mocks package if available/needed
 )
 
 // We need a way to create a minimal agent without full config loading if possible,

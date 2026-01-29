@@ -1,13 +1,3 @@
-## [Unreleased]
-
-## [0.3.1] - 2026-01-29
-- [c4d98a5](http://github.com/thinktwiceco/agent-forge/commit/c4d98a5924725433e0dd23cede840682cce56b8f) - fix(module): correct module path to match repository
-- [a79316a](http://github.com/thinktwiceco/agent-forge/commit/a79316af78c1080ab7a75d18324385b19bef896a) - Merge pull request #6 from thinktwiceco/release-0.3.0
-- [cf3a711](http://github.com/thinktwiceco/agent-forge/commit/cf3a71168fe3326c71a8182191a02ad88414aea0) - Merge pull request #9 from thinktwiceco/changelog-v0.3.0
-- [4470918](http://github.com/thinktwiceco/agent-forge/commit/44709180a230cbd352299da3730b52da8d1e1300) - chore: update changelog for v0.3.0 [skip ci]
-
-
-## [Unreleased]
 ## [0.3.1] - 2026-01-29
 
 ### Fixed
@@ -43,8 +33,7 @@
 - [ac151fb](http://github.com/thinktwiceco/agent-forge/commit/ac151fb9dff1c0648ff91aee5c5514776fbaeeb9) - feat(core): support agent config files and add python sdk playground
 
 
-## [Unreleased]
-## [0.1.0] - 2026-01-21
+# [0.1.0] - 2026-01-21
 - no changes
 
 # Changelog
@@ -54,7 +43,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
 ## [0.1.0] - 2024-01-XX
 
 ### Added

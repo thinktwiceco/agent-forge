@@ -1,9 +1,9 @@
 package agents
 
 import (
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/tools/fs"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/tools/fs"
 )
 
 // OsAgentTemplate defines the system agent template for OS-related operations.

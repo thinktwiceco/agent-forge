@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/thinktwice/agentForge/src/apis"
+	"github.com/thinktwiceco/agent-forge/src/apis"
 )
 
 func main() {

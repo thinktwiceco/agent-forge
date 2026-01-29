@@ -1,6 +1,6 @@
 package logger
 
-import "github.com/thinktwice/agentForge/src/agents"
+import "github.com/thinktwiceco/agent-forge/src/agents"
 
 // DefaultColorRules returns default color rules matching the behavior from cmd/chat/main.go
 func DefaultColorRules() []ColorRule {

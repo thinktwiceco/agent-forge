@@ -30,7 +30,7 @@ When a log level is set, only messages at that level or higher are output. For e
 Initialize the global logger during application startup:
 
 ```go
-import agentforge "github.com/thinktwice/agentForge/src"
+import agentforge "github.com/thinktwiceco/agent-forge/src"
 
 func main() {
     // Load configuration
@@ -163,7 +163,7 @@ agentforge.ErrorLevel  // Errors only
 package main
 
 import (
-    agentforge "github.com/thinktwice/agentForge/src"
+    agentforge "github.com/thinktwiceco/agent-forge/src"
 )
 
 func main() {
@@ -184,7 +184,7 @@ package mypackage
 
 import (
     "os"
-    agentforge "github.com/thinktwice/agentForge/src"
+    agentforge "github.com/thinktwiceco/agent-forge/src"
 )
 
 type MyService struct {

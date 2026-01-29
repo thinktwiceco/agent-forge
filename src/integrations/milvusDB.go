@@ -11,7 +11,7 @@ import (
 	"github.com/milvus-io/milvus/client/v2/entity"
 	"github.com/milvus-io/milvus/client/v2/index"
 	"github.com/milvus-io/milvus/client/v2/milvusclient"
-	"github.com/thinktwice/agentForge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/core"
 )
 
 // MilvusDB implements the core.VectorDB interface using Milvus as the backend.

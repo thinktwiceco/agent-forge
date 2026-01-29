@@ -1,9 +1,7 @@
-"""Data models for Agent Forge SDK.
+"""Data models for ThinkTwice SDK.
 
 These models match the Go structures in src/core/response.go and src/llms/models.go.
 """
-
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
@@ -59,7 +57,7 @@ class ChunkResponse:
     trace: str = ""  # Trace information (e.g., "thinking", "response")
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ChunkResponse:
+    def from_dict(cls, data: dict[str, Any]) -> "ChunkResponse":
         """Create ChunkResponse from dictionary (e.g., from JSON)."""
         # Handle tool_calls
         tool_calls = None

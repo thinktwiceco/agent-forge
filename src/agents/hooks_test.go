@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 func TestAgentHooks_RegistrationAndTrigger(t *testing.T) {

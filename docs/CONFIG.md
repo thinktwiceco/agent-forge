@@ -18,7 +18,7 @@ The `Config` struct contains the following fields:
 ### Basic Usage
 
 ```go
-import agentforge "github.com/thinktwice/agentForge/src"
+import agentforge "github.com/thinktwiceco/agent-forge/src"
 
 // Load configuration from .env file (if present) and environment variables
 config, err := agentforge.NewConfig()

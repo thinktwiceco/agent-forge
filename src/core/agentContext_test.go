@@ -3,8 +3,8 @@ package core
 import (
 	"testing"
 
-	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/mocks"
+	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/mocks"
 )
 
 func TestAgentContext_BuildContext(t *testing.T) {

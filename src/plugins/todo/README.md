@@ -18,7 +18,7 @@ A plugin that provides task management capabilities to agents through a `todo_ha
 Add the todo plugin to your agent configuration:
 
 ```go
-import "github.com/thinktwice/agentForge/src/plugins/todo"
+import "github.com/thinktwiceco/agent-forge/src/plugins/todo"
 
 // Optional: Define a callback function to be notified when todos are updated
 onTodoUpdate := func(todos []*todo.TodoItem) {
@@ -265,11 +265,11 @@ import (
     "fmt"
     "os"
     
-    "github.com/thinktwice/agentForge/src/agents"
-    "github.com/thinktwice/agentForge/src/core"
-    "github.com/thinktwice/agentForge/src/llms"
-    "github.com/thinktwice/agentForge/src/plugins/logger"
-    "github.com/thinktwice/agentForge/src/plugins/todo"
+    "github.com/thinktwiceco/agent-forge/src/agents"
+    "github.com/thinktwiceco/agent-forge/src/core"
+    "github.com/thinktwiceco/agent-forge/src/llms"
+    "github.com/thinktwiceco/agent-forge/src/plugins/logger"
+    "github.com/thinktwiceco/agent-forge/src/plugins/todo"
 )
 
 func main() {

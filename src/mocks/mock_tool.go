@@ -1,7 +1,7 @@
 package mocks
 
 import (
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // MockTool is a mock implementation of llms.Tool
