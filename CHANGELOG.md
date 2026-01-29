@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+## [0.3.1] - 2026-01-29
+- [c4d98a5](http://github.com/thinktwiceco/agent-forge/commit/c4d98a5924725433e0dd23cede840682cce56b8f) - fix(module): correct module path to match repository
+- [a79316a](http://github.com/thinktwiceco/agent-forge/commit/a79316af78c1080ab7a75d18324385b19bef896a) - Merge pull request #6 from thinktwiceco/release-0.3.0
+- [cf3a711](http://github.com/thinktwiceco/agent-forge/commit/cf3a71168fe3326c71a8182191a02ad88414aea0) - Merge pull request #9 from thinktwiceco/changelog-v0.3.0
+- [4470918](http://github.com/thinktwiceco/agent-forge/commit/44709180a230cbd352299da3730b52da8d1e1300) - chore: update changelog for v0.3.0 [skip ci]
+
+
+## [Unreleased]
+## [0.3.1] - 2026-01-29
+
+### Fixed
+- fix(module): correct module path from `github.com/thinktwice/agentForge` to `github.com/thinktwiceco/agent-forge` to match actual repository
+- Updated all import statements across the codebase to use the correct module path
+- Updated documentation to reference the correct module path
+
 ## [0.3.0] - 2026-01-28
 - [6d62c5d](http://github.com/thinktwiceco/agent-forge/commit/6d62c5d7bc9b77f67083e5681c2e4af2bfab28c0) - ci: disable setup-go cache in CI workflow
 - [4071bbc](http://github.com/thinktwiceco/agent-forge/commit/4071bbccdf41b286210548ec570f7a9b96b6dc03) - ci: fix changelog generation and disable setup-go cache to resolve tar errors
