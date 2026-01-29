@@ -143,6 +143,8 @@ func main() {
 
 ### Creating Agents
 
+Agents can be created programmatically using `AgentConfig` or from YAML configuration files. See the [Builder Configuration Guide](src/builder/README.md) for details on creating agents from configuration files.
+
 Agents are created using `AgentConfig`:
 
 ```go
