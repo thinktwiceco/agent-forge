@@ -6,7 +6,7 @@ import (
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
-	agentforge "github.com/thinktwice/agentForge/src"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
 )
 
 // OpenAIEmbeddingGenerator implements the EmbeddingGenerator interface using OpenAI's embedding API.

@@ -1,4 +1,4 @@
-module github.com/thinktwice/agentForge
+module github.com/thinktwiceco/agent-forge
 
 go 1.24.11
 

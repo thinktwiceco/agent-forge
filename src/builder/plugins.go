@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/plugins/logger"
-	"github.com/thinktwice/agentForge/src/plugins/todo"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/plugins/logger"
+	"github.com/thinktwiceco/agent-forge/src/plugins/todo"
 )
 
 type Plugin string

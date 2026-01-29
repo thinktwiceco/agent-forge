@@ -1,8 +1,8 @@
 package expand
 
 import (
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // Expand represents a tool that allows progressive discovery of tools and agents.

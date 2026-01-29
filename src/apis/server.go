@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/thinktwice/agentForge/src/builder"
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/builder"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // Server represents an HTTP server that exposes agent chat functionality via REST API.

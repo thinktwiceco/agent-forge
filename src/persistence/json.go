@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	agentforge "github.com/thinktwice/agentForge/src"
-	"github.com/thinktwice/agentForge/src/llms"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // JSONPersistence implements the Persistence interface using JSON file storage

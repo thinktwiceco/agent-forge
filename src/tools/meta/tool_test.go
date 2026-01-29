@@ -3,7 +3,7 @@ package meta
 import (
 	"testing"
 
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 func TestNewMetaTool(t *testing.T) {

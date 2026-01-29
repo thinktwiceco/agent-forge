@@ -3,8 +3,8 @@ package fs
 import (
 	"fmt"
 
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // Fs represents a file system tool with a restricted root directory.

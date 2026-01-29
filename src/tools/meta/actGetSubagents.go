@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // getSubagents retrieves a list of available subagents with their names and descriptions.

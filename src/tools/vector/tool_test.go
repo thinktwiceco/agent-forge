@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/thinktwice/agentForge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/core"
 )
 
 // MockVectorDB

@@ -3,12 +3,12 @@ package builder
 import (
 	"fmt"
 
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/tools/fs"
-	"github.com/thinktwice/agentForge/src/tools/git"
-	"github.com/thinktwice/agentForge/src/tools/vector"
-	"github.com/thinktwice/agentForge/src/tools/web"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/tools/fs"
+	"github.com/thinktwiceco/agent-forge/src/tools/git"
+	"github.com/thinktwiceco/agent-forge/src/tools/vector"
+	"github.com/thinktwiceco/agent-forge/src/tools/web"
 )
 
 type Tool string

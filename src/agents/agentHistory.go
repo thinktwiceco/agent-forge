@@ -1,9 +1,9 @@
 package agents
 
 import (
-	agentforge "github.com/thinktwice/agentForge/src"
-	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/persistence"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
+	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/persistence"
 )
 
 // ==============================

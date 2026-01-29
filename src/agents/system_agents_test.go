@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/thinktwice/agentForge/src/mocks"
+	"github.com/thinktwiceco/agent-forge/src/mocks"
 )
 
 func TestOsAgent_Constructor(t *testing.T) {

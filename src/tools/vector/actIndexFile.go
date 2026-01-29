@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // indexFile handles the indexFile action for the vector tool.

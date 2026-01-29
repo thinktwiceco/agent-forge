@@ -1,6 +1,6 @@
 package persistence
 
-import "github.com/thinktwice/agentForge/src/llms"
+import "github.com/thinktwiceco/agent-forge/src/llms"
 
 // Persistence interface defines methods for saving and retrieving conversation history
 type Persistence interface {

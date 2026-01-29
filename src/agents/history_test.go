@@ -3,7 +3,7 @@ package agents
 import (
 	"testing"
 
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // MockPersistence

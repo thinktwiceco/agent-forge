@@ -381,7 +381,7 @@ Go modules use semantic versioning tags from the Git repository. When you tag a 
 
 #### 1. **GitHub Releases Page**
 The primary source for consumers to discover versions:
-- URL: `https://github.com/thinktwice/agentForge/releases`
+- URL: `https://github.com/thinktwiceco/agent-forge/releases`
 - Shows all tagged releases with release notes
 - Each release includes:
   - Version number (e.g., `v1.2.3`)
@@ -393,13 +393,13 @@ The primary source for consumers to discover versions:
 Go automatically queries the module proxy:
 ```bash
 # List available versions
-go list -m -versions github.com/thinktwice/agentForge
+go list -m -versions github.com/thinktwiceco/agent-forge
 ```
 
 #### 3. **Git Tags**
 Direct inspection of Git tags:
 ```bash
-git ls-remote --tags https://github.com/thinktwice/agentForge.git
+git ls-remote --tags https://github.com/thinktwiceco/agent-forge.git
 ```
 
 ### Version Selection Strategies
@@ -410,10 +410,10 @@ git ls-remote --tags https://github.com/thinktwice/agentForge.git
 
 ```bash
 # Get latest version
-go get github.com/thinktwice/agentForge@latest
+go get github.com/thinktwiceco/agent-forge@latest
 
 # Or in go.mod
-require github.com/thinktwice/agentForge latest
+require github.com/thinktwiceco/agent-forge latest
 ```
 
 **Decision Process**:
@@ -428,10 +428,10 @@ require github.com/thinktwice/agentForge latest
 
 ```bash
 # Get specific version
-go get github.com/thinktwice/agentForge@v1.2.3
+go get github.com/thinktwiceco/agent-forge@v1.2.3
 
 # Or in go.mod
-require github.com/thinktwice/agentForge v1.2.3
+require github.com/thinktwiceco/agent-forge v1.2.3
 ```
 
 **Decision Process**:
@@ -450,7 +450,7 @@ require github.com/thinktwice/agentForge v1.2.3
 ```go
 // In go.mod
 require (
-    github.com/thinktwice/agentForge v1.2.0
+    github.com/thinktwiceco/agent-forge v1.2.0
 )
 
 // Go will automatically use latest v1.x.x
@@ -469,8 +469,8 @@ require (
 
 ```bash
 # Get pre-release version
-go get github.com/thinktwice/agentForge@v2.0.0-beta.1
-go get github.com/thinktwice/agentForge@v2.0.0-rc.1
+go get github.com/thinktwiceco/agent-forge@v2.0.0-beta.1
+go get github.com/thinktwiceco/agent-forge@v2.0.0-rc.1
 ```
 
 **Decision Process**:
@@ -551,12 +551,12 @@ Understanding semantic versioning helps predict compatibility:
 # 1. Check latest version on GitHub Releases
 # 2. Review CHANGELOG.md for recent changes
 # 3. Install latest stable
-go get github.com/thinktwice/agentForge@latest
+go get github.com/thinktwiceco/agent-forge@latest
 
 # Or specify in go.mod
 go mod init myproject
 # Edit go.mod:
-require github.com/thinktwice/agentForge latest
+require github.com/thinktwiceco/agent-forge latest
 go mod tidy
 ```
 
@@ -564,12 +564,12 @@ go mod tidy
 
 ```bash
 # 1. Check current version
-go list -m github.com/thinktwice/agentForge
+go list -m github.com/thinktwiceco/agent-forge
 
 # 2. Review CHANGELOG.md for changes since your version
 # 3. Check for breaking changes
 # 4. Upgrade to latest patch (safe)
-go get github.com/thinktwice/agentForge@latest
+go get github.com/thinktwiceco/agent-forge@latest
 go mod tidy
 go test ./...  # Verify everything still works
 ```
@@ -579,7 +579,7 @@ go test ./...  # Verify everything still works
 ```go
 // go.mod
 require (
-    github.com/thinktwice/agentForge v1.2.3
+    github.com/thinktwiceco/agent-forge v1.2.3
 )
 
 // This locks to exact version
@@ -591,7 +591,7 @@ require (
 ```go
 // go.mod
 require (
-    github.com/thinktwice/agentForge v2.0.0
+    github.com/thinktwiceco/agent-forge v2.0.0
 )
 
 // After major version upgrade:
@@ -629,13 +629,13 @@ require (
 6. **Use Go's Module Commands**
    ```bash
    # Check what version you're using
-   go list -m github.com/thinktwice/agentForge
+   go list -m github.com/thinktwiceco/agent-forge
    
    # See available updates
-   go list -m -u github.com/thinktwice/agentForge
+   go list -m -u github.com/thinktwiceco/agent-forge
    
    # Update to latest
-   go get -u github.com/thinktwice/agentForge
+   go get -u github.com/thinktwiceco/agent-forge
    ```
 
 ### Version Information in Code
@@ -643,7 +643,7 @@ require (
 Consumers can also check version at runtime (if implemented):
 
 ```go
-import "github.com/thinktwice/agentForge/src/agents"
+import "github.com/thinktwiceco/agent-forge/src/agents"
 
 // If version is exposed via build info
 // (requires build-time version injection)

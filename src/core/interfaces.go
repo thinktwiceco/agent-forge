@@ -1,8 +1,8 @@
 package core
 
 import (
-	agentforge "github.com/thinktwice/agentForge/src"
-	"github.com/thinktwice/agentForge/src/llms"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // SubAgent represents an agent that can be used as a sub-agent

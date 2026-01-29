@@ -3,12 +3,12 @@ package agents
 import (
 	"fmt"
 
-	agentforge "github.com/thinktwice/agentForge/src"
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
-	"github.com/thinktwice/agentForge/src/tools/delegate"
-	"github.com/thinktwice/agentForge/src/tools/expand"
-	"github.com/thinktwice/agentForge/src/tools/meta"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/tools/delegate"
+	"github.com/thinktwiceco/agent-forge/src/tools/expand"
+	"github.com/thinktwiceco/agent-forge/src/tools/meta"
 )
 
 // ==============================

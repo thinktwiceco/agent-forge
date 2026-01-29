@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/thinktwice/agentForge/src/agents"
-	"github.com/thinktwice/agentForge/src/builder"
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/integrations"
-	"github.com/thinktwice/agentForge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/agents"
+	"github.com/thinktwiceco/agent-forge/src/builder"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/integrations"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 const (

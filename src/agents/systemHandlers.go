@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	agentforge "github.com/thinktwice/agentForge/src"
-	"github.com/thinktwice/agentForge/src/core"
-	"github.com/thinktwice/agentForge/src/llms"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 var handleNewSystemAgentAdded = OnAddedSystemAgentHook(func(a *Agent, subAgent core.SubAgent) error {
