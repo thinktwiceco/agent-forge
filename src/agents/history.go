@@ -57,9 +57,19 @@ func (h *History) save() string {
 	return h.chatId
 }
 
+// get loads conversation history from persistence for the specified chatId.
+// It updates the hasSystemMessage flag based on whether the loaded history
+// contains a system message, ensuring correct behavior when reusing History
+// objects across multiple ChatStream calls.
 func (h *History) get(chatId string) {
 	h.chatId = chatId
 	if h.persistence != nil {
 		h.history = h.persistence.GetHistory(chatId, 0, 0)
+		// Update hasSystemMessage flag based on loaded history
+		// This is crucial when the History object is reused across calls
+		h.hasSystemMessage = false
+		if len(h.history) > 0 && h.history[0].Role() == llms.MessageRoleSystem {
+			h.hasSystemMessage = true
+		}
 	}
 }

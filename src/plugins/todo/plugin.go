@@ -162,3 +162,7 @@ func (p *TodoPlugin) addBulkTodos(todos []map[string]string) error {
 	}
 	return nil
 }
+
+func (p *TodoPlugin) clearTodos() {
+	p.items = make([]*TodoItem, 0)
+}

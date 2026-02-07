@@ -89,3 +89,38 @@ func TestResponseCh_TrySend(t *testing.T) {
 		t.Error("Expected TrySend to fail on closed channel")
 	}
 }
+
+func TestResponseCh_ChatIdGetterSetter(t *testing.T) {
+	rc := NewResponseCh("test-agent", "trace", "initial-chat-id", nil)
+
+	// Test initial chatId
+	if rc.GetChatId() != "initial-chat-id" {
+		t.Errorf("Expected initial chatId 'initial-chat-id', got '%s'", rc.GetChatId())
+	}
+
+	// Test SetChatId
+	rc.SetChatId("updated-chat-id")
+	if rc.GetChatId() != "updated-chat-id" {
+		t.Errorf("Expected updated chatId 'updated-chat-id', got '%s'", rc.GetChatId())
+	}
+
+	// Test thread safety by setting multiple times
+	done := make(chan bool)
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			rc.SetChatId("concurrent-id")
+			_ = rc.GetChatId()
+			done <- true
+		}(i)
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < 10; i++ {
+		<-done
+	}
+
+	// Final value should be set
+	if rc.GetChatId() != "concurrent-id" {
+		t.Errorf("Expected final chatId 'concurrent-id', got '%s'", rc.GetChatId())
+	}
+}

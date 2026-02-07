@@ -223,8 +223,17 @@ func (a *Agent) executeChatWithTools() error {
 				return nil
 			}
 
-			// Add tool result to history
-			a.history.addToolMessage(toolCall.ID, toolResult.Result, toolResult.Ephemeral)
+			// Add tool result to history (including error if present)
+			content := toolResult.Result
+			if !toolResult.Success && toolResult.Error != "" {
+				// Include error information in the content for failed tool calls
+				if content != "" {
+					content = content + "\nError: " + toolResult.Error
+				} else {
+					content = "Error: " + toolResult.Error
+				}
+			}
+			a.history.addToolMessage(toolCall.ID, content, toolResult.Ephemeral)
 		}
 
 		// Continue to next iteration (will call LLM again with tool results)

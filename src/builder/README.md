@@ -13,11 +13,18 @@ agent:
   name: "my-agent"
   system_prompt: "You are a helpful assistant."
   model: "deepseek::deepseek-chat"
-  working_dir: "/path/to/working/directory"
+  working_dir: "/path/to/working/directory"  # Optional fallback for tools
   persistence: "json"
   tools:
-    - "fs"
-    - "git"
+    - name: fs
+      root: "/path/to/sandbox"
+    - name: git
+      root: "/path/to/repo"
+    - name: postgres
+      postgresURL: "postgresql://user:password@localhost:5432/mydb"
+      mode: "read"
+      allowedTables: ["users", "orders"]
+      allowedSchemas: ["public"]
   subagents:
     reasoning: "deepseek::deepseek-chat"
     vector: "deepseek::deepseek-chat"
@@ -57,31 +64,114 @@ The `agent` section defines the main agent configuration.
 - **name**: Must be unique. Used for agent registration and identification.
 - **system_prompt**: Optional custom prompt. If omitted, default system prompt is used.
 - **model**: Required LLM model specification. Format: `provider::model-name` (e.g., `deepseek::deepseek-chat`).
-- **working_dir**: Base directory for file system operations. All file paths are validated against this directory for security.
+- **working_dir**: Optional fallback directory for tools that don't specify their own `root` parameter. For backwards compatibility only.
 - **persistence**: 
   - `"json"`: Stores conversation history as JSON files in `data/conversations/`
   - `""` (empty): No persistence, conversations are not saved
-- **tools**: Array of tool identifiers. Each tool provides specific capabilities to the agent.
+- **tools**: Array of tool configurations. Tools can be specified as:
+  - **Object format** (recommended): `{name: "fs", root: "/path"}` - Allows per-tool configuration
+  - **String format** (legacy): `"fs"` - Uses global `working_dir` as fallback
 - **subagents**: Map where keys are subagent names and values are their model specifications.
 - **plugins**: Array of plugin identifiers that extend agent functionality.
 
 ## Tools Configuration
 
-Tools extend agent capabilities with specific functionalities.
+Tools extend agent capabilities with specific functionalities. Each tool can be configured with its own initialization parameters.
 
-| Tool Name | Identifier | Description | Requirements |
-|-----------|------------|-------------|--------------|
-| File System Tool | `"fs"` | File and directory operations (read, write, list, delete) | `working_dir` must be set |
-| Git Tool | `"git"` | Git repository operations (add, commit, push, pull, status, log) | `working_dir` must be set |
-| Web Browser Tool | `"web"` | Web navigation, automation, and content extraction | `working_dir` must be set |
-| Vector DB Tool | `"vector"` | Semantic search and document indexing | `vector-storage` section required |
+### Configuration Format
 
-### Tools Details
+Tools support two configuration formats:
 
-- **File System Tool (`fs`)**: Provides file operations within the `working_dir`. Supports reading, writing, listing, and deleting files and directories.
-- **Git Tool (`git`)**: Enables Git operations on repositories within the `working_dir`. Includes version control operations.
-- **Web Browser Tool (`web`)**: Headless browser automation for web navigation, form filling, screenshot capture, and content extraction.
-- **Vector DB Tool (`vector`)**: Requires vector storage configuration. Enables semantic search, document indexing, and similarity queries.
+**Object format (recommended):**
+```yaml
+tools:
+  - name: fs
+    root: "/path/to/sandbox"
+  - name: postgres
+    postgresURL: "postgresql://..."
+    mode: "read"
+    allowedTables: ["users"]
+```
+
+**String format (legacy):**
+```yaml
+tools:
+  - "fs"  # Uses agent.working_dir as fallback
+  - "git"
+```
+
+### Available Tools
+
+| Tool Name | Identifier | Description | Configuration Parameters |
+|-----------|------------|-------------|--------------------------|
+| File System Tool | `fs` | File and directory operations (read, write, list, delete) | `root` (required): Root directory path |
+| Git Tool | `git` | Git repository operations (add, commit, push, pull, status, log) | `root` (required): Repository directory path |
+| Web Browser Tool | `web` | Web navigation, automation, and content extraction | `root` (required): Working directory path |
+| Vector DB Tool | `vector` | Semantic search and document indexing | No parameters (requires `vector-storage` section) |
+| PostgreSQL Tool | `postgres` | Secure database operations with parameterized queries | See [PostgreSQL Tool Configuration](#postgresql-tool-configuration) |
+
+### Tool Configuration Examples
+
+**File System Tool:**
+```yaml
+tools:
+  - name: fs
+    root: "/home/user/sandbox"  # Required: root directory for file operations
+```
+
+**Git Tool:**
+```yaml
+tools:
+  - name: git
+    root: "/home/user/my-repo"  # Required: git repository directory
+```
+
+**Web Browser Tool:**
+```yaml
+tools:
+  - name: web
+    root: "/home/user/downloads"  # Required: working directory for downloads/screenshots
+```
+
+**Vector DB Tool:**
+```yaml
+tools:
+  - name: vector  # No additional parameters, requires vector-storage section
+```
+
+### PostgreSQL Tool Configuration
+
+The PostgreSQL tool requires inline configuration parameters:
+
+```yaml
+tools:
+  - name: postgres
+    postgresURL: "postgresql://user:password@localhost:5432/mydb"  # Required
+    mode: "read"  # Required: "read" or "write"
+    allowedTables:  # Required: array of table names
+      - "users"
+      - "orders"
+      - "products"
+    allowedSchemas:  # Optional: array of schema names (defaults to public)
+      - "public"
+      - "analytics"
+```
+
+**Configuration parameters:**
+- **postgresURL** (required): PostgreSQL connection URL in format `postgresql://user:pass@host:port/db`
+- **mode** (required): Access mode - `"read"` for SELECT only, `"write"` for all operations
+- **allowedTables** (required): Whitelist of table names the agent can access
+- **allowedSchemas** (optional): Whitelist of schema names (defaults to `["public"]` if omitted)
+
+**READ mode** allows:
+- SELECT queries
+- getTables operation
+- getSchema operation
+
+**WRITE mode** allows:
+- All READ mode operations
+- UPDATE operations
+- INSERT operations
 
 ## Subagents Configuration
 
@@ -240,6 +330,101 @@ vector-storage:
     db_path: "./knowledge.db"
 ```
 
+### Agent with PostgreSQL Database Access
+
+**Example configuration (READ mode):**
+```yaml
+agent:
+  name: "database-agent"
+  model: "deepseek::deepseek-chat"
+  tools:
+    - name: postgres
+      postgresURL: "postgresql://user:password@localhost:5432/mydb"
+      mode: "read"
+      allowedTables:
+        - "users"
+        - "orders"
+        - "products"
+      allowedSchemas:
+        - "public"
+```
+
+**Agent usage (READ mode):**
+
+Query data:
+```
+Tool: postgres
+Parameters:
+  operation: "select"
+  table: "users"
+  select: "name, email WHERE age > 25"
+  limit: 50
+```
+
+List tables:
+```
+Tool: postgres
+Parameters:
+  operation: "getTables"
+  schema: "public"
+```
+
+Get table schema:
+```
+Tool: postgres
+Parameters:
+  operation: "getSchema"
+  table: "users"
+  schema: "public"
+```
+
+**Example configuration (WRITE mode):**
+```yaml
+agent:
+  name: "database-agent"
+  model: "deepseek::deepseek-chat"
+  tools:
+    - name: postgres
+      postgresURL: "postgresql://user:password@localhost:5432/mydb"
+      mode: "write"
+      allowedTables:
+        - "users"
+      allowedSchemas:
+        - "public"
+```
+
+**Agent usage (WRITE mode):**
+
+Update data:
+```
+Tool: postgres
+Parameters:
+  operation: "update"
+  table: "users"
+  update: "last_login = NOW()"
+  select: "WHERE user_id = 123"
+```
+
+Insert data:
+```
+Tool: postgres
+Parameters:
+  operation: "insert"
+  table: "users"
+  add: "name, email VALUES ('John', 'john@example.com')"
+```
+
+**Key features:**
+- SQL injection prevention through parameterized queries
+- Table and schema whitelist enforcement for access control
+- Per-tool configuration embedded in the tools array  
+- Mode-based operation restrictions configured by developer
+- Database introspection via getTables and getSchema operations
+- Agent provides SQL fragments, not complete statements
+- Automatic validation of SQL fragments to prevent injection attempts
+- Connection credentials managed by developer, not exposed to agent
+- Filtered results show only accessible tables and schemas
+
 ### Complete Example
 
 ```yaml
@@ -254,6 +439,7 @@ agent:
     - "git"
     - "web"
     - "vector"
+    - "postgres"
   subagents:
     reasoning: "deepseek::deepseek-chat"
     os: "deepseek::deepseek-chat"
@@ -332,4 +518,6 @@ The builder validates configuration files and will return errors for:
 - [Logger Plugin Documentation](../plugins/logger/README.md) - Logger plugin details
 - [Todo Plugin Documentation](../plugins/todo/README.md) - Todo plugin details
 - [Configuration Guide](../../docs/CONFIG.md) - Environment variable configuration
+
+
 

@@ -110,3 +110,66 @@ func TestHistory_Save(t *testing.T) {
 		t.Errorf("Ephemeral message content not redacted: %s", h.History()[0].Content())
 	}
 }
+
+func TestHistory_GetUpdatesSystemMessageFlag(t *testing.T) {
+	// Test that get() properly updates hasSystemMessage flag based on loaded history
+
+	// Case 1: Loading history WITH system message
+	mockP1 := &MockPersistence{
+		GetHistoryFunc: func(chatId string, limit, offset int) []*llms.UnifiedMessage {
+			return []*llms.UnifiedMessage{
+				llms.SystemMessage("system msg"),
+				llms.UserMessage("user msg"),
+			}
+		},
+	}
+
+	h1 := &History{
+		persistence:      mockP1,
+		hasSystemMessage: false, // Initially false
+	}
+
+	h1.get("test-id")
+	if !h1.hasSystemMessage {
+		t.Error("hasSystemMessage should be true after loading history with system message")
+	}
+	if len(h1.History()) != 2 {
+		t.Errorf("Expected 2 messages, got %d", len(h1.History()))
+	}
+
+	// Case 2: Loading history WITHOUT system message
+	mockP2 := &MockPersistence{
+		GetHistoryFunc: func(chatId string, limit, offset int) []*llms.UnifiedMessage {
+			return []*llms.UnifiedMessage{
+				llms.UserMessage("user msg"),
+			}
+		},
+	}
+
+	h2 := &History{
+		persistence:      mockP2,
+		hasSystemMessage: true, // Initially true
+	}
+
+	h2.get("test-id-2")
+	if h2.hasSystemMessage {
+		t.Error("hasSystemMessage should be false after loading history without system message")
+	}
+
+	// Case 3: Loading empty history
+	mockP3 := &MockPersistence{
+		GetHistoryFunc: func(chatId string, limit, offset int) []*llms.UnifiedMessage {
+			return []*llms.UnifiedMessage{}
+		},
+	}
+
+	h3 := &History{
+		persistence:      mockP3,
+		hasSystemMessage: true, // Initially true
+	}
+
+	h3.get("test-id-3")
+	if h3.hasSystemMessage {
+		t.Error("hasSystemMessage should be false after loading empty history")
+	}
+}
