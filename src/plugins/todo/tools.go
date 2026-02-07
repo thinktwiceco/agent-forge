@@ -12,7 +12,7 @@ func newTodoHandlerTool(plugin *TodoPlugin) llms.Tool {
 	return &core.Tool{
 		Name: TODO_HANDLER_TOOL,
 		Description: `
-A tool that allows you to add, get, and update todo items. Use this tool to keep track of tasks and make sure you complete everything that has been requested
+A tool that allows you to add, get, update, and clear todo items. Use this tool to keep track of tasks and make sure you complete everything that has been requested
 Expand on this tool to have a better description of how to use it.
 Use it to keep track of your work in a multi step process, or a planning process, or anything
 that can be broken down into smaller steps.
@@ -23,6 +23,7 @@ that can be broken down into smaller steps.
   * addBulkTodos: Adds multiple todo items at once
   * getTodos: Gets all todo items
   * updateTodo: Updates the status of a todo item (can use either 'id' or 'title' to identify the item)
+  * clearTodos: Deletes all todo items
 
 - Example:
 You are asked to calculate the surface of a rectangle.
@@ -48,7 +49,7 @@ of the todo items.
 			{
 				Name:        "action",
 				Type:        "string",
-				Description: "The action to perform: 'addTodo', 'addBulkTodos', 'getTodos', or 'updateTodo'",
+				Description: "The action to perform: 'addTodo', 'addBulkTodos', 'getTodos', 'updateTodo', or 'clearTodos'",
 				Required:    true,
 			},
 			{
@@ -181,8 +182,12 @@ of the todo items.
 
 				return core.NewErrorResponse("either 'id' or 'title' parameter is required for update_todo action")
 
+			case "clearTodos":
+				plugin.clearTodos()
+				return core.NewSuccessResponse("All todo items cleared successfully")
+
 			default:
-				return core.NewErrorResponse(fmt.Sprintf("unknown action: %s. Valid actions are: 'add_todo', 'addBulkTodos', 'get_todos', or 'update_todo'", action))
+				return core.NewErrorResponse(fmt.Sprintf("unknown action: %s. Valid actions are: 'addTodo', 'addBulkTodos', 'getTodos', 'updateTodo', or 'clearTodos'", action))
 			}
 		},
 	}

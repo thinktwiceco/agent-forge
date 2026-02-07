@@ -237,3 +237,12 @@ func (arc *ResponseCh) SetChatId(chatId string) {
 	defer arc.mu.Unlock()
 	arc.chatId = chatId
 }
+
+// GetChatId returns the current chatId for this response channel.
+// This should be called after the response is complete to get the final chatId
+// (which may have been generated during the conversation save process).
+func (arc *ResponseCh) GetChatId() string {
+	arc.mu.Lock()
+	defer arc.mu.Unlock()
+	return arc.chatId
+}

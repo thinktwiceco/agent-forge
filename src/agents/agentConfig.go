@@ -7,7 +7,7 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
-const defaultMaxToolIterations = 10
+const defaultMaxToolIterations = 30
 
 // AgentConfig holds configuration parameters for creating a new Agent.
 //

@@ -896,3 +896,100 @@ func TestNewTodoPlugin(t *testing.T) {
 		t.Errorf("Expected empty todo list initially, got %d items", len(items))
 	}
 }
+
+// TestTodoPlugin_ClearTodos tests clearing all todos
+func TestTodoPlugin_ClearTodos(t *testing.T) {
+	plugin := NewTodoPlugin(nil)
+
+	// Add some todos
+	if err := plugin.addTodoItem("Todo 1", "Description 1"); err != nil {
+		t.Fatalf("Failed to add todo 1: %v", err)
+	}
+	if err := plugin.addTodoItem("Todo 2", "Description 2"); err != nil {
+		t.Fatalf("Failed to add todo 2: %v", err)
+	}
+	if err := plugin.addTodoItem("Todo 3", "Description 3"); err != nil {
+		t.Fatalf("Failed to add todo 3: %v", err)
+	}
+
+	// Verify todos were added
+	items := plugin.getTodoItems()
+	if len(items) != 3 {
+		t.Errorf("Expected 3 todo items, got %d", len(items))
+	}
+
+	// Clear all todos
+	plugin.clearTodos()
+
+	// Verify todos were cleared
+	items = plugin.getTodoItems()
+	if len(items) != 0 {
+		t.Errorf("Expected 0 todo items after clear, got %d", len(items))
+	}
+}
+
+// TestTodoHandlerTool_ClearTodos tests the clearTodos action
+func TestTodoHandlerTool_ClearTodos(t *testing.T) {
+	plugin := NewTodoPlugin(nil)
+
+	// Add some todos
+	if err := plugin.addTodoItem("Todo 1", "Description 1"); err != nil {
+		t.Fatalf("Failed to add todo 1: %v", err)
+	}
+	if err := plugin.addTodoItem("Todo 2", "Description 2"); err != nil {
+		t.Fatalf("Failed to add todo 2: %v", err)
+	}
+
+	// Verify todos were added
+	items := plugin.getTodoItems()
+	if len(items) != 2 {
+		t.Errorf("Expected 2 todo items before clear, got %d", len(items))
+	}
+
+	// Call clearTodos action
+	tools := plugin.Tools()
+	tool := tools[0]
+
+	agentContext := map[string]any{}
+	args := map[string]any{
+		"action": "clearTodos",
+	}
+
+	result := tool.Call(agentContext, args)
+	if !result.Success() {
+		t.Errorf("Expected success, got error: %s", result.Error())
+	}
+
+	if !strings.Contains(result.Data(), "cleared successfully") {
+		t.Errorf("Expected success message, got: %s", result.Data())
+	}
+
+	// Verify todos were cleared
+	items = plugin.getTodoItems()
+	if len(items) != 0 {
+		t.Errorf("Expected 0 todo items after clear, got %d", len(items))
+	}
+}
+
+// TestTodoHandlerTool_ClearTodos_Empty tests clearTodos on empty list
+func TestTodoHandlerTool_ClearTodos_Empty(t *testing.T) {
+	plugin := NewTodoPlugin(nil)
+	tools := plugin.Tools()
+	tool := tools[0]
+
+	agentContext := map[string]any{}
+	args := map[string]any{
+		"action": "clearTodos",
+	}
+
+	result := tool.Call(agentContext, args)
+	if !result.Success() {
+		t.Errorf("Expected success even with empty list, got error: %s", result.Error())
+	}
+
+	// Verify still empty
+	items := plugin.getTodoItems()
+	if len(items) != 0 {
+		t.Errorf("Expected 0 todo items, got %d", len(items))
+	}
+}

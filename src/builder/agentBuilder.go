@@ -225,11 +225,11 @@ func (b *AgentBuilder) buildSubagents() ([]core.SubAgent, error) {
 func (b *AgentBuilder) buildTools() ([]llms.Tool, error) {
 	tools := []llms.Tool{}
 	for _, tool := range b.tools {
-		tool, err := tool.getTool(b.workingDir, b.vectorDB, b.embeddingGenerator)
+		t, err := tool.getTool(b.workingDir, b.vectorDB, b.embeddingGenerator)
 		if err != nil {
 			return nil, err
 		}
-		tools = append(tools, tool)
+		tools = append(tools, t)
 	}
 	return tools, nil
 }

@@ -5,8 +5,12 @@ agent:
   working_dir: "/home/verte/Desktop/sandbox"
   persistence: "json"
   tools:
-    - "fs"
-    - "git"
+    - name: fs
+      root: "/home/verte/Desktop/sandbox"
+    - name: git
+      root: "/home/verte/Desktop/sandbox"
+    - name: web
+      root: "/home/verte/Desktop/sandbox"
   subagents:
     reasoning: "deepseek::deepseek-chat"
     vector: "deepseek::deepseek-chat"

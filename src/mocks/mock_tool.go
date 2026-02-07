@@ -65,3 +65,15 @@ func (r *MockToolResult) Error() string   { return r.ErrorVal }
 func (r *MockToolResult) Data() string    { return r.DataVal }
 func (r *MockToolResult) Ephemeral() bool { return r.EphemeralVal }
 func (r *MockToolResult) Cleanup() func() { return r.CleanupFunc }
+
+// NewErrorTool creates a mock tool that always returns an error
+func NewErrorTool(name, description, errorMsg string) *MockTool {
+	tool := NewMockTool(name)
+	tool.Definition.Description = description
+	tool.Result = &MockToolResult{
+		SuccessVal: false,
+		ErrorVal:   errorMsg,
+		DataVal:    "",
+	}
+	return tool
+}

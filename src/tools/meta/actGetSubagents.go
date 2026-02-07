@@ -15,8 +15,8 @@ func (m *Meta) getSubagents(agentContext map[string]any) llms.ToolReturn {
 		return core.NewEphemeralResponse("[]")
 	}
 
-	// Handle []*core.SubAgent
-	subAgents, ok := subAgentsRaw.([]*core.SubAgent)
+	// Handle []core.SubAgent (slice of interfaces, not pointers)
+	subAgents, ok := subAgentsRaw.([]core.SubAgent)
 	if !ok {
 		// Try to handle []interface{} case
 		subAgentsSlice, ok := subAgentsRaw.([]interface{})
@@ -24,10 +24,10 @@ func (m *Meta) getSubagents(agentContext map[string]any) llms.ToolReturn {
 			return core.NewEphemeralResponse("[]")
 		}
 
-		subAgents = make([]*core.SubAgent, 0, len(subAgentsSlice))
+		subAgents = make([]core.SubAgent, 0, len(subAgentsSlice))
 		for _, saRaw := range subAgentsSlice {
-			if saPtr, ok := saRaw.(*core.SubAgent); ok {
-				subAgents = append(subAgents, saPtr)
+			if sa, ok := saRaw.(core.SubAgent); ok {
+				subAgents = append(subAgents, sa)
 			}
 		}
 	}
@@ -37,12 +37,11 @@ func (m *Meta) getSubagents(agentContext map[string]any) llms.ToolReturn {
 	}
 
 	subAgentList := make([]map[string]string, 0, len(subAgents))
-	for _, subAgentPtr := range subAgents {
-		if subAgentPtr == nil {
+	for _, subAgent := range subAgents {
+		if subAgent == nil {
 			continue
 		}
-		// Dereference pointer to get the interface value
-		subAgent := *subAgentPtr
+		// subAgent is already an interface value, no need to dereference
 		subAgentInfo := map[string]string{
 			"name":             subAgent.Name(),
 			"basicDescription": subAgent.BasicDescription(),
