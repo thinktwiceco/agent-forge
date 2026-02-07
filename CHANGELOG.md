@@ -1,3 +1,17 @@
+## [Unreleased]
+
+## [0.4.0] - 2026-02-07
+- [fe4d8f4](http://github.com/thinktwiceco/agent-forge/commit/fe4d8f4ca5fcc9d314277ed97ecfbd98d201ecc7) - Merge pull request #12 from thinktwiceco/release/v0.4.0
+- [d3c8daa](http://github.com/thinktwiceco/agent-forge/commit/d3c8daaf751ab1e6fa8b1e4f072db013bf5b6d85) - ci: remove duplicate test workflow
+- [e99d470](http://github.com/thinktwiceco/agent-forge/commit/e99d470b8e11f4210844bd1bf601cb63fcadf5bb) - chore(release): prepare release v0.4.0
+- [c25b65f](http://github.com/thinktwiceco/agent-forge/commit/c25b65fd59a2485e04783220135a05a62f54f356) - Merge branch 'main' of github.com:thinktwiceco/agent-forge
+- [7e09fca](http://github.com/thinktwiceco/agent-forge/commit/7e09fca3fe84ab5f3619acb03bf341b75363f0be) - Add builder module documentation with configuration guide
+- [a236d59](http://github.com/thinktwiceco/agent-forge/commit/a236d59b3963ded4427f9b24d66f2d2dd3521b17) - Merge pull request #11 from thinktwiceco/changelog-v0.3.1
+- [8a33339](http://github.com/thinktwiceco/agent-forge/commit/8a3333973f08c6979fb67344e4e6fe5f74ac66d9) - Merge branch 'main' into changelog-v0.3.1
+- [366dc96](http://github.com/thinktwiceco/agent-forge/commit/366dc9639b6c72391f5baa04820df03443294d68) - Merge pull request #10 from thinktwiceco/release-0.3.1
+- [f0421b9](http://github.com/thinktwiceco/agent-forge/commit/f0421b95250766419fb7de40754d57587b074d4c) - chore: update changelog for v0.3.1 [skip ci]
+
+
 ## [0.3.1] - 2026-01-29
 
 ### Fixed
