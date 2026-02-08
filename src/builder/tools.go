@@ -5,6 +5,7 @@ import (
 
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/tools/api"
 	"github.com/thinktwiceco/agent-forge/src/tools/fs"
 	"github.com/thinktwiceco/agent-forge/src/tools/git"
 	"github.com/thinktwiceco/agent-forge/src/tools/postgres"
@@ -23,6 +24,18 @@ type Tool struct {
 	Mode           string   `yaml:"mode,omitempty"`
 	AllowedTables  []string `yaml:"allowedTables,omitempty"`
 	AllowedSchemas []string `yaml:"allowedSchemas,omitempty"`
+	// API-specific configs
+	Endpoints []struct {
+		Name          string `yaml:"name"`
+		URL           string `yaml:"url"`
+		Method        string `yaml:"method"`
+		Description   string `yaml:"description"`
+		Payload       string `yaml:"payload,omitempty"`
+		QueryParams   string `yaml:"queryParams,omitempty"`
+		URLParameters string `yaml:"urlParameters,omitempty"`
+		Validator     string `yaml:"validator,omitempty"` // Name of registered validator function
+	} `yaml:"endpoints,omitempty"`
+	OnApiCallHook string `yaml:"onApiCallHook,omitempty"` // Name of registered hook
 }
 
 // UnmarshalYAML implements custom unmarshaling to support both string and object formats
@@ -50,6 +63,7 @@ const (
 	VECTOR_DB_TOOL   = "vector"
 	GIT_TOOL         = "git"
 	POSTGRES_TOOL    = "postgres"
+	API_TOOL         = "api"
 )
 
 func (t *Tool) getTool(
@@ -109,6 +123,40 @@ func (t *Tool) getTool(
 			t.AllowedTables,
 			t.AllowedSchemas,
 		), nil
+	case API_TOOL:
+		if len(t.Endpoints) == 0 {
+			return nil, fmt.Errorf("endpoints are required for api tool")
+		}
+
+		// Convert builder endpoints to api.Endpoint
+		endpoints := make([]api.Endpoint, len(t.Endpoints))
+		for i, e := range t.Endpoints {
+			endpoint := api.Endpoint{
+				Name:          e.Name,
+				URL:           e.URL,
+				Method:        e.Method,
+				Description:   e.Description,
+				Payload:       e.Payload,
+				QueryParams:   e.QueryParams,
+				URLParameters: e.URLParameters,
+			}
+
+			// Attach validator if specified
+			if e.Validator != "" {
+				validator := api.GetValidator(e.Validator)
+				if validator == nil {
+					return nil, fmt.Errorf("validator not found: %s for endpoint: %s", e.Validator, e.Name)
+				}
+				endpoint.Validate = validator
+			}
+
+			endpoints[i] = endpoint
+		}
+
+		// Get hook from registry or use default
+		hook := api.GetHook(t.OnApiCallHook)
+
+		return api.NewApiTool(t.Name, endpoints, hook), nil
 	}
 	return nil, fmt.Errorf("invalid tool: %s", t.Name)
 }

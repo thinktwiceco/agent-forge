@@ -1,5 +1,25 @@
 ## [Unreleased]
 
+### Added
+- **API Tool**: New generic API tool for making HTTP requests to configured endpoints
+  - Support for GET, POST, PUT, DELETE, PATCH methods
+  - URL parameter substitution (e.g., `/users/{user_id}`)
+  - Query parameter support (e.g., `?limit=10&offset=0`)
+  - Request body support for POST/PUT/PATCH
+  - Authentication hooks for adding auth headers without exposing secrets to agents
+  - Per-endpoint validation functions for parameter safety
+  - Validator registry with built-in validators (`ValidatePositiveIntParam`, `ValidateRequiredParams`, `ValidateBodyMaxSize`)
+  - Hook registry for reusable authentication patterns
+  - YAML configuration support
+  - Dynamic endpoint discovery - agent automatically sees all available endpoints
+  - Complete Pokemon API example demonstrating usage
+
+### Documentation
+- Added comprehensive API Tool documentation in README.md
+- Created API Tool README with detailed usage examples
+- Added Pokemon API example configuration and documentation
+- Updated Table of Contents to include Built-in Tools section
+
 ## [0.4.0] - 2026-02-07
 - [fe4d8f4](http://github.com/thinktwiceco/agent-forge/commit/fe4d8f4ca5fcc9d314277ed97ecfbd98d201ecc7) - Merge pull request #12 from thinktwiceco/release/v0.4.0
 - [d3c8daa](http://github.com/thinktwiceco/agent-forge/commit/d3c8daaf751ab1e6fa8b1e4f072db013bf5b6d85) - ci: remove duplicate test workflow
@@ -10,7 +30,6 @@
 - [8a33339](http://github.com/thinktwiceco/agent-forge/commit/8a3333973f08c6979fb67344e4e6fe5f74ac66d9) - Merge branch 'main' into changelog-v0.3.1
 - [366dc96](http://github.com/thinktwiceco/agent-forge/commit/366dc9639b6c72391f5baa04820df03443294d68) - Merge pull request #10 from thinktwiceco/release-0.3.1
 - [f0421b9](http://github.com/thinktwiceco/agent-forge/commit/f0421b95250766419fb7de40754d57587b074d4c) - chore: update changelog for v0.3.1 [skip ci]
-
 
 ## [0.3.1] - 2026-01-29
 

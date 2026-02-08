@@ -21,6 +21,13 @@ A powerful Go framework for building intelligent agents with LLM integration, to
   - [Coding Agent](#coding-agent)
   - [Web Agent](#web-agent)
   - [Vector Agent](#vector-agent)
+- [Built-in Tools](#built-in-tools)
+  - [File System Tool](#file-system-tool)
+  - [Git Tool](#git-tool)
+  - [Postgres Tool](#postgres-tool)
+  - [API Tool](#api-tool)
+  - [Web Browser Tool](#web-browser-tool)
+  - [Vector Database Tool](#vector-database-tool)
 - [Advanced Features](#advanced-features)
   - [Streaming Responses](#streaming-responses)
   - [Conversation Persistence](#conversation-persistence)
@@ -357,6 +364,165 @@ agent.AddSystemAgent(vectorAgent)
 - Similarity searches
 
 **Note:** Requires a vector database (e.g., Milvus) and an embedding generator (e.g., OpenAI embeddings) to be initialized separately.
+
+## Built-in Tools
+
+Agent Forge includes several built-in tools that can be easily integrated with your agents. These tools provide common functionality for file system operations, Git operations, database access, and API interactions.
+
+### File System Tool
+
+The file system tool provides safe file operations within a restricted root directory.
+
+```go
+import "github.com/thinktwiceco/agent-forge/src/tools/fs"
+
+fsTool := fs.NewFsTool("/path/to/root")
+```
+
+**Available operations:** Read, write, list, delete files and directories.
+
+### Git Tool
+
+The Git tool enables Git operations within a repository.
+
+```go
+import "github.com/thinktwiceco/agent-forge/src/tools/git"
+
+gitTool := git.NewGitTool("/path/to/repo")
+```
+
+**Available operations:** Status, diff, log, add, commit, push, branch, reset, checkout, clone.
+
+### Postgres Tool
+
+The Postgres tool provides secure database operations with table whitelisting.
+
+```go
+import "github.com/thinktwiceco/agent-forge/src/tools/postgres"
+
+pgTool := postgres.NewPostgresTool(
+    "postgresql://user:pass@localhost:5432/db",
+    "read",  // or "write" for INSERT/UPDATE/DELETE
+    []string{"users", "products"},  // allowed tables
+    []string{"public"},              // allowed schemas
+)
+```
+
+**Modes:** `read` (SELECT only), `write` (full DML access).
+
+### API Tool
+
+The API tool enables agents to make HTTP API calls to configured endpoints with authentication and validation support.
+
+```go
+import "github.com/thinktwiceco/agent-forge/src/tools/api"
+
+// Define endpoints
+endpoints := []api.Endpoint{
+    {
+        Name:          "get_user",
+        URL:           "https://api.example.com/users/{user_id}",
+        Method:        "GET",
+        Description:   "Get user by ID",
+        URLParameters: `- user_id: string - The user ID`,
+    },
+    {
+        Name:        "create_post",
+        URL:         "https://api.example.com/posts",
+        Method:      "POST",
+        Description: "Create a new post",
+        Payload:     `- title: string - Post title
+- content: string - Post content`,
+    },
+}
+
+// Optional: Create authentication hook
+authHook := func(url string, headers map[string]string, body string) (map[string]string, error) {
+    headers["Authorization"] = "Bearer " + os.Getenv("API_TOKEN")
+    return headers, nil
+}
+
+// Create API tool
+apiTool := api.NewApiTool("my_api", endpoints, authHook)
+```
+
+**Features:**
+- Dynamic endpoint discovery - Agent automatically sees all available endpoints
+- URL parameter substitution (e.g., `/users/{user_id}`)
+- Query parameter support (e.g., `?limit=10&offset=0`)
+- Request body support for POST/PUT/PATCH
+- Authentication hooks for adding auth headers without exposing secrets
+- Per-endpoint validation for parameter safety
+- YAML configuration support
+
+**YAML Configuration:**
+
+```yaml
+agent:
+  tools:
+    - name: "api"
+      endpoints:
+        - name: "get_user"
+          url: "https://api.example.com/users/{user_id}"
+          method: "GET"
+          description: "Get user by ID"
+          urlParameters: |
+            - user_id: string - The user ID
+          validator: "validate_positive_id"  # Optional
+      onApiCallHook: "add_auth_token"  # Optional
+```
+
+**Parameter Validation:**
+
+Register validators to ensure parameters are safe before making API calls:
+
+```go
+// Register validators
+api.RegisterValidator("validate_positive_id", 
+    api.ValidatePositiveIntParam("user_id"))
+
+api.RegisterValidator("validate_body_size",
+    api.ValidateBodyMaxSize(10000)) // 10KB limit
+
+// Register authentication hooks
+api.RegisterHook("add_auth_token", func(url string, headers map[string]string, body string) (map[string]string, error) {
+    headers["Authorization"] = "Bearer " + getAPIToken()
+    return headers, nil
+})
+```
+
+**Built-in validators:**
+- `ValidatePositiveIntParam` - Ensures parameters are positive integers
+- `ValidateRequiredParams` - Ensures parameters are present and non-empty  
+- `ValidateBodyMaxSize` - Limits request body size
+
+**Examples:**
+- [API Tool Documentation](src/tools/api/README.md) - Comprehensive guide
+- [Pokemon API Example](examples/README.md) - Working integration with PokeAPI
+
+### Web Browser Tool
+
+The web browser tool provides web automation capabilities using a headless browser.
+
+```go
+import "github.com/thinktwiceco/agent-forge/src/tools/web"
+
+webTool := web.NewWebTool("/path/to/working/dir")
+```
+
+**Available actions:** Navigate, click, fill forms, extract content, take screenshots, execute JavaScript.
+
+### Vector Database Tool
+
+The vector database tool enables semantic search over indexed documents.
+
+```go
+import "github.com/thinktwiceco/agent-forge/src/tools/vector"
+
+vectorTool := vector.NewVectorTool(vectorDB, embeddingGenerator)
+```
+
+**Available actions:** Index documents, semantic search, list documents, delete documents.
 
 ## Advanced Features
 
