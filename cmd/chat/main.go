@@ -178,15 +178,15 @@ func initializeAgent() (*agents.Agent, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Configure and add Pokemon API tool
 	fmt.Printf("%s%s  → Adding Pokemon API tool...%s\n", ColorDim, ColorBlue, ColorReset)
 	pokemonEndpoints := []api.Endpoint{
 		{
-			Name:        "get_pokemon",
-			URL:         "https://pokeapi.co/api/v2/pokemon/{name}",
-			Method:      "GET",
-			Description: "Get detailed information about a specific Pokemon by name or ID",
+			Name:          "get_pokemon",
+			URL:           "https://pokeapi.co/api/v2/pokemon/{name}",
+			Method:        "GET",
+			Description:   "Get detailed information about a specific Pokemon by name or ID",
 			URLParameters: `- name: string - The name or ID of the Pokemon (e.g., "pikachu", "25")`,
 		},
 		{
@@ -198,11 +198,11 @@ func initializeAgent() (*agents.Agent, error) {
 - offset: int - Number of results to skip for pagination (default: 0)`,
 		},
 	}
-	
+
 	// No authentication needed for PokeAPI, so we pass nil for the hook
 	pokemonTool := api.NewApiTool("pokemon_api", pokemonEndpoints, nil)
 	agent.AddTools([]llms.Tool{pokemonTool})
-	
+
 	fmt.Printf("%s%s  ✓ Agent initialized successfully with Pokemon API%s\n", ColorDim, ColorGreen, ColorReset)
 	return agent, nil
 }
