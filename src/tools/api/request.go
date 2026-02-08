@@ -41,7 +41,12 @@ func (a *Api) executeRequest(endpoint *Endpoint, method, url string, headers map
 	if err != nil {
 		return core.NewErrorResponse(fmt.Sprintf("failed to execute request: %v", err))
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Log error but don't fail the request
+			_ = closeErr
+		}
+	}()
 
 	// 5. Read response
 	respBody, err := io.ReadAll(resp.Body)
