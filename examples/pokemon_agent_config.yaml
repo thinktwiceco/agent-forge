@@ -1,0 +1,54 @@
+agent:
+  name: "Pokemon Agent"
+  model: "deepseek::deepseek-chat"
+  workingDir: "/tmp/pokemon-agent"
+  
+  tools:
+    - name: "fs"
+      root: "/tmp/pokemon-agent"
+    
+    - name: "api"
+      endpoints:
+        - name: "get_pokemon"
+          url: "https://pokeapi.co/api/v2/pokemon/{name}"
+          method: "GET"
+          description: "Get detailed information about a specific Pokemon by name or ID"
+          urlParameters: |
+            - name: string - The name or ID of the Pokemon (e.g., "pikachu", "25")
+        
+        - name: "list_pokemon"
+          url: "https://pokeapi.co/api/v2/pokemon"
+          method: "GET"
+          description: "List all Pokemon with pagination support"
+          queryParams: |
+            - limit: int - Number of results to return (default: 20, max: 100)
+            - offset: int - Number of results to skip for pagination (default: 0)
+        
+        - name: "get_pokemon_species"
+          url: "https://pokeapi.co/api/v2/pokemon-species/{id}"
+          method: "GET"
+          description: "Get Pokemon species information including evolution chain"
+          urlParameters: |
+            - id: string - The ID or name of the Pokemon species
+        
+        - name: "get_ability"
+          url: "https://pokeapi.co/api/v2/ability/{id}"
+          method: "GET"
+          description: "Get information about a Pokemon ability"
+          urlParameters: |
+            - id: string - The ID or name of the ability
+        
+        - name: "get_type"
+          url: "https://pokeapi.co/api/v2/type/{id}"
+          method: "GET"
+          description: "Get information about a Pokemon type and type effectiveness"
+          urlParameters: |
+            - id: string - The ID or name of the type (e.g., "fire", "water")
+
+  subagents:
+    - type: "reasoning"
+      model: "deepseek::deepseek-reasoner"
+  
+  plugins:
+    - "logger"
+    - "todo"

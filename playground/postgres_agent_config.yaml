@@ -1,0 +1,18 @@
+agent:
+  name: "postgres-database-agent"
+  system_prompt: "You are a database assistant with secure access to a PostgreSQL database. You can query and modify data according to your configured permissions."
+  model: "deepseek::deepseek-chat"
+  working_dir: "/home/verte/Desktop/sandbox"
+  persistence: "json"
+  tools:
+    - name: postgres
+      postgresURL: "postgresql://testuser:testpass@localhost:5432/testdb?sslmode=disable"
+      mode: "write"  # Use "read" for SELECT, getTables, getSchema; or "write" for all operations
+      allowedTables:
+        - "users"
+        - "orders"
+        - "products"
+      allowedSchemas:
+        - "public"  # Allow access to public schema (can add more schemas)
+  plugins:
+    - "logger"
