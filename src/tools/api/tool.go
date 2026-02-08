@@ -71,7 +71,7 @@ func (a *Api) generateAdvancedDescription() string {
 		builder.WriteString(fmt.Sprintf("   URL: %s\n", endpoint.URL))
 
 		if endpoint.URLParameters != "" {
-			builder.WriteString(fmt.Sprintf("   URL Parameters:\n"))
+			builder.WriteString("   URL Parameters:\n")
 			// Split by lines and indent
 			for _, line := range strings.Split(strings.TrimSpace(endpoint.URLParameters), "\n") {
 				builder.WriteString(fmt.Sprintf("     %s\n", strings.TrimSpace(line)))
@@ -79,14 +79,14 @@ func (a *Api) generateAdvancedDescription() string {
 		}
 
 		if endpoint.QueryParams != "" {
-			builder.WriteString(fmt.Sprintf("   Query Parameters:\n"))
+			builder.WriteString("   Query Parameters:\n")
 			for _, line := range strings.Split(strings.TrimSpace(endpoint.QueryParams), "\n") {
 				builder.WriteString(fmt.Sprintf("     %s\n", strings.TrimSpace(line)))
 			}
 		}
 
 		if endpoint.Payload != "" {
-			builder.WriteString(fmt.Sprintf("   Request Body:\n"))
+			builder.WriteString("   Request Body:\n")
 			for _, line := range strings.Split(strings.TrimSpace(endpoint.Payload), "\n") {
 				builder.WriteString(fmt.Sprintf("     %s\n", strings.TrimSpace(line)))
 			}
