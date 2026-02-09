@@ -9,6 +9,8 @@ import (
 )
 
 // executeGetTables retrieves the list of tables in the specified schema
+//
+//nolint:unused // Reserved for future use
 func (pg *Postgres) executeGetTables(schema string) (string, error) {
 	// Validate schema name
 	if err := validateSchemaName(schema); err != nil {
@@ -30,7 +32,7 @@ func (pg *Postgres) executeGetTables(schema string) (string, error) {
 		if err != nil {
 			return fmt.Errorf("failed to retrieve tables: %w", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var allTables []string
 		var filteredTables []string
@@ -41,7 +43,7 @@ func (pg *Postgres) executeGetTables(schema string) (string, error) {
 				return fmt.Errorf("failed to scan table row: %w", err)
 			}
 
-			allTables = append(allTables, fmt.Sprintf("%s (%s)", tableName, tableType))
+			_ = append(allTables, fmt.Sprintf("%s (%s)", tableName, tableType))
 
 			// Filter based on allowed tables
 			if pg.isTableAllowed(tableName) {
@@ -86,6 +88,8 @@ func (pg *Postgres) executeGetTables(schema string) (string, error) {
 }
 
 // isTableAllowed checks if a table is in the allowed tables list
+//
+//nolint:unused // Used internally by executeGetTables
 func (pg *Postgres) isTableAllowed(tableName string) bool {
 	for _, allowed := range pg.allowedTables {
 		if tableName == allowed {

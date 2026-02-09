@@ -15,11 +15,11 @@ func (pg *Postgres) executeQuery(query string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to database.\nError: %v\n\nPossible issues:\n- Database server is not running\n- Incorrect host or port\n- Invalid credentials\n- Database does not exist\n- Network connectivity issues\n- Firewall blocking connection", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Test the connection
 	if err := db.Ping(); err != nil {
-		return "", fmt.Errorf("failed to ping database.\nError: %v\n\nThe connection parameters are correct but the database is not responding.", err)
+		return "", fmt.Errorf("failed to ping database.\nError: %v\n\nThe connection parameters are correct but the database is not responding", err)
 	}
 
 	// Detect if this is a read or write operation
@@ -38,7 +38,7 @@ func (pg *Postgres) executeSelectQuery(db *sql.DB, query string) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("query execution failed: %v", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Get column names
 	columns, err := rows.Columns()

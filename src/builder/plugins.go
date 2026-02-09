@@ -16,6 +16,14 @@ const (
 	TODO_PLUGIN   Plugin = "todo"
 )
 
+// Global callback for todo plugin (can be set by applications)
+var globalTodoCallback func(todos []*todo.TodoItem)
+
+// SetTodoCallback sets the global callback for the todo plugin
+func SetTodoCallback(callback func(todos []*todo.TodoItem)) {
+	globalTodoCallback = callback
+}
+
 func (p Plugin) getPlugin() (core.Plugin, error) {
 	switch p {
 	case LOGGER_PLUGIN:
@@ -25,7 +33,8 @@ func (p Plugin) getPlugin() (core.Plugin, error) {
 			os.Stdout,
 		), nil
 	case TODO_PLUGIN:
-		return todo.NewTodoPlugin(nil), nil
+		// Use global callback if set, otherwise use nil
+		return todo.NewTodoPlugin(globalTodoCallback), nil
 	}
 	return nil, fmt.Errorf("invalid plugin: %s", p)
 }

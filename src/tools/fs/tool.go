@@ -22,12 +22,14 @@ func NewFsTool(root string) llms.Tool {
 
 	return &core.Tool{
 		Name:        "fs",
-		Description: "Perform file system operations (read, write, delete, list) on files within a restricted directory.",
+		Description: "Perform file system operations (read, write, delete, list, ripgrep) on files within a restricted directory.",
 		AdvanceDesc: `Advanced Details:
 - Parameters:
-  * operation (string, required): The operation to perform - "read", "write", "delete", "list", "get_file_info", or "get_root"
-  * path (string, required for read/write/delete/list/get_file_info): File or directory path relative to the root directory
+  * operation (string, required): The operation to perform - "read", "write", "delete", "list", "get_file_info", "get_root", or "ripgrep"
+  * path (string, required for read/write/delete/list/get_file_info/ripgrep): File or directory path relative to the root directory
   * content (string, optional): File content - required for "write" operation
+  * pattern (string, required for ripgrep): Search pattern for ripgrep operation
+  * flags (array of strings, optional): Additional ripgrep flags (e.g., ["-i", "-n", "--color=never"])
 - Behavior:
   * All file paths are validated to ensure they stay within the root directory
   * Path traversal attempts (e.g., "../") are blocked for security
@@ -37,6 +39,7 @@ func NewFsTool(root string) llms.Tool {
   * List operation lists all files and directories in the specified directory
   * GetFileInfo operation returns detailed file information (permissions, ownership, size, timestamps)
   * GetRoot operation returns the sandbox root directory path
+  * Ripgrep operation searches for patterns in files using ripgrep (rg must be installed)
 - Usage:
   * Use "read" to read file contents
   * Use "write" to create or update files (provide content parameter)
@@ -44,6 +47,7 @@ func NewFsTool(root string) llms.Tool {
   * Use "list" to list files and directories in a directory
   * Use "get_file_info" to retrieve detailed file information (permissions, ownership, size, timestamps)
   * Use "get_root" to retrieve the sandbox root directory path (no path parameter needed)
+  * Use "ripgrep" to search for patterns in files (provide pattern parameter, optional flags array)
 - Security: All operations are sandboxed to the root directory to prevent unauthorized access`,
 		TroubleshootingInfo: `Troubleshooting:
 - "path traversal detected": The provided path attempts to escape the root directory - use relative paths only
@@ -51,21 +55,23 @@ func NewFsTool(root string) llms.Tool {
 - "directory not found": The directory doesn't exist (for list operation) - verify the path is correct
 - "path is not a directory": The path exists but is not a directory (for list operation)
 - "missing required parameter: content": Content parameter is required for write operations
-- "invalid operation": Operation must be exactly "read", "write", "delete", "list", "get_file_info", or "get_root"
+- "missing required parameter: pattern": Pattern parameter is required for ripgrep operations
+- "ripgrep (rg) is not installed": ripgrep must be installed and in PATH for ripgrep operations
+- "invalid operation": Operation must be exactly "read", "write", "delete", "list", "get_file_info", "get_root", or "ripgrep"
 - Permission errors: Ensure the process has read/write/delete permissions for the root directory
 - "failed to create directory": Parent directory creation failed - check permissions
-- "missing required parameter: path": Path parameter is required for read/write/delete/list/get_file_info operations (not needed for get_root)`,
+- "missing required parameter: path": Path parameter is required for read/write/delete/list/get_file_info/ripgrep operations (not needed for get_root)`,
 		Parameters: []core.Parameter{
 			{
 				Name:        "operation",
 				Type:        "string",
-				Description: "The operation to perform: 'read', 'write', 'delete', 'list', 'get_file_info', or 'get_root'",
+				Description: "The operation to perform: 'read', 'write', 'delete', 'list', 'get_file_info', 'get_root', or 'ripgrep'",
 				Required:    true,
 			},
 			{
 				Name:        "path",
 				Type:        "string",
-				Description: "File or directory path relative to the root directory (required for 'read', 'write', 'delete', 'list', 'get_file_info'; not needed for 'get_root')",
+				Description: "File or directory path relative to the root directory (required for 'read', 'write', 'delete', 'list', 'get_file_info', 'ripgrep'; not needed for 'get_root')",
 				Required:    false,
 			},
 			{
@@ -74,14 +80,26 @@ func NewFsTool(root string) llms.Tool {
 				Description: "File content - required for 'write' operation",
 				Required:    false,
 			},
+			{
+				Name:        "pattern",
+				Type:        "string",
+				Description: "Search pattern - required for 'ripgrep' operation",
+				Required:    false,
+			},
+			{
+				Name:        "flags",
+				Type:        "array",
+				Description: "Additional ripgrep flags - optional for 'ripgrep' operation (e.g., [\"-i\", \"-n\", \"--color=never\"])",
+				Required:    false,
+			},
 		},
 		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 			operation := args["operation"].(string)
 
 			// Validate operation
-			if operation != "read" && operation != "write" && operation != "delete" && operation != "list" && operation != "get_file_info" && operation != "get_root" {
+			if operation != "read" && operation != "write" && operation != "delete" && operation != "list" && operation != "get_file_info" && operation != "get_root" && operation != "ripgrep" {
 				return core.NewErrorResponse(fmt.Sprintf(
-					"invalid operation '%s'. Must be 'read', 'write', 'delete', 'list', 'get_file_info', or 'get_root'",
+					"invalid operation '%s'. Must be 'read', 'write', 'delete', 'list', 'get_file_info', 'get_root', or 'ripgrep'",
 					operation,
 				))
 			}
@@ -152,6 +170,36 @@ func NewFsTool(root string) llms.Tool {
 			// Handle get_file_info operation
 			if operation == "get_file_info" {
 				info, err := fs.getFileInfo(pathStr)
+				if err != nil {
+					return core.NewErrorResponse(err.Error())
+				}
+				return core.NewSuccessResponse(info)
+			}
+
+			// Handle ripgrep operation
+			if operation == "ripgrep" {
+				pattern, ok := args["pattern"]
+				if !ok {
+					return core.NewErrorResponse("missing required parameter: pattern (required for ripgrep operation)")
+				}
+				patternStr, ok := pattern.(string)
+				if !ok {
+					return core.NewErrorResponse("pattern parameter must be a string")
+				}
+
+				// Extract flags if provided
+				var flags []string
+				if flagsArg, ok := args["flags"]; ok {
+					if flagsArray, ok := flagsArg.([]interface{}); ok {
+						for _, flag := range flagsArray {
+							if flagStr, ok := flag.(string); ok {
+								flags = append(flags, flagStr)
+							}
+						}
+					}
+				}
+
+				info, err := fs.ripgrep(pathStr, patternStr, flags)
 				if err != nil {
 					return core.NewErrorResponse(err.Error())
 				}

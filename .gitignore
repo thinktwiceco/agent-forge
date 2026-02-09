@@ -59,3 +59,13 @@ __pycache__/
 history/
 
 agentforge-server
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+*.db-lock
+*.db-trace
+*.db-trace-lock
+*.db-trace-lock-journal
+*.db-trace-lock-wal
+*.db-trace-lock-journal

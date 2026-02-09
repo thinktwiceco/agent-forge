@@ -8,6 +8,8 @@ import (
 )
 
 // executeUpdate performs an UPDATE query on the database
+//
+//nolint:unused // Reserved for future use
 func (pg *Postgres) executeUpdate(table, updateClause, whereClause string) (string, error) {
 	// Table is already validated by the handler
 

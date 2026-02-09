@@ -108,8 +108,8 @@ func TestAgent_ChatWithTools(t *testing.T) {
 		SessionStorage: make(map[string]any),
 	}
 
-	// Initialize history manually since we skip ChatStream
-	agent.history = &History{
+	// Create a history instance for this request (per-request pattern)
+	history := &History{
 		history: []*llms.UnifiedMessage{},
 	}
 
@@ -145,8 +145,8 @@ func TestAgent_ChatWithTools(t *testing.T) {
 		}
 	}()
 
-	// Trigger the chat
-	err := agent.executeChatWithTools()
+	// Trigger the chat with the history instance
+	err := agent.executeChatWithTools(history)
 
 	_ = err // Ignore error in this test context as we consume output in goroutine
 
@@ -156,7 +156,7 @@ func TestAgent_ChatWithTools(t *testing.T) {
 	}
 
 	// Verify history contains tool result
-	hist := agent.history.History()
+	hist := history.History()
 	foundToolResult := false
 	for _, msg := range hist {
 		// Check for Tool role

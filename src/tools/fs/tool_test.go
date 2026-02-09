@@ -117,4 +117,81 @@ func TestFsTool_Integration(t *testing.T) {
 			t.Error("Expected failure for path traversal")
 		}
 	})
+
+	// 8. Ripgrep Search
+	t.Run("ripgrep", func(t *testing.T) {
+		// Create test files
+		testContent1 := "This is a test file\nWith multiple lines\nContaining searchable content"
+		testContent2 := "Another file\nWith different content\nBut also searchable"
+
+		args1 := map[string]any{
+			"operation": "write",
+			"path":      "test1.txt",
+			"content":   testContent1,
+		}
+		result1 := tool.Call(nil, args1)
+		if !result1.Success() {
+			t.Errorf("write test1.txt failed: %s", result1.Error())
+		}
+
+		args2 := map[string]any{
+			"operation": "write",
+			"path":      "test2.txt",
+			"content":   testContent2,
+		}
+		result2 := tool.Call(nil, args2)
+		if !result2.Success() {
+			t.Errorf("write test2.txt failed: %s", result2.Error())
+		}
+
+		// Test ripgrep search
+		args := map[string]any{
+			"operation": "ripgrep",
+			"path":      ".",
+			"pattern":   "searchable",
+		}
+		result := tool.Call(nil, args)
+
+		// Check if ripgrep is available
+		if !result.Success() && strings.Contains(result.Error(), "not installed") {
+			t.Skip("ripgrep not installed, skipping test")
+		}
+
+		if !result.Success() {
+			t.Errorf("ripgrep failed: %s", result.Error())
+		}
+
+		// Should contain matches
+		if !strings.Contains(result.Data(), "searchable") {
+			t.Errorf("ripgrep should find 'searchable' in files")
+		}
+
+		// Test with flags
+		argsWithFlags := map[string]any{
+			"operation": "ripgrep",
+			"path":      ".",
+			"pattern":   "SEARCHABLE",
+			"flags":     []interface{}{"-i"}, // case insensitive
+		}
+		resultWithFlags := tool.Call(nil, argsWithFlags)
+		if resultWithFlags.Success() {
+			if !strings.Contains(resultWithFlags.Data(), "searchable") && !strings.Contains(resultWithFlags.Data(), "SEARCHABLE") {
+				t.Errorf("ripgrep with -i flag should find matches")
+			}
+		}
+
+		// Test no matches
+		argsNoMatch := map[string]any{
+			"operation": "ripgrep",
+			"path":      ".",
+			"pattern":   "nonexistent_pattern_xyz",
+		}
+		resultNoMatch := tool.Call(nil, argsNoMatch)
+		if !resultNoMatch.Success() {
+			t.Errorf("ripgrep should succeed even with no matches: %s", resultNoMatch.Error())
+		}
+		if !strings.Contains(resultNoMatch.Data(), "No matches found") {
+			t.Errorf("ripgrep should report no matches found")
+		}
+	})
 }

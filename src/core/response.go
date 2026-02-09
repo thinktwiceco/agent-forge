@@ -24,6 +24,7 @@ type ExtendedChunkResponse struct {
 	PromptTokens     int               `json:"promptTokens,omitempty"`     // Input tokens consumed
 	CompletionTokens int               `json:"completionTokens,omitempty"` // Output tokens generated
 	TotalTokens      int               `json:"totalTokens,omitempty"`      // Total tokens used
+	Iteration        int               `json:"iteration,omitempty"`        // Tool iteration number (for tracking response turns)
 	AgentName        string            `json:"agentName"`                  // Name of the agent producing this chunk
 	Trace            string            `json:"trace"`                      // Trace information (e.g., "thinking", "response")
 	ChatId           string            `json:"chatId"`                     // Conversation identifier

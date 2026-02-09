@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ThinkTwice Agent</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h1>Conversations</h1>
+          <button id="new-chat" class="btn">New</button>
+        </div>
+        <div id="conversation-list" class="conversation-list"></div>
+      </aside>
+
+      <main class="chat">
+        <div id="chat-header" class="chat-header">
+          <div class="chat-title">Chat</div>
+          <div id="chat-status" class="chat-status">Idle</div>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <form id="chat-form" class="chat-input">
+          <textarea id="chat-input" placeholder="Send a message..." rows="2"></textarea>
+          <button type="submit" class="btn primary">Send</button>
+        </form>
+      </main>
+
+      <aside class="config">
+        <div id="todos-panel" class="todos-panel"></div>
+        
+        <div class="config-section-wrapper">
+          <div class="config-header">
+            <h2>Agent Config</h2>
+            <div class="config-header-actions">
+              <button id="config-toggle" class="btn-icon" aria-label="Toggle config">
+                <span class="toggle-icon">▼</span>
+              </button>
+              <button id="reload-agent" class="btn">Reload</button>
+            </div>
+          </div>
+          <div id="config-body" class="config-body config-collapsed"></div>
+        </div>
+      </aside>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+    <script type="module" src="/static/js/app.js"></script>
+  </body>
+</html>

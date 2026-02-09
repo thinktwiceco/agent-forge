@@ -29,8 +29,10 @@ func TestAgent_ToolError_InHistory(t *testing.T) {
 		Tools:             []llms.Tool{errorTool},
 	})
 
-	// Initialize the agent's history
-	agent.ensureHistory("")
+	// Create a history instance for this request
+	history := &History{
+		history: []*llms.UnifiedMessage{},
+	}
 
 	// Manually simulate a tool call and execution (to avoid multi-turn complexity)
 	toolCall := llms.ToolCall{
@@ -56,14 +58,14 @@ func TestAgent_ToolError_InHistory(t *testing.T) {
 			content = "Error: " + toolResult.Error
 		}
 	}
-	agent.history.addToolMessage(toolCall.ID, content, toolResult.Ephemeral)
+	history.addToolMessage(toolCall.ID, content, toolResult.Ephemeral)
 
 	// Now check the history to verify the error is included
-	history := agent.history.History()
+	messages := history.History()
 
 	// Find the tool message in history
 	var toolMessage *llms.UnifiedMessage
-	for _, msg := range history {
+	for _, msg := range messages {
 		if msg.Role() == llms.MessageRoleTool {
 			toolMessage = msg
 			break
