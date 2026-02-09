@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"sync"
 
 	"github.com/thinktwiceco/agent-forge/src/builder"
@@ -32,8 +33,14 @@ func (cm *ConfigManager) Load() error {
 		return fmt.Errorf("read config: %w", err)
 	}
 
+	// Interpolate environment variables in the YAML content
+	interpolatedData, err := interpolateEnvVars(string(data))
+	if err != nil {
+		return fmt.Errorf("interpolate env vars: %w", err)
+	}
+
 	var cfg builder.Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	if err := yaml.Unmarshal([]byte(interpolatedData), &cfg); err != nil {
 		return fmt.Errorf("parse config: %w", err)
 	}
 
@@ -41,6 +48,34 @@ func (cm *ConfigManager) Load() error {
 	cm.config = cfg
 	cm.mu.Unlock()
 	return nil
+}
+
+// interpolateEnvVars replaces ${VAR_NAME} with the corresponding environment variable value.
+// Returns an error if a referenced environment variable is not set.
+func interpolateEnvVars(content string) (string, error) {
+	// Match ${VAR_NAME} pattern
+	re := regexp.MustCompile(`\$\{([^}]+)\}`)
+
+	var interpolationError error
+	result := re.ReplaceAllStringFunc(content, func(match string) string {
+		// Extract variable name from ${VAR_NAME}
+		varName := re.FindStringSubmatch(match)[1]
+
+		// Get environment variable value
+		value := os.Getenv(varName)
+		if value == "" {
+			interpolationError = fmt.Errorf("environment variable not set: %s", varName)
+			return match // Return original if not found
+		}
+
+		return value
+	})
+
+	if interpolationError != nil {
+		return "", interpolationError
+	}
+
+	return result, nil
 }
 
 func (cm *ConfigManager) Save() error {

@@ -1,0 +1,31 @@
+# Copy to config.yaml and fill in your values.
+# Use ${VAR_NAME} for env var interpolation (e.g. paths, secrets).
+agent:
+  name: "My Agent"
+  system_prompt: |
+    You are a helpful agent. Customize this prompt for your use case.
+  model: "deepseek::deepseek-chat"
+  working_dir: "${AGENT_WORKING_DIR}"
+  persistence: "json"
+  tools:
+    - name: fs
+      root: "${REPO_ROOT}"
+    - name: git
+      root: "${REPO_ROOT}"
+    # Optional: add postgres with ${DATABASE_URL}
+    # - name: postgres
+    #   postgresURL: "${DATABASE_URL}"
+    #   mode: "read"
+    #   allowedSchemas: ["public"]
+    #   allowedTables: ["users", "items"]
+    # Optional: add api with authentication hook
+    # - name: api
+    #   onApiCallHook: "my_auth_hook"
+    #   endpoints:
+    #     - name: get_example
+    #       url: "https://api.example.com/resource"
+    #       method: "GET"
+  subagents:
+    reasoning: "deepseek::deepseek-reasoner"
+  plugins:
+    - "todo"
