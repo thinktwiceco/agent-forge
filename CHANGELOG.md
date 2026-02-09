@@ -1,8 +1,13 @@
 ## [Unreleased]
 
-### Added
-- **New UI**: Full new UI in `cmd/ui` folder to chat with the agent
+## [0.4.2] - 2026-02-09
+- [6314e16](http://github.com/thinktwiceco/agent-forge/commit/6314e16da01692cccc984f72df4143cba7ec639d) - Merge pull request #17 from thinktwiceco/release/v0.4.2
+- [02e083e](http://github.com/thinktwiceco/agent-forge/commit/02e083e0253e3acc273e426f0eccbbd88a8df2c3) - chore(release): prepare release v0.4.2
+- [748e112](http://github.com/thinktwiceco/agent-forge/commit/748e1123386b140995fb11e3b59c07f2fc0dadcb) - Merge pull request #16 from thinktwiceco/changelog-v0.4.1
+- [2c32d6d](http://github.com/thinktwiceco/agent-forge/commit/2c32d6dafe62336410a4a9f40f24434d36e76c7e) - chore: update changelog for v0.4.1 [skip ci]
 
+
+## [Unreleased]
 ## [0.4.1] - 2026-02-08
 - [55e9ab9](http://github.com/thinktwiceco/agent-forge/commit/55e9ab9a0dc689971af4839da4f08b5d0f011ac7) - Merge pull request #15 from thinktwiceco/release/v0.4.1
 - [7ff6c14](http://github.com/thinktwiceco/agent-forge/commit/7ff6c140c5d0ecb8952fac78dbce6353c6d3d671) - chore(release): prepare release v0.4.1
