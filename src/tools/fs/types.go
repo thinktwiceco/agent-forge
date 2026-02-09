@@ -134,3 +134,34 @@ Last Modified: %s
 Owner UID: %d
 Owner GID: %d`, r.RelativePath, r.AbsolutePath, r.Size, r.Permissions, r.Mode, r.IsDirectory, r.Modified, r.UID, r.GID)
 }
+
+// ripgrepResponse represents a ripgrep search result.
+type ripgrepResponse struct {
+	Pattern      string
+	RelativePath string
+	AbsolutePath string
+	Flags        []string
+	MatchCount   int
+	Output       string
+	Status       string
+}
+
+// String formats the ripgrep response as a string.
+func (r *ripgrepResponse) String() string {
+	result := fmt.Sprintf(`File Operation: Ripgrep Search
+Pattern: %s
+Path (relative): %s
+Path (absolute): %s`, r.Pattern, r.RelativePath, r.AbsolutePath)
+
+	if len(r.Flags) > 0 {
+		result += fmt.Sprintf("\nFlags: %s", fmt.Sprintf("%v", r.Flags))
+	}
+
+	result += fmt.Sprintf("\n%s\n", r.Status)
+
+	if r.Output != "" {
+		result += fmt.Sprintf("\nMatches:\n---\n%s\n---", r.Output)
+	}
+
+	return result
+}

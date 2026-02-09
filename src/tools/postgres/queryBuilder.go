@@ -77,7 +77,7 @@ func (qb *QueryBuilder) BuildUpdate(updateClause, whereClause string) (string, [
 ✗ Bad:  update: "status = 'active'"
 ✓ Good: update: "status = 'active' WHERE user_id = 123"
 
-Provide the WHERE clause in the 'select' parameter.`)
+Provide the WHERE clause in the 'select' parameter`)
 	}
 
 	// Parse and parameterize SET clause
@@ -204,12 +204,14 @@ func (qb *QueryBuilder) parameterizeWhereClause(whereClause string) (string, err
 			var value interface{}
 			if strings.Contains(number, ".") {
 				var f float64
-				fmt.Sscanf(number, "%f", &f)
-				value = f
+				if _, err := fmt.Sscanf(number, "%f", &f); err == nil {
+					value = f
+				}
 			} else {
 				var i int
-				fmt.Sscanf(number, "%d", &i)
-				value = i
+				if _, err := fmt.Sscanf(number, "%d", &i); err == nil {
+					value = i
+				}
 			}
 
 			qb.params = append(qb.params, value)

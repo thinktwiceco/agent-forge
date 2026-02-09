@@ -47,6 +47,8 @@ func (r *PostgresResponse) String() string {
 }
 
 // formatDataPreview formats query results for preview
+//
+//nolint:unused // Used internally by executeSelect
 func formatDataPreview(columns []string, rows [][]interface{}, maxRows int) string {
 	if len(rows) == 0 {
 		return "No data returned."
@@ -83,6 +85,8 @@ func formatDataPreview(columns []string, rows [][]interface{}, maxRows int) stri
 }
 
 // formatValue converts an interface{} value to a display string
+//
+//nolint:unused // Used internally by formatDataPreview
 func formatValue(val interface{}) string {
 	if val == nil {
 		return "NULL"

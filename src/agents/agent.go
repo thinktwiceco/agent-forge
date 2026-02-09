@@ -21,8 +21,6 @@ type Agent struct {
 	responseCh *core.ResponseCh
 	// Tools available to the agent.
 	tools []llms.Tool
-	// Deal with message history.
-	history *History
 	// Subsystem of agents
 	subAgents []core.SubAgent
 	// System Prompt as a final system prompt
@@ -111,9 +109,11 @@ func NewAgent(config *AgentConfig) *Agent {
 // Returns:
 //   - *core.ResponseCh: Response channel that can be used to receive streaming chunks
 func (a *Agent) ChatStream(message string, chatId string) *core.ResponseCh {
-	a.ensureHistory(chatId)
-	a.handleSystemPromptInjection()
-	a.history.addUserMessage(message)
+	// Create a new History instance for this request (per-request history)
+	// This eliminates concurrency issues with shared state
+	history := a.createHistory(chatId)
+	a.injectSystemPrompt(history)
+	history.addUserMessage(message)
 	errs := a.hooks.newUserMessageEvent(a, message)
 	logHookErrors(errs)
 
@@ -143,11 +143,11 @@ func (a *Agent) ChatStream(message string, chatId string) *core.ResponseCh {
 			a.responseCh = oldResponseCh
 		}()
 
-		if err := a.executeChatWithTools(); err != nil {
+		if err := a.executeChatWithTools(history); err != nil {
 			responseCh.Error <- err
 		}
 		// Save history and get the final chatId (generated if it was empty)
-		finalChatId := a.history.save()
+		finalChatId := history.save()
 		// Update the response channel's chatId in case it was newly generated
 		responseCh.SetChatId(finalChatId)
 	}()

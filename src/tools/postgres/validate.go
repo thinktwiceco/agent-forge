@@ -7,6 +7,8 @@ import (
 )
 
 // validateMode ensures the mode is either "read" or "write"
+//
+//nolint:unused // Reserved for future use
 func validateMode(value any) error {
 	mode, ok := value.(string)
 	if !ok {
@@ -26,6 +28,8 @@ func validateMode(value any) error {
 }
 
 // validateOperation ensures the operation is valid
+//
+//nolint:unused // Reserved for future use
 func validateOperation(value any) error {
 	operation, ok := value.(string)
 	if !ok {
@@ -48,6 +52,8 @@ func validateOperation(value any) error {
 }
 
 // validateModeOperation checks if the operation is allowed in the given mode
+//
+//nolint:unused // Reserved for future use
 func validateModeOperation(mode, operation string) error {
 	if mode == "read" {
 		// READ mode allows: select, getTables, getSchema
@@ -68,6 +74,8 @@ To perform %s operations, use mode: "write"`, operation, operation)
 }
 
 // validateTable checks if the table is in the allowed tables whitelist
+//
+//nolint:unused // Used internally by executeGetSchema
 func validateTable(table string, allowedTables []string) error {
 	// Check for empty table name
 	if strings.TrimSpace(table) == "" {
@@ -91,13 +99,15 @@ func validateTable(table string, allowedTables []string) error {
 	if !found {
 		return fmt.Errorf(`table '%s' is not in the allowed tables list.
 Available tables: %v
-Use one of the allowed tables from the whitelist.`, table, allowedTables)
+Use one of the allowed tables from the whitelist`, table, allowedTables)
 	}
 
 	return nil
 }
 
 // validateTableName checks table name for injection attempts
+//
+//nolint:unused // Used internally by validateTable
 func validateTableName(tableName string) error {
 	// Check for special characters that could indicate injection
 	// Allow only alphanumeric characters and underscores
@@ -166,7 +176,7 @@ Provide only the %s clause content, not a complete SQL statement.
 ✗ Bad example:  "%s name, email FROM users WHERE id = 5"
 ✓ Good example: "name, email WHERE id = 5"
 
-Remove SQL keywords and provide only the clause fragment.`, fragmentType, pattern.message, fragmentType, pattern.message)
+Remove SQL keywords and provide only the clause fragment`, fragmentType, pattern.message, fragmentType, pattern.message)
 		}
 	}
 
@@ -174,21 +184,21 @@ Remove SQL keywords and provide only the clause fragment.`, fragmentType, patter
 	if strings.Contains(fragment, ";") {
 		return fmt.Errorf(`invalid '%s' parameter: detected semicolon (;).
 Semicolons are used to terminate SQL statements and are not allowed in fragments.
-Provide only a single clause fragment without semicolons.`, fragmentType)
+Provide only a single clause fragment without semicolons`, fragmentType)
 	}
 
 	// Check for SQL comments
 	if strings.Contains(fragment, "--") || strings.Contains(fragment, "/*") || strings.Contains(fragment, "*/") {
 		return fmt.Errorf(`invalid '%s' parameter: detected SQL comment syntax (-- or /* */).
 SQL comments are not allowed as they can be used for injection attacks.
-Provide clean clause fragments without comments.`, fragmentType)
+Provide clean clause fragments without comments`, fragmentType)
 	}
 
 	// Check for UNION attacks
 	if strings.Contains(lowerFragment, "union") {
 		return fmt.Errorf(`invalid '%s' parameter: detected 'UNION' keyword.
 UNION is not allowed as it can be used for SQL injection attacks.
-Structure your query properly without UNION statements.`, fragmentType)
+Structure your query properly without UNION statements`, fragmentType)
 	}
 
 	// Fragment-specific validation
@@ -220,7 +230,7 @@ Do not include the FROM clause - the table name is specified in the 'table' para
 	// Check for subqueries
 	if strings.Contains(fragment, "(") && strings.Contains(lowerFragment, "select") {
 		return fmt.Errorf(`invalid 'select' parameter: subqueries are not supported.
-Provide a simple column list and WHERE conditions without nested queries.`)
+Provide a simple column list and WHERE conditions without nested queries`)
 	}
 
 	return nil
@@ -287,7 +297,7 @@ func validateLimit(limit int) error {
 Requested: %d
 Maximum: %d
 
-Use a limit of %d or less, and use 'offset' for pagination if you need more results.`, limit, maxLimit, maxLimit)
+Use a limit of %d or less, and use 'offset' for pagination if you need more results`, limit, maxLimit, maxLimit)
 	}
 
 	return nil
@@ -303,6 +313,8 @@ func validateOffset(offset int) error {
 }
 
 // validatePostgresURL performs basic validation on the PostgreSQL connection URL
+//
+//nolint:unused // Reserved for future use
 func validatePostgresURL(url string) error {
 	if strings.TrimSpace(url) == "" {
 		return fmt.Errorf("postgres_url cannot be empty")
@@ -319,6 +331,8 @@ Example: postgresql://myuser:mypass@localhost:5432/mydb`)
 }
 
 // validateSchema checks if the schema is in the allowed schemas list
+//
+//nolint:unused // Reserved for future use
 func validateSchema(schema string, allowedSchemas []string) error {
 	// Check for empty schema name
 	if strings.TrimSpace(schema) == "" {
@@ -342,13 +356,15 @@ func validateSchema(schema string, allowedSchemas []string) error {
 	if !found {
 		return fmt.Errorf(`schema '%s' is not in the allowed schemas list.
 Available schemas: %v
-Use one of the allowed schemas from the whitelist.`, schema, allowedSchemas)
+Use one of the allowed schemas from the whitelist`, schema, allowedSchemas)
 	}
 
 	return nil
 }
 
 // validateSchemaName checks schema name for injection attempts
+//
+//nolint:unused // Used internally by executeGetSchema, executeGetTables, validateSchema
 func validateSchemaName(schemaName string) error {
 	// Check for special characters that could indicate injection
 	// Allow only alphanumeric characters and underscores

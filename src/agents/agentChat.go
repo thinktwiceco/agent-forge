@@ -12,13 +12,13 @@ import (
 
 // executeChatWithTools executes the chat loop with automatic tool execution.
 // It handles streaming responses, tool call detection, execution, and iteration.
-func (a *Agent) executeChatWithTools() error {
+func (a *Agent) executeChatWithTools(history *History) error {
 	iteration := 0
 	var cleanupFuncs []func() // Accumulate cleanup functions from all tool executions
 
 	for iteration < a.config.MaxToolIterations {
 		iteration++
-		messages := a.history.History()
+		messages := history.History()
 		agentforge.Debug("Starting iteration %d with %d messages in history", iteration, len(messages))
 		// Call LLM with current history and tools
 		llmResponseCh := a.llmEngine.ChatStream(messages, a.tools)
@@ -57,6 +57,17 @@ func (a *Agent) executeChatWithTools() error {
 					fullContent += chunk.Content
 				} else if chunk.Delta != "" {
 					fullContent += chunk.Delta
+				}
+
+				// Add iteration number to chunk
+				chunk.Iteration = iteration
+
+				// Re-serialize chunk with iteration
+				var marshalErr error
+				chunkBytes, marshalErr = json.Marshal(chunk)
+				if marshalErr != nil {
+					agentforge.Debug("Error re-serializing chunk with iteration: %v", marshalErr)
+					return fmt.Errorf("failed to re-serialize chunk: %w", marshalErr)
 				}
 
 				// Check for tool calls
@@ -134,6 +145,7 @@ func (a *Agent) executeChatWithTools() error {
 					PromptTokens:     promptTokens,
 					CompletionTokens: completionTokens,
 					TotalTokens:      totalTokens,
+					Iteration:        iteration,
 				}
 				var err error
 				completedChunkBytes, err = json.Marshal(completionChunk)
@@ -154,7 +166,7 @@ func (a *Agent) executeChatWithTools() error {
 				return fmt.Errorf("attempting to save empty message to history")
 			}
 
-			a.history.addAssistantMessage(fullContent, promptTokens, completionTokens, totalTokens)
+			history.addAssistantMessage(fullContent, promptTokens, completionTokens, totalTokens)
 			a.hooks.newAssistantMessageEvent(a, fullContent, promptTokens, completionTokens, totalTokens)
 			return nil
 		}
@@ -168,7 +180,7 @@ func (a *Agent) executeChatWithTools() error {
 		}
 		a.hooks.newAssistantMessageWithToolCallsEvent(a, fullContent, toolCalls, promptTokens, completionTokens, totalTokens)
 
-		a.history.addAssistantMessageWithToolCalls(fullContent, toolCalls, promptTokens, completionTokens, totalTokens)
+		history.addAssistantMessageWithToolCalls(fullContent, toolCalls, promptTokens, completionTokens, totalTokens)
 
 		agentforge.Debug("Detected %d tool calls, executing tools", len(toolCalls))
 		// Execute each tool
@@ -179,6 +191,7 @@ func (a *Agent) executeChatWithTools() error {
 				Status:        llms.StatusToolExecuting,
 				Type:          llms.TypeToolExecuting,
 				ToolExecuting: &toolCall,
+				Iteration:     iteration,
 			}
 			executingBytes, err := json.Marshal(executingChunk)
 			if err != nil {
@@ -210,6 +223,7 @@ func (a *Agent) executeChatWithTools() error {
 				Status:      llms.StatusToolResult,
 				Type:        llms.TypeToolResult,
 				ToolResults: []llms.ToolResult{toolResult},
+				Iteration:   iteration,
 			}
 			resultBytes, err := json.Marshal(resultChunk)
 			if err != nil {
@@ -233,7 +247,7 @@ func (a *Agent) executeChatWithTools() error {
 					content = "Error: " + toolResult.Error
 				}
 			}
-			a.history.addToolMessage(toolCall.ID, content, toolResult.Ephemeral)
+			history.addToolMessage(toolCall.ID, content, toolResult.Ephemeral)
 		}
 
 		// Continue to next iteration (will call LLM again with tool results)

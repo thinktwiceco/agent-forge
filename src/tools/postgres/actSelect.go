@@ -8,6 +8,8 @@ import (
 )
 
 // executeSelect performs a SELECT query on the database
+//
+//nolint:unused // Reserved for future use
 func (pg *Postgres) executeSelect(table, selectClause string, limit, offset int) (string, error) {
 	// Table is already validated by the handler
 
@@ -25,7 +27,7 @@ func (pg *Postgres) executeSelect(table, selectClause string, limit, offset int)
 		if err != nil {
 			return fmt.Errorf("query execution failed: %w", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		// Get column names
 		columns, err := rows.Columns()
@@ -77,6 +79,8 @@ func (pg *Postgres) executeSelect(table, selectClause string, limit, offset int)
 }
 
 // connect establishes a connection to the PostgreSQL database
+//
+//nolint:unused // Used internally by executeWithConnection
 func (pg *Postgres) connect() (*sql.DB, error) {
 	db, err := sql.Open("postgres", pg.postgresURL)
 	if err != nil {
@@ -90,7 +94,7 @@ Example: postgresql://myuser:mypass@localhost:5432/mydb`, err)
 
 	// Test the connection
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf(`failed to connect to database.
 Error: %v
 
@@ -111,12 +115,14 @@ Possible issues:
 }
 
 // executeWithConnection manages the database connection lifecycle
+//
+//nolint:unused // Used internally by executeGetSchema, executeGetTables, executeInsert, executeSelect, executeUpdate
 func (pg *Postgres) executeWithConnection(queryFunc func(*sql.DB) error) error {
 	db, err := pg.connect()
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	return queryFunc(db)
 }

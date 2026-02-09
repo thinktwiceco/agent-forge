@@ -8,6 +8,8 @@ import (
 )
 
 // executeInsert performs an INSERT query on the database
+//
+//nolint:unused // Reserved for future use
 func (pg *Postgres) executeInsert(table, addClause string) (string, error) {
 	// Table is already validated by the handler
 

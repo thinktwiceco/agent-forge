@@ -40,6 +40,7 @@ type ChunkResponse struct {
 	PromptTokens     int          `json:"promptTokens,omitempty"`     // Input tokens consumed
 	CompletionTokens int          `json:"completionTokens,omitempty"` // Output tokens generated
 	TotalTokens      int          `json:"totalTokens,omitempty"`      // Total tokens used
+	Iteration        int          `json:"iteration,omitempty"`        // Tool iteration number (for tracking response turns)
 }
 
 // ResponseCh manages channels for streaming responses and errors.

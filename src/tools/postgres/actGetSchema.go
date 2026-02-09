@@ -9,6 +9,8 @@ import (
 )
 
 // executeGetSchema retrieves the schema (column information) for a specified table
+//
+//nolint:unused // Reserved for future use
 func (pg *Postgres) executeGetSchema(table, schema string) (string, error) {
 	// Validate schema and table names
 	if err := validateSchemaName(schema); err != nil {
@@ -42,7 +44,7 @@ func (pg *Postgres) executeGetSchema(table, schema string) (string, error) {
 		if err != nil {
 			return fmt.Errorf("failed to retrieve schema: %w", err)
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		var columns []string
 		columnCount := 0
