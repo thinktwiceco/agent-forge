@@ -1,6 +1,16 @@
 ## [Unreleased]
 
 ## [0.4.3] - 2026-02-10
+- [8bb578c](http://github.com/thinktwiceco/agent-forge/commit/8bb578ce8ff132497ef6d3f16a4bc7f90c7b9320) - Merge pull request #20 from thinktwiceco/release/v0.4.3
+- [8fcb52a](http://github.com/thinktwiceco/agent-forge/commit/8fcb52afddb4ceb8dcc0ef441d4ff4e3f414cae9) - chore(release): prepare release v0.4.3
+- [f4769e3](http://github.com/thinktwiceco/agent-forge/commit/f4769e3d1eeebece931e8127d85efe9c6032a39b) - Merge pull request #19 from thinktwiceco/release/v0.4.2
+- [d65f4d4](http://github.com/thinktwiceco/agent-forge/commit/d65f4d427d858d69317c05c6c325f5deaf460bbd) - Merge pull request #18 from thinktwiceco/changelog-v0.4.2
+- [0824516](http://github.com/thinktwiceco/agent-forge/commit/08245161d3474a8c6ab381639938f23fd592c1b6) - chore(release): prepare release v0.4.2
+- [b334c57](http://github.com/thinktwiceco/agent-forge/commit/b334c57b39f82392998b2974bbd6c201384af9b3) - chore: update changelog for v0.4.2 [skip ci]
+
+
+## [Unreleased]
+## [0.4.3] - 2026-02-10
 
 ### Added
 - Add Kimi-K2.5 (moonshotai/Kimi-K2.5) to TogetherAI available models
