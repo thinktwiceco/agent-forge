@@ -1,6 +1,8 @@
 package core
 
 import (
+	"context"
+
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
@@ -12,7 +14,7 @@ type SubAgent interface {
 	agentforge.Discoverable
 	// ChatStream initiates a streaming chat interaction with the agent
 	// Returns a ResponseCh that can be used to consume streaming responses
-	ChatStream(message string, chatId string) *ResponseCh
+	ChatStream(ctx context.Context, message string, chatId string) *ResponseCh
 
 	// Name returns the unique identifier of the agent
 	Name() string

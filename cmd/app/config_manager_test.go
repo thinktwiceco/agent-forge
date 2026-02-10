@@ -65,7 +65,7 @@ func TestInterpolateEnvVars(t *testing.T) {
 			// Set up environment variables
 			for key, value := range tt.envVars {
 				_ = os.Setenv(key, value)
-				defer os.Unsetenv(key)
+				defer func(k string) { _ = os.Unsetenv(k) }(key)
 			}
 
 			// Run interpolation
@@ -115,7 +115,7 @@ func TestConfigManagerLoadWithInterpolation(t *testing.T) {
 	// Set environment variable
 	testDBURL := "postgres://test:test@localhost:5432/testdb"
 	_ = os.Setenv("TEST_DATABASE_URL", testDBURL)
-	defer os.Unsetenv("TEST_DATABASE_URL")
+	defer func() { _ = os.Unsetenv("TEST_DATABASE_URL") }()
 
 	// Create config manager and load config
 	cm, err := NewConfigManager(configPath)

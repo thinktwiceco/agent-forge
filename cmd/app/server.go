@@ -13,11 +13,12 @@ import (
 var embeddedStatic embed.FS
 
 type Server struct {
-	engine    *gin.Engine
-	agentMgr  *AgentManager
-	configMgr *ConfigManager
-	todoMgr   *TodoManager
-	httpSrv   *http.Server
+	engine       *gin.Engine
+	agentMgr     *AgentManager
+	configMgr    *ConfigManager
+	todoMgr      *TodoManager
+	httpSrv      *http.Server
+	convRegistry *ConversationRegistry
 }
 
 func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoManager) *Server {
@@ -25,10 +26,11 @@ func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoMa
 	engine.Use(gin.Logger(), gin.Recovery(), corsMiddleware())
 
 	server := &Server{
-		engine:    engine,
-		agentMgr:  agentMgr,
-		configMgr: configMgr,
-		todoMgr:   todoMgr,
+		engine:       engine,
+		agentMgr:     agentMgr,
+		configMgr:    configMgr,
+		todoMgr:      todoMgr,
+		convRegistry: NewConversationRegistry(),
 	}
 	server.setupRoutes()
 	return server
@@ -52,6 +54,7 @@ func (s *Server) setupRoutes() {
 
 	api := s.engine.Group("/api")
 	api.POST("/chat", s.handleChat)
+	api.POST("/chat/stop", s.handleStopChat)
 	api.GET("/conversations", s.handleListConversations)
 	api.GET("/conversations/:id", s.handleGetConversation)
 	api.DELETE("/conversations/:id", s.handleDeleteConversation)

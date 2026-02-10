@@ -1,6 +1,8 @@
 package agents
 
 import (
+	"context"
+
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
@@ -103,12 +105,13 @@ func NewAgent(config *AgentConfig) *Agent {
 // This method implements the core.SubAgent interface.
 //
 // Parameters:
+//   - ctx: Context for cancellation and deadline control
 //   - message: The user message to send
 //   - chatId: The conversation ID (empty string for new conversations)
 //
 // Returns:
 //   - *core.ResponseCh: Response channel that can be used to receive streaming chunks
-func (a *Agent) ChatStream(message string, chatId string) *core.ResponseCh {
+func (a *Agent) ChatStream(ctx context.Context, message string, chatId string) *core.ResponseCh {
 	// Create a new History instance for this request (per-request history)
 	// This eliminates concurrency issues with shared state
 	history := a.createHistory(chatId)
@@ -143,7 +146,7 @@ func (a *Agent) ChatStream(message string, chatId string) *core.ResponseCh {
 			a.responseCh = oldResponseCh
 		}()
 
-		if err := a.executeChatWithTools(history); err != nil {
+		if err := a.executeChatWithTools(ctx, history); err != nil {
 			responseCh.Error <- err
 		}
 		// Save history and get the final chatId (generated if it was empty)

@@ -22,7 +22,7 @@ type Postgres struct {
 //   - postgresURL: PostgreSQL connection URL (format: postgresql://user:pass@host:port/db)
 //   - mode: Access mode - "read" (SELECT only) or "write" (SELECT, INSERT, UPDATE, DELETE)
 //   - allowedTables: Whitelist of table names the agent can access
-//   - allowedSchemas: Whitelist of schema names (currently not enforced, reserved for future use)
+//   - allowedSchemas: Whitelist of schema names; when set, tables must be in these schemas and search_path is set for convenience
 func NewPostgresTool(postgresURL, mode string, allowedTables, allowedSchemas []string) llms.Tool {
 	pg := &Postgres{
 		postgresURL:    postgresURL,
@@ -31,15 +31,28 @@ func NewPostgresTool(postgresURL, mode string, allowedTables, allowedSchemas []s
 		allowedSchemas: allowedSchemas,
 	}
 
+	desc := fmt.Sprintf("Execute SQL queries on PostgreSQL database. Allowed tables: %v. Mode: %s", allowedTables, mode)
+	if len(allowedSchemas) > 0 {
+		desc += fmt.Sprintf(". Allowed schemas: %v", allowedSchemas)
+	}
+
+	schemaGuidance := ""
+	if len(allowedSchemas) > 0 {
+		schemaGuidance = fmt.Sprintf(`  * Allowed Schemas: %v (tables must be in these schemas; use schema."TableName" for mixed-case names)
+  * IMPORTANT for mixed-case table names (e.g. Org, User): Use double-quoted identifiers: schema."Org" or "Org"
+  * Unquoted identifiers are lowercased by PostgreSQL - "Org" and org are different
+
+`, allowedSchemas)
+	}
+
 	return &core.Tool{
 		Name:        "postgres",
-		Description: fmt.Sprintf("Execute SQL queries on PostgreSQL database. Allowed tables: %v. Mode: %s", allowedTables, mode),
+		Description: desc,
 		AdvanceDesc: fmt.Sprintf(`Advanced Details:
 - Configuration:
   * Mode: %s (READ allows SELECT only; WRITE allows SELECT, INSERT, UPDATE, DELETE)
   * Allowed Tables: %v (queries can only access these tables)
-
-- Parameters:
+%s- Parameters:
   * query (string, required): Complete SQL query to execute
 
 - Behavior:
@@ -71,13 +84,18 @@ func NewPostgresTool(postgresURL, mode string, allowedTables, allowedSchemas []s
     query: "DELETE FROM orders WHERE order_status = 'cancelled' AND order_date < '2024-01-01'"
   
   Join query (available in READ and WRITE modes):
-    query: "SELECT u.name, o.order_id, o.total_amount FROM users u JOIN orders o ON u.user_id = o.user_id WHERE u.status = 'active'"`, mode, allowedTables),
+    query: "SELECT u.name, o.order_id, o.total_amount FROM users u JOIN orders o ON u.user_id = o.user_id WHERE u.status = 'active'"
+
+  With schema and mixed-case tables (when allowedSchemas is set):
+    query: "SELECT * FROM private.\"Org\" LIMIT 10"
+    query: "SELECT * FROM private.\"User\" WHERE \"orgId\" = 'xxx'"`, mode, allowedTables, schemaGuidance),
 		TroubleshootingInfo: fmt.Sprintf(`Troubleshooting:
 - "access denied: table(s) not in allowed list": Your query references tables that are not in the allowed list: %v. Only use these tables.
 - "operation not allowed in READ mode": You attempted a write operation (INSERT, UPDATE, DELETE) but the tool is in READ mode (%s). Only SELECT queries are allowed in READ mode.
 - "dangerous operation detected": Operations like DROP, TRUNCATE, ALTER, CREATE are not allowed for security reasons.
 - "unsupported SQL statement": Only SELECT, INSERT, UPDATE, and DELETE statements are supported.
-- "could not extract table names": The query structure is too complex or malformed. Ensure table names are clearly specified.
+- "could not extract table names": The query structure is too complex or malformed. Use explicit table names (schema.\"TableName\" for mixed-case).
+- "relation X does not exist": Tables may be in a different schema. Use schema-qualified names: schema.\"TableName\". For mixed-case tables, use double quotes.
 - Connection errors: Check that the database server is running, credentials are correct, and network connectivity is available.
 - Query execution errors: Verify your SQL syntax is correct and column/table names exist in the database.`, allowedTables, mode),
 		Parameters: []core.Parameter{
@@ -101,7 +119,7 @@ func NewPostgresTool(postgresURL, mode string, allowedTables, allowedSchemas []s
 			}
 
 			// Validate the query
-			_, err := ValidateQuery(query, pg.mode, pg.allowedTables)
+			_, err := ValidateQuery(query, pg.mode, pg.allowedTables, pg.allowedSchemas)
 			if err != nil {
 				return core.NewErrorResponse(fmt.Sprintf("query validation failed: %v", err))
 			}

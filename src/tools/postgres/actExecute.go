@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	_ "github.com/lib/pq"
 )
@@ -23,7 +24,7 @@ func (pg *Postgres) executeQuery(query string) (string, error) {
 	}
 
 	// Detect if this is a read or write operation
-	queryInfo, _ := ValidateQuery(query, pg.mode, pg.allowedTables)
+	queryInfo, _ := ValidateQuery(query, pg.mode, pg.allowedTables, pg.allowedSchemas)
 
 	if queryInfo.StatementType == "SELECT" {
 		return pg.executeSelectQuery(db, query)
@@ -32,13 +33,67 @@ func (pg *Postgres) executeQuery(query string) (string, error) {
 	return pg.executeWrite(db, query, queryInfo.StatementType)
 }
 
+// runQuery runs the query, setting search_path first when allowedSchemas is configured.
+// Returns (rows, commitOrNil, error). Call commitOrNil() before returning on success.
+func (pg *Postgres) runSelect(db *sql.DB, query string) (*sql.Rows, func(), error) {
+	if len(pg.allowedSchemas) == 0 {
+		rows, err := db.Query(query)
+		return rows, func() {}, err
+	}
+	parts := make([]string, len(pg.allowedSchemas))
+	for i, s := range pg.allowedSchemas {
+		parts[i] = `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, nil, err
+	}
+	if _, err := tx.Exec("SET search_path TO " + strings.Join(parts, ", ")); err != nil {
+		_ = tx.Rollback()
+		return nil, nil, err
+	}
+	rows, err := tx.Query(query)
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, nil, err
+	}
+	return rows, func() { _ = tx.Commit() }, nil
+}
+
+// runExec runs an exec query, setting search_path first when allowedSchemas is configured.
+func (pg *Postgres) runExec(db *sql.DB, query string) (sql.Result, error) {
+	if len(pg.allowedSchemas) == 0 {
+		return db.Exec(query)
+	}
+	parts := make([]string, len(pg.allowedSchemas))
+	for i, s := range pg.allowedSchemas {
+		parts[i] = `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.Exec("SET search_path TO " + strings.Join(parts, ", ")); err != nil {
+		return nil, err
+	}
+	result, err := tx.Exec(query)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // executeSelectQuery executes a SELECT query and returns formatted results
 func (pg *Postgres) executeSelectQuery(db *sql.DB, query string) (string, error) {
-	rows, err := db.Query(query)
+	rows, commit, err := pg.runSelect(db, query)
 	if err != nil {
 		return "", fmt.Errorf("query execution failed: %v", err)
 	}
-	defer func() { _ = rows.Close() }()
+	defer func() { _ = rows.Close(); commit() }()
 
 	// Get column names
 	columns, err := rows.Columns()
@@ -103,7 +158,7 @@ func (pg *Postgres) executeSelectQuery(db *sql.DB, query string) (string, error)
 
 // executeWrite executes INSERT, UPDATE, or DELETE queries
 func (pg *Postgres) executeWrite(db *sql.DB, query, stmtType string) (string, error) {
-	result, err := db.Exec(query)
+	result, err := pg.runExec(db, query)
 	if err != nil {
 		return "", fmt.Errorf("query execution failed: %v", err)
 	}

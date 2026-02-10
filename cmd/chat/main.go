@@ -211,12 +211,12 @@ func initializeAgent() (*agents.Agent, error) {
 // All chunks are formatted by the logger plugin hook when read from the channel
 // Returns the chatId (which may be newly generated) and any error
 func processResponse(agent *agents.Agent, message string, chatId string) (string, error) {
-	// Get response channel with chatId to maintain conversation history
-	responseCh := agent.ChatStream(message, chatId)
-
 	// Process streaming response with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
+
+	// Get response channel with chatId to maintain conversation history
+	responseCh := agent.ChatStream(ctx, message, chatId)
 
 	chunkChan := responseCh.Start()
 	receivedAnyChunk := false

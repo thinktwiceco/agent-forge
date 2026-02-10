@@ -146,7 +146,7 @@ func TestAgent_ChatWithTools(t *testing.T) {
 	}()
 
 	// Trigger the chat with the history instance
-	err := agent.executeChatWithTools(history)
+	err := agent.executeChatWithTools(context.Background(), history)
 
 	_ = err // Ignore error in this test context as we consume output in goroutine
 

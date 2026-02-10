@@ -1,3 +1,42 @@
+// Generic tool call formatting - no tool-specific logic
+const SENSITIVE_KEYS = new Set([
+  "password", "passwd", "secret", "token", "apikey", "api_key", "apiKey",
+  "key", "authorization", "auth", "credentials"
+]);
+
+function truncate(str, maxLen = 50) {
+  if (typeof str !== "string") return String(str);
+  if (str.length <= maxLen) return str;
+  return str.slice(0, maxLen) + "…";
+}
+
+function formatArguments(args) {
+  if (!args || typeof args !== "object") return "";
+  const parts = [];
+  for (const [key, value] of Object.entries(args)) {
+    const k = String(key).toLowerCase();
+    if (SENSITIVE_KEYS.has(k)) continue;
+    const str = typeof value === "object" ? JSON.stringify(value) : String(value ?? "");
+    parts.push(`${key}=${truncate(str, 40)}`);
+  }
+  return truncate(parts.join(", "), 100);
+}
+
+function formatToolCallSummary(call) {
+  const name = call?.function?.name || call?.name || "Unknown tool";
+  const args = call?.function?.arguments ?? call?.arguments ?? {};
+  const argSummary = formatArguments(args);
+  return argSummary ? `${name}: ${argSummary}` : name;
+}
+
+function formatToolResultSummary(result) {
+  const name = result?.toolName || "Tool";
+  if (!result?.success) return null;
+  const resultStr = (result?.result || "").trim();
+  const summary = resultStr ? truncate(resultStr, 80) : "";
+  return summary ? `✓ ${name}: ${summary}` : `✓ ${name}`;
+}
+
 export class ChatManager {
   constructor(appState) {
     this.state = appState;
@@ -5,8 +44,10 @@ export class ChatManager {
     this.formEl = document.getElementById("chat-form");
     this.inputEl = document.getElementById("chat-input");
     this.statusEl = document.getElementById("chat-status");
+    this.stopBtn = document.getElementById("stop-btn");
     this.currentAssistantEl = null;
     this.currentIteration = null; // Track current iteration for message grouping
+    this.abortController = null; // AbortController for cancelling streams
 
     this.formEl.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -20,12 +61,60 @@ export class ChatManager {
         this.handleSubmit();
       }
     });
+
+    // Handle stop button click
+    if (this.stopBtn) {
+      this.stopBtn.addEventListener("click", () => {
+        this.stopStream();
+      });
+    }
   }
 
   setStatus(text) {
     if (this.statusEl) {
       this.statusEl.textContent = text;
     }
+  }
+
+  showStopButton() {
+    if (this.stopBtn) {
+      this.stopBtn.style.display = "block";
+    }
+  }
+
+  hideStopButton() {
+    if (this.stopBtn) {
+      this.stopBtn.style.display = "none";
+    }
+  }
+
+  async stopStream() {
+    // Abort the fetch request
+    if (this.abortController) {
+      this.abortController.abort();
+    }
+
+    // Send stop request to backend
+    if (this.state.conversationId) {
+      try {
+        await fetch("/api/chat/stop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId: this.state.conversationId }),
+        });
+      } catch (err) {
+        // Ignore errors from stop endpoint (request might already be done)
+        console.log("Stop request failed:", err);
+      }
+    }
+
+    // Update UI
+    this.hideStopButton();
+    this.setStatus("Stopped");
+    this.appendMessage("System", "Agent stopped", [
+      "message",
+      "msg-tool-result-error",
+    ]);
   }
 
   clearMessages() {
@@ -91,10 +180,10 @@ export class ChatManager {
         "msg-assistant",
       ], true); // Enable markdown for assistant messages
       if (msg.toolCalls && msg.toolCalls.length) {
-        const toolNames = msg.toolCalls
-          .map((call) => call.function?.name || call.name || "Unknown tool")
-          .join(", ");
-        this.appendMessage("Tool call", toolNames, [
+        const body = msg.toolCalls
+          .map((call) => formatToolCallSummary(call))
+          .join(" | ");
+        this.appendMessage("Tool call", body, [
           "message",
           "msg-tool-call",
         ]);
@@ -113,29 +202,52 @@ export class ChatManager {
 
   async startStream(message) {
     this.setStatus("Streaming");
+    this.showStopButton();
+    
+    // Create new AbortController for this request
+    this.abortController = new AbortController();
+    
     const query =
       this.state.conversationId !== ""
         ? `?conversationId=${encodeURIComponent(this.state.conversationId)}`
         : "";
 
-    const res = await fetch(`/api/chat${query}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
-    });
+    try {
+      const res = await fetch(`/api/chat${query}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+        signal: this.abortController.signal,
+      });
 
-    if (!res.ok || !res.body) {
-      this.setStatus("Error");
-      this.appendMessage("System", "Failed to start stream", [
-        "message",
-        "msg-tool-result-error",
-      ]);
-      return;
+      if (!res.ok || !res.body) {
+        this.setStatus("Error");
+        this.hideStopButton();
+        this.appendMessage("System", "Failed to start stream", [
+          "message",
+          "msg-tool-result-error",
+        ]);
+        return;
+      }
+
+      await parseSSEStream(res.body, (eventType, payload) => {
+        this.handleStreamEvent(eventType, payload);
+      });
+    } catch (err) {
+      if (err.name === "AbortError") {
+        // Request was aborted by user, this is expected
+        console.log("Stream aborted by user");
+      } else {
+        this.setStatus("Error");
+        this.hideStopButton();
+        this.appendMessage("System", `Stream error: ${err.message}`, [
+          "message",
+          "msg-tool-result-error",
+        ]);
+      }
+    } finally {
+      this.abortController = null;
     }
-
-    await parseSSEStream(res.body, (eventType, payload) => {
-      this.handleStreamEvent(eventType, payload);
-    });
   }
 
   handleStreamEvent(eventType, payload) {
@@ -164,6 +276,7 @@ export class ChatManager {
       this.handleToolResultEvent(payload);
     } else if (eventType === "completed") {
       this.setStatus("Idle");
+      this.hideStopButton();
       this.state.events.dispatchEvent(
         new CustomEvent("conversationUpdated", {
           detail: { id: this.state.conversationId },
@@ -171,6 +284,7 @@ export class ChatManager {
       );
     } else if (eventType === "error") {
       this.setStatus("Error");
+      this.hideStopButton();
       this.appendMessage("Error", payload.content || "Unknown error", [
         "message",
         "msg-tool-result-error",
@@ -212,9 +326,7 @@ export class ChatManager {
     const calls = payload.toolCalls || [];
     const body =
       calls.length > 0
-        ? calls
-            .map((call) => call.function?.name || call.name || "Unknown tool")
-            .join(", ")
+        ? calls.map((call) => formatToolCallSummary(call)).join(" | ")
         : "Tool call requested";
     this.appendMessage(this.formatAgentLabel(payload), body, [
       "message",
@@ -226,8 +338,14 @@ export class ChatManager {
   }
 
   handleToolExecutingEvent(payload) {
-    // Skip displaying tool executing events to reduce verbosity
-    // Tool calls already show what's being executed
+    const call = payload.toolExecuting;
+    if (!call) return;
+    const body = `Running: ${formatToolCallSummary(call)}`;
+    this.appendMessage(this.formatAgentLabel(payload), body, [
+      "message",
+      "msg-tool-executing",
+      this.subagentClass(payload),
+    ]);
   }
 
   handleToolResultEvent(payload) {
@@ -235,8 +353,7 @@ export class ChatManager {
     if (results.length === 0) {
       return;
     }
-    
-    // Show only errors, skip successful tool results to reduce verbosity
+
     results.forEach((result) => {
       if (!result.success) {
         const toolName = result.toolName || "Tool";
@@ -246,6 +363,15 @@ export class ChatManager {
           `✗ ${toolName}: ${errorMsg}`,
           ["message", "msg-tool-result-error", this.subagentClass(payload)]
         );
+      } else if (!result.ephemeral) {
+        const summary = formatToolResultSummary(result);
+        if (summary) {
+          this.appendMessage(
+            this.formatAgentLabel(payload),
+            summary,
+            ["message", "msg-tool-result-success", this.subagentClass(payload)]
+          );
+        }
       }
     });
   }

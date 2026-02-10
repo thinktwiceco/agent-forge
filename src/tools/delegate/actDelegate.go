@@ -1,6 +1,7 @@
 package delegate
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -38,7 +39,8 @@ func (d *Delegate) delegate(ctx map[string]any, subAgentName string, message str
 	agentforge.Info("[%s] ➡️ [%s] ➡️ \n%s", parentAgentName, subAgentName, message)
 
 	// Execute delegation by calling sub agent's ChatStream
-	delegateResponseCh := assignedSubAgent.ChatStream(message, "")
+	// Use background context for sub-agent delegation (sub-agents inherit parent's lifecycle)
+	delegateResponseCh := assignedSubAgent.ChatStream(context.Background(), message, "")
 
 	// Accumulate the full response
 	var fullResponse string

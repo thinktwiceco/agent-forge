@@ -1,5 +1,5 @@
 # Copy to config.yaml and fill in your values.
-# Use ${VAR_NAME} for env var interpolation (e.g. paths, secrets).
+# Use dollar-brace syntax for env var interpolation, e.g. REPO_ROOT, DATABASE_URL.
 agent:
   name: "My Agent"
   system_prompt: |

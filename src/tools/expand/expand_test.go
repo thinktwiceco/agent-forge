@@ -1,6 +1,7 @@
 package expand
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -67,7 +68,7 @@ func (m *mockDiscoverableAgent) Name() string {
 	return m.name
 }
 
-func (m *mockDiscoverableAgent) ChatStream(message string, chatId string) *core.ResponseCh {
+func (m *mockDiscoverableAgent) ChatStream(ctx context.Context, message string, chatId string) *core.ResponseCh {
 	return nil // Not needed for this test
 }
 
