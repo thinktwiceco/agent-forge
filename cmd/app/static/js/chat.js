@@ -44,6 +44,7 @@ export class ChatManager {
 
   async startNewConversation() {
     this.state.conversationId = "";
+    localStorage.removeItem('currentConversationId');
     this.currentAssistantEl = null;
     this.currentIteration = null;
     this.setStatus("Idle");
@@ -52,6 +53,7 @@ export class ChatManager {
 
   async loadConversation(conversationId) {
     this.state.conversationId = conversationId;
+    localStorage.setItem('currentConversationId', conversationId);
     this.currentAssistantEl = null;
     this.currentIteration = null;
     this.clearMessages();
@@ -143,6 +145,8 @@ export class ChatManager {
 
     if (payload.chatId && payload.chatId !== this.state.conversationId) {
       this.state.conversationId = payload.chatId;
+      // Persist to localStorage
+      localStorage.setItem('currentConversationId', payload.chatId);
       this.state.events.dispatchEvent(
         new CustomEvent("conversationIdUpdated", {
           detail: { id: payload.chatId },

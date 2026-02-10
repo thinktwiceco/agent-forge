@@ -26,6 +26,11 @@ go.work
 .venv/
 !*.example
 
+# Local config (contains secrets/user paths)
+cmd/app/config.yaml
+cmd/app/config-test.yaml
+agent_config.yaml
+
 # Node.js
 node_modules/
 npm-debug.log

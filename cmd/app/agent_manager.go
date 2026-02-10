@@ -56,25 +56,28 @@ func (am *AgentManager) Reload() error {
 }
 
 func (am *AgentManager) buildAgent() (*agents.Agent, error) {
-	configPath := am.configMgr.ConfigPath()
+	// Use the already-loaded config with interpolated environment variables
+	cfg := am.configMgr.GetConfig()
 
-	agentBuilder, err := builder.NewAgentBuilderFromConfig(configPath)
+	agentBuilder, err := builder.NewAgentBuilderFromConfigStruct(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create agent builder: %w", err)
 	}
 
 	// Vector components are optional - only build if configured
-	vectorBuilder, err := builder.NewVectorBuilderFromConfig(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("create vector builder: %w", err)
-	}
+	if cfg.VectorStorage != nil {
+		vectorBuilder, err := builder.NewVectorBuilderFromConfigStruct(*cfg.VectorStorage)
+		if err != nil {
+			return nil, fmt.Errorf("create vector builder: %w", err)
+		}
 
-	// Only build and set vector components if they're configured
-	if err := vectorBuilder.Build(); err == nil {
-		agentBuilder.SetVectorDB(vectorBuilder.GetVectorDB())
-		agentBuilder.SetEmbeddingGenerator(vectorBuilder.GetEmbeddingGenerator())
+		// Only build and set vector components if they're configured
+		if err := vectorBuilder.Build(); err == nil {
+			agentBuilder.SetVectorDB(vectorBuilder.GetVectorDB())
+			agentBuilder.SetEmbeddingGenerator(vectorBuilder.GetEmbeddingGenerator())
+		}
+		// Silently ignore vector build errors - vector DB is optional
 	}
-	// Silently ignore vector build errors - vector DB is optional
 
 	agent, err := agentBuilder.Build()
 	if err != nil {

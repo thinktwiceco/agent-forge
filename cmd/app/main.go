@@ -9,12 +9,17 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
 	configPath := flag.String("config", "agent_config.yaml", "path to agent config")
 	port := flag.String("port", "8080", "server port")
 	flag.Parse()
+
+	// Load .env file (ignore error if file doesn't exist)
+	_ = godotenv.Load()
 
 	// Register API hooks before creating agent
 	RegisterApiHooks()

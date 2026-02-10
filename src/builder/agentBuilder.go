@@ -60,6 +60,16 @@ func NewAgentBuilderFromConfig(configPath string) (*AgentBuilder, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	return newAgentBuilderFromConfigStruct(cfg)
+}
+
+// NewAgentBuilderFromConfigStruct creates an agent builder from an already-loaded Config struct.
+// This is useful when the config has been pre-processed (e.g., environment variable interpolation).
+func NewAgentBuilderFromConfigStruct(cfg Config) (*AgentBuilder, error) {
+	return newAgentBuilderFromConfigStruct(cfg)
+}
+
+func newAgentBuilderFromConfigStruct(cfg Config) (*AgentBuilder, error) {
 	b := NewAgentBuilder(cfg.Agent.Name, cfg.Agent.Persistence)
 	if cfg.Agent.SystemPrompt != "" {
 		b.SetSystemPrompt(cfg.Agent.SystemPrompt)

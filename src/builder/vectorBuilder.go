@@ -51,28 +51,38 @@ func NewVectorBuilderFromConfig(configPath string) (*VectorBuilder, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	return newVectorBuilderFromConfigStruct(cfg.VectorStorage)
+}
+
+// NewVectorBuilderFromConfigStruct creates a VectorBuilder from an already-loaded VectorStorageConfig.
+// This is useful when the config has been pre-processed (e.g., environment variable interpolation).
+func NewVectorBuilderFromConfigStruct(cfg VectorStorageConfig) (*VectorBuilder, error) {
+	return newVectorBuilderFromConfigStruct(cfg)
+}
+
+func newVectorBuilderFromConfigStruct(cfg VectorStorageConfig) (*VectorBuilder, error) {
 	b := NewVectorBuilder()
 
 	// Set vector database type
-	if cfg.VectorStorage.VectorDB != "" {
-		b.SetVectorDBType(VectorDBType(cfg.VectorStorage.VectorDB))
+	if cfg.VectorDB != "" {
+		b.SetVectorDBType(VectorDBType(cfg.VectorDB))
 
 		// Set database-specific configuration
 		switch b.vectorDBType {
 		case SQLITE_VECTOR_DB:
-			if cfg.VectorStorage.SQLite != nil {
-				b.dbConfig = cfg.VectorStorage.SQLite
+			if cfg.SQLite != nil {
+				b.dbConfig = cfg.SQLite
 			}
 		case MILVUS_VECTOR_DB:
-			if cfg.VectorStorage.Milvus != nil {
-				b.dbConfig = cfg.VectorStorage.Milvus
+			if cfg.Milvus != nil {
+				b.dbConfig = cfg.Milvus
 			}
 		}
 	}
 
 	// Set embedding model
-	if cfg.VectorStorage.EmbeddingModel != "" {
-		b.SetEmbeddingModel(cfg.VectorStorage.EmbeddingModel)
+	if cfg.EmbeddingModel != "" {
+		b.SetEmbeddingModel(cfg.EmbeddingModel)
 	}
 
 	return b, nil
