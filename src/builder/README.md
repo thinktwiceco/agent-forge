@@ -268,6 +268,7 @@ Models are specified in the format: `provider::model-name`
 - `togetherai::meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo`
 - `togetherai::Qwen/Qwen2.5-7B-Instruct-Turbo`
 - `togetherai::zai-org/GLM-4.7`
+- `togetherai::moonshotai/Kimi-K2.5`
 
 ### Embedding Models
 

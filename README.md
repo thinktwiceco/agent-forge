@@ -682,7 +682,7 @@ func main() {
 
 ## Environment Variables
 
-- `AF_TOGETHERAI_API_KEY` - API key for TogetherAI
+- `AF_TOGETHERAI_API_KEY` - API key for TogetherAI (see [Builder README](src/builder/README.md#example-models) for available models including Kimi-K2.5, Llama, Qwen, GLM-4.7)
 - `AF_DEEPSEEK_API_KEY` - API key for DeepSeek
 - `AF_OPENAI_API_KEY` - API key for OpenAI
 - `AF_LOG_LEVEL` - Logging level (DEBUG, INFO, WARN, ERROR). Default: INFO

@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -12,11 +13,20 @@ import (
 
 // executeChatWithTools executes the chat loop with automatic tool execution.
 // It handles streaming responses, tool call detection, execution, and iteration.
-func (a *Agent) executeChatWithTools(history *History) error {
+func (a *Agent) executeChatWithTools(ctx context.Context, history *History) error {
 	iteration := 0
 	var cleanupFuncs []func() // Accumulate cleanup functions from all tool executions
 
 	for iteration < a.config.MaxToolIterations {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			agentforge.Debug("Context cancelled, stopping execution")
+			return fmt.Errorf("execution cancelled: %w", ctx.Err())
+		default:
+			// Continue execution
+		}
+
 		iteration++
 		messages := history.History()
 		agentforge.Debug("Starting iteration %d with %d messages in history", iteration, len(messages))
@@ -36,6 +46,10 @@ func (a *Agent) executeChatWithTools(history *History) error {
 		agentforge.Debug("Waiting for LLM response chunks...")
 		for {
 			select {
+			case <-ctx.Done():
+				// Context cancelled, stop processing
+				agentforge.Debug("Context cancelled during LLM response streaming")
+				return fmt.Errorf("execution cancelled: %w", ctx.Err())
 			case chunkBytes, ok := <-llmResponseCh.Response:
 				if !ok {
 					// LLM response channel closed, streaming complete
@@ -161,9 +175,10 @@ func (a *Agent) executeChatWithTools(history *History) error {
 				return nil
 			}
 
-			// Save the message to history with token usage
+			// Save the message to history with token usage (skip if LLM returned empty content)
 			if fullContent == "" {
-				return fmt.Errorf("attempting to save empty message to history")
+				agentforge.Debug("LLM returned empty completion; skipping history save")
+				return nil
 			}
 
 			history.addAssistantMessage(fullContent, promptTokens, completionTokens, totalTokens)

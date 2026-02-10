@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -21,7 +22,7 @@ func TestAgent_ChatStream_Unit(t *testing.T) {
 		Trace:     "test-trace",
 	})
 
-	responseCh := agent.ChatStream("Hello", "")
+	responseCh := agent.ChatStream(context.Background(), "Hello", "")
 
 	var receivedContent string
 	var sawStreaming bool

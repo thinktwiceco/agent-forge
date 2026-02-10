@@ -42,4 +42,5 @@ const (
 	SSEEventToolResult    = "tool_result"
 	SSEEventCompleted     = "completed"
 	SSEEventError         = "error"
+	SSEEventThinking      = "thinking"
 )

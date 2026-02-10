@@ -186,7 +186,8 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
 
 	// Get response channel from agent with conversationId
-	responseCh := agent.ChatStream(req.Message, conversationId)
+	// Use request context for cancellation support
+	responseCh := agent.ChatStream(r.Context(), req.Message, conversationId)
 
 	// Stream chunks as NDJSON (one JSON object per line)
 	encoder := json.NewEncoder(w)

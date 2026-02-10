@@ -6,8 +6,9 @@ import (
 	"strings"
 )
 
-// ValidateQuery validates a SQL query against mode and table restrictions
-func ValidateQuery(query, mode string, allowedTables []string) (*QueryInfo, error) {
+// ValidateQuery validates a SQL query against mode, table, and schema restrictions.
+// allowedSchemas can be nil/empty to skip schema validation.
+func ValidateQuery(query, mode string, allowedTables []string, allowedSchemas []string) (*QueryInfo, error) {
 	query = strings.TrimSpace(query)
 
 	if query == "" {
@@ -28,22 +29,34 @@ func ValidateQuery(query, mode string, allowedTables []string) (*QueryInfo, erro
 		return nil, err
 	}
 
-	// Extract tables from the query
-	tables, err := extractTables(query, stmtType)
+	// Extract tables from the query (use original query to preserve quoted identifier case)
+	tableRefs, err := extractTableRefs(query, stmtType)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate all tables are in the allowed list
-	if err := validateAllTables(tables, allowedTables); err != nil {
+	if err := validateTableRefs(tableRefs, allowedTables, allowedSchemas); err != nil {
 		return nil, err
+	}
+
+	// Build table names list for QueryInfo (for backward compatibility)
+	tableNames := make([]string, len(tableRefs))
+	for i, ref := range tableRefs {
+		tableNames[i] = ref.Table
 	}
 
 	return &QueryInfo{
 		StatementType: stmtType,
-		Tables:        tables,
+		Tables:        tableNames,
 		Query:         query,
 	}, nil
+}
+
+// TableRef represents a table reference extracted from a query (may include schema)
+type TableRef struct {
+	Schema string // empty if unqualified
+	Table  string // table name, stripped of quotes, preserved case for quoted
 }
 
 // QueryInfo contains information about a validated query
@@ -109,109 +122,107 @@ func validateStatementForMode(stmtType, mode string) error {
 	return nil
 }
 
-// extractTables extracts table names from a SQL query
-func extractTables(query, stmtType string) ([]string, error) {
-	queryLower := strings.ToLower(query)
-	tables := make([]string, 0)
+// tableRefPattern matches PostgreSQL table references:
+// - table or "table" (unquoted folds to lowercase, quoted preserves case)
+// - schema.table or schema."table" or "schema"."table"
+var (
+	// Matches table ref after FROM, JOIN, INTO, UPDATE - supports schema.table and "quoted" identifiers
+	tableRefPattern = regexp.MustCompile(`(?i)(?:from|join|into|update)\s+((?:[a-zA-Z0-9_]+|"[^"]*")\.)?([a-zA-Z0-9_]+|"[^"]*")(?:\s|$|,|\))`)
+	deleteFromPat   = regexp.MustCompile(`(?i)delete\s+from\s+((?:[a-zA-Z0-9_]+|"[^"]*")\.)?([a-zA-Z0-9_]+|"[^"]*")(?:\s|$|,|\))`)
+)
+
+// parseTableRef extracts schema and table from a regex match, normalizing quoted identifiers
+func parseTableRef(schemaPart, tablePart string) TableRef {
+	ref := TableRef{}
+	if schemaPart != "" {
+		ref.Schema = strings.TrimRight(schemaPart, ".")
+		if len(ref.Schema) >= 2 && ref.Schema[0] == '"' {
+			ref.Schema = ref.Schema[1 : len(ref.Schema)-1]
+		} else {
+			ref.Schema = strings.ToLower(ref.Schema)
+		}
+	}
+	if len(tablePart) >= 2 && tablePart[0] == '"' {
+		ref.Table = tablePart[1 : len(tablePart)-1] // preserve case for quoted
+	} else {
+		ref.Table = strings.ToLower(tablePart)
+	}
+	return ref
+}
+
+// extractTableRefs extracts table references from a SQL query (supports quoted identifiers and schema.table)
+func extractTableRefs(query, stmtType string) ([]TableRef, error) {
+	refs := make([]TableRef, 0)
+	seen := make(map[string]bool)
+
+	addRef := func(ref TableRef) {
+		key := ref.Schema + "." + ref.Table
+		if ref.Schema == "" {
+			key = ref.Table
+		}
+		if !seen[key] {
+			seen[key] = true
+			refs = append(refs, ref)
+		}
+	}
 
 	switch stmtType {
 	case "SELECT":
-		// Extract tables from FROM and JOIN clauses
-		tables = extractTablesFromSelect(queryLower)
+		for _, m := range tableRefPattern.FindAllStringSubmatch(query, -1) {
+			if len(m) >= 3 {
+				addRef(parseTableRef(m[1], m[2]))
+			}
+		}
 	case "INSERT":
-		// Extract table from INSERT INTO
-		tables = extractTableFromInsert(queryLower)
+		if m := tableRefPattern.FindStringSubmatch(query); len(m) >= 3 {
+			addRef(parseTableRef(m[1], m[2]))
+		}
 	case "UPDATE":
-		// Extract table from UPDATE
-		tables = extractTableFromUpdate(queryLower)
+		if m := tableRefPattern.FindStringSubmatch(query); len(m) >= 3 {
+			addRef(parseTableRef(m[1], m[2]))
+		}
 	case "DELETE":
-		// Extract table from DELETE FROM
-		tables = extractTableFromDelete(queryLower)
+		if m := deleteFromPat.FindStringSubmatch(query); len(m) >= 3 {
+			addRef(parseTableRef(m[1], m[2]))
+		}
 	}
 
-	if len(tables) == 0 {
+	if len(refs) == 0 {
 		return nil, fmt.Errorf("could not extract table names from query")
 	}
-
-	return tables, nil
+	return refs, nil
 }
 
-// extractTablesFromSelect extracts table names from SELECT statements
-func extractTablesFromSelect(query string) []string {
-	tables := make([]string, 0)
+// validateTableRefs checks that all extracted tables are allowed and schemas (if specified) are allowed
+func validateTableRefs(refs []TableRef, allowedTables []string, allowedSchemas []string) error {
+	allowedTableMap := make(map[string]bool)
+	for _, t := range allowedTables {
+		allowedTableMap[strings.ToLower(t)] = true
+	}
+	allowedSchemaMap := make(map[string]bool)
+	for _, s := range allowedSchemas {
+		allowedSchemaMap[strings.ToLower(s)] = true
+	}
 
-	// Pattern to match FROM clause
-	fromRegex := regexp.MustCompile(`\bfrom\s+([a-z0-9_]+)`)
-	matches := fromRegex.FindAllStringSubmatch(query, -1)
-	for _, match := range matches {
-		if len(match) > 1 {
-			tables = append(tables, match[1])
+	unauthorized := make([]string, 0)
+	for _, ref := range refs {
+		tableKey := strings.ToLower(ref.Table)
+		if !allowedTableMap[tableKey] {
+			if ref.Schema != "" {
+				unauthorized = append(unauthorized, ref.Schema+"."+ref.Table)
+			} else {
+				unauthorized = append(unauthorized, ref.Table)
+			}
+			continue
+		}
+		if ref.Schema != "" && len(allowedSchemas) > 0 && !allowedSchemaMap[strings.ToLower(ref.Schema)] {
+			unauthorized = append(unauthorized, ref.Schema+"."+ref.Table+" (schema not in allowed list)")
 		}
 	}
 
-	// Pattern to match JOIN clauses
-	joinRegex := regexp.MustCompile(`\bjoin\s+([a-z0-9_]+)`)
-	matches = joinRegex.FindAllStringSubmatch(query, -1)
-	for _, match := range matches {
-		if len(match) > 1 {
-			tables = append(tables, match[1])
-		}
-	}
-
-	return tables
-}
-
-// extractTableFromInsert extracts table name from INSERT statements
-func extractTableFromInsert(query string) []string {
-	// Pattern to match INSERT INTO table_name
-	insertRegex := regexp.MustCompile(`\binsert\s+into\s+([a-z0-9_]+)`)
-	matches := insertRegex.FindStringSubmatch(query)
-	if len(matches) > 1 {
-		return []string{matches[1]}
-	}
-	return []string{}
-}
-
-// extractTableFromUpdate extracts table name from UPDATE statements
-func extractTableFromUpdate(query string) []string {
-	// Pattern to match UPDATE table_name
-	updateRegex := regexp.MustCompile(`\bupdate\s+([a-z0-9_]+)`)
-	matches := updateRegex.FindStringSubmatch(query)
-	if len(matches) > 1 {
-		return []string{matches[1]}
-	}
-	return []string{}
-}
-
-// extractTableFromDelete extracts table name from DELETE statements
-func extractTableFromDelete(query string) []string {
-	// Pattern to match DELETE FROM table_name
-	deleteRegex := regexp.MustCompile(`\bdelete\s+from\s+([a-z0-9_]+)`)
-	matches := deleteRegex.FindStringSubmatch(query)
-	if len(matches) > 1 {
-		return []string{matches[1]}
-	}
-	return []string{}
-}
-
-// validateAllTables checks if all extracted tables are in the allowed list
-func validateAllTables(tables []string, allowedTables []string) error {
-	allowedMap := make(map[string]bool)
-	for _, table := range allowedTables {
-		allowedMap[strings.ToLower(table)] = true
-	}
-
-	unauthorizedTables := make([]string, 0)
-	for _, table := range tables {
-		if !allowedMap[strings.ToLower(table)] {
-			unauthorizedTables = append(unauthorizedTables, table)
-		}
-	}
-
-	if len(unauthorizedTables) > 0 {
+	if len(unauthorized) > 0 {
 		return fmt.Errorf("access denied: table(s) %v not in allowed list. Allowed tables: %v",
-			unauthorizedTables, allowedTables)
+			unauthorized, allowedTables)
 	}
-
 	return nil
 }

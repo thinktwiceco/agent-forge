@@ -3,6 +3,7 @@
 package agents
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -40,7 +41,7 @@ func TestAgent_Reasoning_TwoTraces(t *testing.T) {
 	})
 
 	// Send a message that should trigger reasoning
-	responseCh := agent.ChatStream("Can you tell me what is the surface of a trapezoid with the following sides: 10, 20, 10, 20 and height 10?", "")
+	responseCh := agent.ChatStream(context.Background(), "Can you tell me what is the surface of a trapezoid with the following sides: 10, 20, 10, 20 and height 10?", "")
 
 	// Track which traces we observe
 	observedTraces := make(map[string]bool)

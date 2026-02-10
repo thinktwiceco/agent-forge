@@ -118,7 +118,7 @@ func TestValidateQuery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			info, err := ValidateQuery(tt.query, tt.mode, allowedTables)
+			info, err := ValidateQuery(tt.query, tt.mode, allowedTables, nil)
 
 			if tt.wantError {
 				if err == nil {
@@ -179,12 +179,68 @@ func TestExtractTables(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tables, err := extractTables(tt.query, tt.stmtType)
+			refs, err := extractTableRefs(tt.query, tt.stmtType)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if len(tables) != tt.wantCount {
-				t.Errorf("expected %d tables, got %d: %v", tt.wantCount, len(tables), tables)
+			if len(refs) != tt.wantCount {
+				t.Errorf("expected %d tables, got %d: %v", tt.wantCount, len(refs), refs)
+			}
+		})
+	}
+}
+
+func TestValidateQuery_QuotedIdentifiersAndSchema(t *testing.T) {
+	allowedTables := []string{"Org", "User"}
+	allowedSchemas := []string{"private"}
+
+	tests := []struct {
+		name      string
+		query     string
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name:      "quoted table name",
+			query:     `SELECT * FROM "Org" LIMIT 5`,
+			wantError: false,
+		},
+		{
+			name:      "schema-qualified quoted table",
+			query:     `SELECT * FROM private."Org" LIMIT 5`,
+			wantError: false,
+		},
+		{
+			name:      "schema-qualified unquoted table",
+			query:     `SELECT * FROM private."User" WHERE id = 1`,
+			wantError: false,
+		},
+		{
+			name:      "JOIN with quoted and schema-qualified",
+			query:     `SELECT o.*, u.* FROM private."Org" o JOIN private."User" u ON o.id = u.org_id`,
+			wantError: false,
+		},
+		{
+			name:      "disallowed schema",
+			query:     `SELECT * FROM public."Org"`,
+			wantError: true,
+			errorMsg:  "not in allowed list",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ValidateQuery(tt.query, "read", allowedTables, allowedSchemas)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
 			}
 		})
 	}

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/thinktwiceco/agent-forge/src/core"
 )
 
 func (s *Server) handleChat(c *gin.Context) {
@@ -27,19 +29,46 @@ func (s *Server) handleChat(c *gin.Context) {
 
 	conversationID := c.Query("conversationId")
 
+	// Create a context with cancel for this request
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
+	// Register cancel function if we have a conversation ID
+	// Note: For new conversations, we'll get the ID from the first chunk
+	var registeredConvID string
+
 	writer := NewSSEWriter(c)
 	writer.SetHeaders()
 
-	responseCh := agent.ChatStream(req.Message, conversationID)
+	responseCh := agent.ChatStream(ctx, req.Message, conversationID)
 	stream := responseCh.Start()
+
+	// Clean up function
+	defer func() {
+		if registeredConvID != "" {
+			s.convRegistry.Unregister(registeredConvID)
+		}
+	}()
 
 	for {
 		select {
-		case <-c.Request.Context().Done():
+		case <-ctx.Done():
+			// Context cancelled - send error event and return
+			errorChunk := core.ExtendedChunkResponse{
+				Content: "Agent stopped",
+				Status:  "error",
+			}
+			_ = writer.WriteEvent("error", errorChunk)
 			return
 		case chunk, ok := <-stream:
 			if !ok {
 				return
+			}
+
+			// Extract conversation ID from chunk if we haven't registered yet
+			if registeredConvID == "" && chunk.ChatId != "" {
+				registeredConvID = chunk.ChatId
+				s.convRegistry.Register(chunk.ChatId, cancel)
 			}
 
 			eventType := EventTypeFromChunk(chunk)

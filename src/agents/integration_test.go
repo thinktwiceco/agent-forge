@@ -3,6 +3,7 @@
 package agents
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -54,7 +55,7 @@ func TestAgent_fooTool_WithRealLLM(t *testing.T) {
 		Tools:     []llms.Tool{tools.NewFooTool()},
 	})
 
-	responseCh := agent.ChatStream(`Use the foo tool to echo back exactly "Hello, test!"`, "")
+	responseCh := agent.ChatStream(context.Background(), `Use the foo tool to echo back exactly "Hello, test!"`, "")
 
 	var (
 		sawToolCall      bool

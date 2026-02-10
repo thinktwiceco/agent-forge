@@ -1,6 +1,10 @@
 package agents
 
-import "github.com/thinktwiceco/agent-forge/src/core"
+import (
+	"context"
+
+	"github.com/thinktwiceco/agent-forge/src/core"
+)
 
 // mockSubAgent is a mock implementation of the core.SubAgent interface for testing.
 type mockSubAgent struct {
@@ -8,7 +12,7 @@ type mockSubAgent struct {
 	basicDescriptionFunc   func() string
 	advanceDescriptionFunc func() string
 	troubleshootingFunc    func() string
-	chatStreamFunc         func(message string, chatId string) *core.ResponseCh
+	chatStreamFunc         func(ctx context.Context, message string, chatId string) *core.ResponseCh
 }
 
 // newMockSubAgent creates a new mock subagent with the given functions.
@@ -62,9 +66,9 @@ func (m *mockSubAgent) Troubleshooting() string {
 }
 
 // ChatStream initiates a streaming chat interaction with the mock subagent.
-func (m *mockSubAgent) ChatStream(message string, chatId string) *core.ResponseCh {
+func (m *mockSubAgent) ChatStream(ctx context.Context, message string, chatId string) *core.ResponseCh {
 	if m.chatStreamFunc != nil {
-		return m.chatStreamFunc(message, chatId)
+		return m.chatStreamFunc(ctx, message, chatId)
 	}
 	// Return a simple response channel
 	return core.NewResponseCh("mock-subagent", "test", "", nil)
