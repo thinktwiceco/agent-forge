@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+## [0.4.4] - 2026-02-16
+
+### Changed
+- chore(release): prepare release v0.4.4 (patch version bump)
+
 ## [0.4.3] - 2026-02-10
 
 ### Added
