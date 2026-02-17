@@ -194,4 +194,72 @@ func TestFsTool_Integration(t *testing.T) {
 			t.Errorf("ripgrep should report no matches found")
 		}
 	})
+
+	// 9. GrepLogs - unavailable when AF_LOG_FILE not set
+	t.Run("grep_logs_unavailable", func(t *testing.T) {
+		// Ensure AF_LOG_FILE is unset
+		origVal := os.Getenv("AF_LOG_FILE")
+		_ = os.Unsetenv("AF_LOG_FILE")
+		defer func() {
+			if origVal != "" {
+				_ = os.Setenv("AF_LOG_FILE", origVal)
+			}
+		}()
+
+		args := map[string]any{
+			"operation": "grep_logs",
+			"pattern":   "ERROR",
+		}
+		result := tool.Call(nil, args)
+		if result.Success() {
+			t.Error("grep_logs should fail when AF_LOG_FILE is not set")
+		}
+		if !strings.Contains(result.Error(), "logs are not streaming to a file") {
+			t.Errorf("grep_logs should explain that logs are not streaming to file, got: %s", result.Error())
+		}
+	})
+
+	// 10. GrepLogs - works when AF_LOG_FILE is set
+	t.Run("grep_logs_available", func(t *testing.T) {
+		// Create a temp log file
+		logFile, err := os.CreateTemp("", "grep-logs-test-*.log")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = os.Remove(logFile.Name()) }()
+		logPath := logFile.Name()
+
+		_, _ = logFile.WriteString("2025/02/11 10:00:00 [INFO] Application started\n")
+		_, _ = logFile.WriteString("2025/02/11 10:00:01 [DEBUG] Loading config\n")
+		_, _ = logFile.WriteString("2025/02/11 10:00:02 [ERROR] Connection failed\n")
+		_ = logFile.Close()
+
+		origVal := os.Getenv("AF_LOG_FILE")
+		_ = os.Setenv("AF_LOG_FILE", logPath)
+		defer func() {
+			if origVal != "" {
+				_ = os.Setenv("AF_LOG_FILE", origVal)
+			} else {
+				_ = os.Unsetenv("AF_LOG_FILE")
+			}
+		}()
+
+		args := map[string]any{
+			"operation": "grep_logs",
+			"pattern":   "ERROR",
+		}
+		result := tool.Call(nil, args)
+
+		// Skip if ripgrep not installed
+		if !result.Success() && strings.Contains(result.Error(), "not installed") {
+			t.Skip("ripgrep not installed, skipping test")
+		}
+
+		if !result.Success() {
+			t.Errorf("grep_logs failed: %s", result.Error())
+		}
+		if !strings.Contains(result.Data(), "Connection failed") {
+			t.Errorf("grep_logs should find ERROR line, got: %s", result.Data())
+		}
+	})
 }

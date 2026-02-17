@@ -54,24 +54,16 @@ func (p *LoggerPlugin) Name() string {
 	return PLUGIN_NAME
 }
 
-func (p *LoggerPlugin) SystemPrompt() string {
-	return ""
-}
-
-// On implements the core.Plugin interface
-func (p *LoggerPlugin) On(event core.Event) core.AgentHookFn {
-	switch event {
-	case core.EventNewChunk:
-		fn := agents.OnNewChunkHook(p.handleNewChunk)
-		return fn
+// Hooks implements the core.HookProvider interface
+// Returns a map of event hooks that this plugin provides
+func (p *LoggerPlugin) Hooks() map[core.Event]core.AgentHookFn {
+	return map[core.Event]core.AgentHookFn{
+		core.EventNewChunk: agents.OnNewChunkHook(p.handleNewChunk),
 	}
-	return nil
 }
 
-// Tools implements the core.Plugin interface
-func (p *LoggerPlugin) Tools() []llms.Tool {
-	return []llms.Tool{} // Logger plugin doesn't provide tools
-}
+// Note: Logger plugin does not implement ToolProvider or PromptProvider
+// as it only provides event hooks for logging purposes.
 
 // handleNewChunk is called when a new chunk is created
 // This hook formats and prints chunks based on the plugin's rules

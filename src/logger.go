@@ -73,13 +73,22 @@ func NewLogger(level LogLevel, output io.Writer) *Logger {
 // NewLoggerFromConfig creates a new Logger instance using the Config.
 //
 // Parameters:
-//   - config: The Config containing the AF_LOG_LEVEL setting
+//   - config: The Config containing the AF_LOG_LEVEL and optionally AF_LOG_FILE settings
 //
 // Returns:
-//   - *Logger: A new Logger instance configured based on AF_LOG_LEVEL
+//   - *Logger: A new Logger instance configured based on AF_LOG_LEVEL and AF_LOG_FILE
 func NewLoggerFromConfig(config *Config) *Logger {
 	level := parseLogLevel(config.AFLogLevel)
-	return NewLogger(level, os.Stdout)
+	output := io.Writer(os.Stdout)
+	if config.AFLogFile != "" {
+		file, err := os.OpenFile(config.AFLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Printf("AF_LOG_FILE: failed to open %s: %v; logging to stdout only", config.AFLogFile, err)
+		} else {
+			output = io.MultiWriter(os.Stdout, file)
+		}
+	}
+	return NewLogger(level, output)
 }
 
 // InitLogger initializes the global logger with the provided configuration.

@@ -128,6 +128,12 @@ export class ChatManager {
     }
     this.inputEl.value = "";
     this.appendMessage("You", message, ["message", "msg-user"]);
+    
+    // Reset tracking variables for the next assistant response
+    // This ensures each response creates a new message bubble
+    this.currentAssistantEl = null;
+    this.currentIteration = null;
+    
     await this.startStream(message);
   }
 

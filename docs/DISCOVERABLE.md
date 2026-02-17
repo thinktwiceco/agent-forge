@@ -49,23 +49,23 @@ troubleshooting := agent.Troubleshooting() // Returns Troubleshooting field
 
 ### Tools
 
-Tools implement the `Discoverable` interface through the universal tool constructor:
+Tools implement the `Discoverable` interface through the `core.Tool` struct:
 
 ```go
-tool := core.NewTool(
-    "tool-name",
-    "Basic one-line description",
-    "Advanced description with detailed parameters and usage",
-    "Troubleshooting information and common issues",
-    []core.Parameter{
+tool := &core.Tool{
+    Name:                "tool-name",
+    Description:         "Basic one-line description",
+    AdvanceDesc:         "Advanced description with detailed parameters and usage",
+    TroubleshootingInfo: "Troubleshooting information and common issues",
+    Parameters: []core.Parameter{
         {Name: "param1", Type: "string", Required: true},
     },
-    handlerFunc,
-)
+    Handler: handlerFunc,
+}
 
 // Access descriptions
 basic := tool.BasicDescription()       // Returns basic description
-advanced := tool.AdvanceDescription()  // Returns advanced description
+advanced := tool.AdvanceDescription()   // Returns advanced description
 troubleshooting := tool.Troubleshooting() // Returns troubleshooting info
 ```
 
@@ -144,31 +144,33 @@ config := agents.AgentConfig{
 ### Example Tool with All Descriptions
 
 ```go
-calculatorTool := core.NewTool(
-    "calculate",
-    "Performs mathematical calculations",
-    `Advanced Details:
+calculatorTool := &core.Tool{
+    Name:        "calculate",
+    Description: "Performs mathematical calculations",
+    AdvanceDesc: `Advanced Details:
 - Supports basic operations: +, -, *, /
 - Handles floating point numbers
 - Expression format: "2 + 2" or "10 * 5"
 - Returns numeric result as string`,
-    `Troubleshooting:
+    TroubleshootingInfo: `Troubleshooting:
 - Invalid expression: Check syntax (e.g., "2+2" not "2 plus 2")
 - Division by zero: Returns error message
 - Large numbers: May lose precision beyond 15 digits`,
-    []core.Parameter{
+    Parameters: []core.Parameter{
         {Name: "expression", Type: "string", Required: true},
     },
-    calculatorHandler,
-)
+    Handler: calculatorHandler,
+}
 ```
 
 ## System Agent Templates
 
-The `SystemAgentTemplate` also supports discoverable descriptions:
+The `SystemAgentTemplate` (in `src/agents/system/`) also supports discoverable descriptions:
 
 ```go
-template := agents.NewSystemAgentTemplate("agent-name", "trace")
+import "github.com/thinktwiceco/agent-forge/src/agents/system"
+
+template, _ := system.NewSystemAgentTemplate("agent-name", "trace")
 template.
     AddSystemPrompt(incipit, steps, output, examples, critical).
     AddDescription(incipit, examples).

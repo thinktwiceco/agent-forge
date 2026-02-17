@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/thinktwiceco/agent-forge/src/agents/system"
 	"github.com/thinktwiceco/agent-forge/src/mocks"
 )
 
@@ -139,7 +140,7 @@ func TestVectorAgent_Constructor(t *testing.T) {
 }
 
 func TestSystemAgentTemplate_Methods(t *testing.T) {
-	tmpl, err := NewSystemAgentTemplate("test", "trace")
+	tmpl, err := system.NewSystemAgentTemplate("test", "trace")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +165,7 @@ func TestSystemAgentTemplate_Methods(t *testing.T) {
 		t.Error("Troubleshooting mismatch")
 	}
 
-	_, err = NewSystemAgentTemplate("", "trace")
+	_, err = system.NewSystemAgentTemplate("", "trace")
 	if err == nil {
 		t.Error("Expected error for empty name")
 	}

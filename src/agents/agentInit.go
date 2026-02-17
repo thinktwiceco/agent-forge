@@ -4,6 +4,10 @@ import (
 	"fmt"
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
+	agentctx "github.com/thinktwiceco/agent-forge/src/agents/context"
+	"github.com/thinktwiceco/agent-forge/src/agents/execution"
+	"github.com/thinktwiceco/agent-forge/src/agents/handlers"
+	"github.com/thinktwiceco/agent-forge/src/agents/prompts"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 	"github.com/thinktwiceco/agent-forge/src/tools/delegate"
@@ -35,6 +39,35 @@ func (a *Agent) ensureConfig() {
 	}
 
 	a.systemPrompt = a.config.SystemPrompt
+
+	// Initialize context window management fields
+	a.maxContextTokens = a.config.MaxContextTokens
+	a.reservedOutputTokens = a.config.ReservedOutputTokens
+	a.minRecentMessages = a.config.MinRecentMessages
+	a.enableSummarization = a.config.EnableSummarization
+
+	if a.maxContextTokens > 0 {
+		agentforge.Debug("Context window management enabled: maxTokens=%d, reserved=%d, minRecent=%d, summarization=%v",
+			a.maxContextTokens, a.reservedOutputTokens, a.minRecentMessages, a.enableSummarization)
+
+		// Initialize token counter if context window management is enabled
+		a.tokenCounter = llms.NewTokenCounter("approximate")
+		agentforge.Debug("Token counter initialized for context window management")
+
+		// Initialize truncation strategy if not set
+		if a.config.TruncationStrategy == nil {
+			a.config.TruncationStrategy = agentctx.NewSlidingWindow(
+				a.minRecentMessages,
+				a.tokenCounter,
+			)
+			agentforge.Debug("Using default SlidingWindowStrategy for truncation")
+		} else {
+			agentforge.Debug("Using custom TruncationStrategy")
+		}
+	}
+
+	// Set up history factory for per-request history creation
+	a.historyFactory = a.createHistoryFactory()
 }
 
 // prepare the callbacks for the agent
@@ -102,37 +135,69 @@ func (a *Agent) loadDelegateTool() {
 	a.tools = append(a.tools, dt)
 }
 
-// initAgentContext builds the agent context struct with static fields
-// that don't change during the agent's lifetime.
-// Preserves SessionStorage and PluginFields if they already exist.
+// initAgentContext rebuilds the agent context and syncs all components.
+// Called when tools or sub-agents change (e.g. AddTools, AddSystemAgent).
 func (a *Agent) initAgentContext() {
-	// Preserve existing SessionStorage when reinitializing, or create new if doesn't exist
-	var existingSessionStorage map[string]any
-	if a.agentContext != nil && a.agentContext.SessionStorage != nil {
-		existingSessionStorage = a.agentContext.SessionStorage
-	} else {
-		// Always initialize SessionStorage, never leave it nil
-		existingSessionStorage = make(map[string]any)
-	}
+	a.contextMgr.UpdateConfig(agentctx.Config{
+		AgentName:          a.Name(),
+		Trace:              a.Trace(),
+		Model:              fmt.Sprintf("%s-%s", a.config.LLMEngine.Provider(), a.config.LLMEngine.Model()),
+		Tools:              a.tools,
+		SubAgents:          a.subAgents,
+		TokenCounter:       a.tokenCounter,
+		TruncationStrategy: a.config.TruncationStrategy,
+		MaxContextTokens:   a.maxContextTokens,
+		ReservedTokens:     a.reservedOutputTokens,
+	})
+	a.agentContext = a.contextMgr.Context()
+	a.executor.UpdateAgentContext(a.agentContext)
+	a.executor.UpdateTools(a.tools)
+}
 
-	// Preserve existing PluginFields when reinitializing, or create new if doesn't exist
-	var existingPluginFields map[string]any
-	if a.agentContext != nil && a.agentContext.PluginFields != nil {
-		existingPluginFields = a.agentContext.PluginFields
-	} else {
-		// Always initialize PluginFields, never leave it nil
-		existingPluginFields = make(map[string]any)
-	}
+// ensureSystemPrompt rebuilds the system prompt and updates promptBuilder.
+// Called when tools or sub-agents change.
+func (a *Agent) ensureSystemPrompt() {
+	a.promptBuilder.UpdateConfig(prompts.Config{
+		SystemPrompt: a.config.SystemPrompt,
+		MainAgent:    a.config.MainAgent,
+		Tone:         a.config.Tone,
+		Tools:        a.tools,
+		SubAgents:    a.subAgents,
+	})
+	a.systemPrompt = a.promptBuilder.Build()
+}
 
-	a.agentContext = &core.AgentContext{
-		AgentName:      a.Name(),
-		Trace:          a.Trace(),
-		Model:          fmt.Sprintf("%s-%s", a.config.LLMEngine.Provider(), a.config.LLMEngine.Model()),
-		Tools:          a.tools,
-		SubAgents:      a.subAgents,
-		SessionStorage: existingSessionStorage, // Always a valid map, never nil
-		PluginFields:   existingPluginFields,   // Always a valid map, never nil
+// createExecutor creates the execution Executor with hooks and dependencies.
+func (a *Agent) createExecutor() ExecutionEngine {
+	hooks := &execution.HooksRunner{
+		OnContextBuild: func(agentContext *core.AgentContext) []error {
+			return a.hooks.contextBuildEvent(a, agentContext)
+		},
+		OnBeforeToolExecution: func(toolCall *llms.ToolCall) []error {
+			return a.hooks.beforeToolExecutionEvent(a, toolCall)
+		},
+		OnToolExecution: func(toolResult *llms.ToolResult) []error {
+			return a.hooks.toolExecutionEvent(a, toolResult)
+		},
+		OnNewAssistantMessage: func(message string, promptTokens, completionTokens, totalTokens int) []error {
+			return a.hooks.newAssistantMessageEvent(a, message, promptTokens, completionTokens, totalTokens)
+		},
+		OnNewAssistantMessageWithTools: func(message string, toolCalls []llms.ToolCall, promptTokens, completionTokens, totalTokens int) []error {
+			return a.hooks.newAssistantMessageWithToolCallsEvent(a, message, toolCalls, promptTokens, completionTokens, totalTokens)
+		},
+		LogHookErrors: logHookErrors,
 	}
+	return execution.NewExecutor(
+		a.llmEngine,
+		a.tools,
+		a.agentContext,
+		execution.Config{
+			MaxToolIterations: a.config.MaxToolIterations,
+			AgentName:         a.config.AgentName,
+			Tracer:            a.config.Tracer,
+		},
+		hooks,
+	)
 }
 
 func (a *Agent) addSystemAgents() {
@@ -161,14 +226,88 @@ func (a *Agent) registerPlugins() {
 	}
 	agentforge.Debug("🔌 ADDING PLUGIN REGISTRATION HOOK FOR AGENT %s 🔌", a.config.AgentName)
 	agentforge.Debug("🔌 Plugins count: %d 🔌", len(a.config.Plugins))
-	a.hooks.on(core.EventAgentInitialization, handlePluginInitialization)
+	a.hooks.on(core.EventAgentInitialization, a.createPluginInitializationHandler())
 	agentforge.Debug("🔌 Plugin registration hook added successfully 🔌")
+}
+
+// createPluginInitializationHandler creates the handler for plugin initialization
+func (a *Agent) createPluginInitializationHandler() OnAgentInitializationHook {
+	return func(agent *Agent, config *AgentConfig) error {
+		agentforge.Debug("🔌 [handlePluginInitialization] START for agent %s", agent.config.AgentName)
+		agentforge.Debug("🔌 [handlePluginInitialization] Plugins count: %d", len(agent.config.Plugins))
+
+		if len(agent.config.Plugins) == 0 {
+			agentforge.Debug("🔌 [handlePluginInitialization] No plugins to register")
+			return nil
+		}
+
+		systemPromptAdded := false
+
+		// Register all the plugins using interface segregation
+		for i, plugin := range agent.config.Plugins {
+			agentforge.Debug("🔌 [handlePluginInitialization] Processing plugin %d: %s", i+1, plugin.Name())
+
+			// Check if plugin provides hooks
+			if hp, ok := plugin.(core.HookProvider); ok {
+				hooks := hp.Hooks()
+				for event, hook := range hooks {
+					if hook != nil {
+						agentforge.Debug("🔌 [handlePluginInitialization] Registering hook for event: %s", event)
+						agent.hooks.on(event, hook)
+					}
+				}
+			}
+
+			// Check if plugin provides tools
+			if tp, ok := plugin.(core.ToolProvider); ok {
+				tools := tp.Tools()
+				for _, tool := range tools {
+					agentforge.Debug("🔌 [handlePluginInitialization] Registering tool: %s", tool.GetName())
+					agent.config.Tools = append(agent.config.Tools, tool)
+				}
+			}
+
+			// Check if plugin provides system prompt
+			if pp, ok := plugin.(core.PromptProvider); ok {
+				sp := pp.SystemPrompt()
+				if sp != "" {
+					if !systemPromptAdded {
+						agent.config.SystemPrompt += "[PLUGIN TOOLS INSTRUCTIONS]"
+					}
+					agentforge.Debug("🔌 [handlePluginInitialization] Adding system prompt from plugin")
+					agent.config.SystemPrompt += fmt.Sprintf("\n [%s plugin]:\n%s\n\n", plugin.Name(), sp)
+					agent.ensureSystemPrompt()
+					systemPromptAdded = true
+				}
+			}
+		}
+
+		agentforge.Debug("🔌 [handlePluginInitialization] COMPLETED")
+		return nil
+	}
 }
 
 // / ========= SYSTEM HOOKS ========= ///
 func (a *Agent) registerSystemCallbacks() {
-	// a.hooks.on(core.EventNewUserMessage, handleNewUserMessage)
-	a.hooks.on(core.EventAddedSystemAgent, handleNewSystemAgentAdded)
-	a.hooks.on(core.EventAddedTools, handleNewToolsAdded)
-	// a.hooks.on(core.EventNewAssistantMessage, handleNewAssistantMessage)
+	// Create system handlers and register them with the hook system
+	systemHandlers := handlers.NewSystemHandlers()
+
+	// Create adapter functions that bridge between the hook system and the interface-based handlers
+	registerSystemAgentHook := func(handler func(handlers.AgentOperations, core.SubAgent) error) {
+		// Create a hook with the correct signature for the hook system
+		hook := OnAddedSystemAgentHook(func(agent *Agent, subAgent core.SubAgent) error {
+			return handler(agent, subAgent)
+		})
+		a.hooks.on(core.EventAddedSystemAgent, hook)
+	}
+
+	registerToolsHook := func(handler func(handlers.AgentOperations, []llms.Tool) error) {
+		// Create a hook with the correct signature for the hook system
+		hook := OnAddedToolsHook(func(agent *Agent, tools []llms.Tool) error {
+			return handler(agent, tools)
+		})
+		a.hooks.on(core.EventAddedTools, hook)
+	}
+
+	systemHandlers.RegisterWith(registerSystemAgentHook, registerToolsHook)
 }

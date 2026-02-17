@@ -2,9 +2,14 @@ package agents
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
+	agentctx "github.com/thinktwiceco/agent-forge/src/agents/context"
+	"github.com/thinktwiceco/agent-forge/src/agents/prompts"
 	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/history"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
@@ -31,7 +36,20 @@ type Agent struct {
 	// System Prompt as a final system prompt
 	systemPrompt string
 	// Hooks for the agent
-	hooks *AgentHooks
+	hooks HookRegistry
+	// Extracted components (execution, prompts, context)
+	// Using interfaces for loose coupling and testability
+	executor      ExecutionEngine
+	promptBuilder PromptBuilder
+	contextMgr    ContextManager
+	// Context window management (prepared for future token counting implementation)
+	maxContextTokens     int
+	reservedOutputTokens int
+	minRecentMessages    int
+	enableSummarization  bool
+	tokenCounter         llms.TokenCounter
+	// History factory creates a new history Manager for each ChatStream call
+	historyFactory func(chatId string) history.Manager
 }
 
 // ===== Constructor =====
@@ -58,6 +76,16 @@ func NewAgent(config *AgentConfig) *Agent {
 		config: config,
 	}
 
+	// Initialize prompt builder early (before plugins) with minimal config
+	// Plugins may need to update the system prompt during initialization
+	a.promptBuilder = prompts.NewBuilder(prompts.Config{
+		SystemPrompt: config.SystemPrompt,
+		MainAgent:    config.MainAgent,
+		Tone:         config.Tone,
+		Tools:        []llms.Tool{},     // Will be populated later
+		SubAgents:    []core.SubAgent{}, // Will be populated later
+	})
+
 	a.ensureHooks()
 	a.registerPlugins()
 
@@ -72,12 +100,37 @@ func NewAgent(config *AgentConfig) *Agent {
 	a.initSystemTools()
 	a.loadDelegateTool()
 	a.setResponseCh()
-	a.initAgentContext()
+
+	// Create context manager and set agentContext
+	// Pass truncation strategy and token counter to the manager
+	a.contextMgr = agentctx.NewManager(agentctx.Config{
+		AgentName:          a.Name(),
+		Trace:              a.Trace(),
+		Model:              fmt.Sprintf("%s-%s", a.config.LLMEngine.Provider(), a.config.LLMEngine.Model()),
+		Tools:              a.tools,
+		SubAgents:          a.subAgents,
+		TokenCounter:       a.tokenCounter,
+		TruncationStrategy: a.config.TruncationStrategy,
+		MaxContextTokens:   a.maxContextTokens,
+		ReservedTokens:     a.reservedOutputTokens,
+	})
+	a.agentContext = a.contextMgr.Context()
+
+	// Update prompt builder with final tools and subagents, then build system prompt
+	a.promptBuilder.UpdateConfig(prompts.Config{
+		SystemPrompt: a.config.SystemPrompt,
+		MainAgent:    a.config.MainAgent,
+		Tone:         a.config.Tone,
+		Tools:        a.tools,
+		SubAgents:    a.subAgents,
+	})
+	a.systemPrompt = a.promptBuilder.Build()
+
+	// Create executor
+	a.executor = a.createExecutor()
 
 	// System Callbacks are defined in systemHandlers.go
-	// Are common handlers for system events
 	a.registerSystemCallbacks()
-	a.ensureSystemPrompt()
 
 	errs = a.hooks.agentInitializedEvent(a)
 
@@ -114,9 +167,9 @@ func NewAgent(config *AgentConfig) *Agent {
 func (a *Agent) ChatStream(ctx context.Context, message string, chatId string) *core.ResponseCh {
 	// Create a new History instance for this request (per-request history)
 	// This eliminates concurrency issues with shared state
-	history := a.createHistory(chatId)
-	a.injectSystemPrompt(history)
-	history.addUserMessage(message)
+	hm := a.createHistory(chatId)
+	a.injectSystemPrompt(hm)
+	hm.AddUserMessage(message)
 	errs := a.hooks.newUserMessageEvent(a, message)
 	logHookErrors(errs)
 
@@ -146,13 +199,28 @@ func (a *Agent) ChatStream(ctx context.Context, message string, chatId string) *
 			a.responseCh = oldResponseCh
 		}()
 
-		if err := a.executeChatWithTools(ctx, history); err != nil {
+		if err := a.executor.ExecuteChatWithTools(ctx, hm, responseCh); err != nil {
 			responseCh.Error <- err
 		}
 		// Save history and get the final chatId (generated if it was empty)
-		finalChatId := history.save()
-		// Update the response channel's chatId in case it was newly generated
+		finalChatId := hm.Save()
 		responseCh.SetChatId(finalChatId)
+
+		// Send final chunk with chatId so frontend receives it before stream closes.
+		// Without this, new conversations never propagate the generated ID to the client.
+		if finalChatId != "" {
+			chatIdChunk := core.ExtendedChunkResponse{
+				ChatId:    finalChatId,
+				Status:    llms.StatusCompleted,
+				Type:      llms.TypeCompletion,
+				Content:   "",
+				AgentName: a.config.AgentName,
+				Trace:     a.config.Trace,
+			}
+			if chunkBytes, err := json.Marshal(chatIdChunk); err == nil {
+				responseCh.TrySend(chunkBytes)
+			}
+		}
 	}()
 
 	return responseCh
@@ -265,3 +333,33 @@ func (a *Agent) AgentAsSubAgent() core.SubAgent {
 	a.config.MainAgent = false
 	return a
 }
+
+// ===== AgentOperations Interface Implementation =====
+//
+// These methods implement the handlers.AgentOperations interface,
+// providing the minimal operations that system handlers need.
+
+// LoadDelegateTool rebuilds the delegate tool when sub-agents change.
+// This is part of the handlers.AgentOperations interface.
+func (a *Agent) LoadDelegateTool() {
+	a.loadDelegateTool()
+}
+
+// EnsureSystemPrompt rebuilds the system prompt when configuration changes.
+// This is part of the handlers.AgentOperations interface.
+func (a *Agent) EnsureSystemPrompt() {
+	a.ensureSystemPrompt()
+}
+
+// InitAgentContext rebuilds the agent context when tools or sub-agents change.
+// This is part of the handlers.AgentOperations interface.
+func (a *Agent) InitAgentContext() {
+	a.initAgentContext()
+}
+
+// ===== Compile-time Interface Assertions =====
+//
+// Ensure Agent implements the SubAgent composition and its constituent interfaces.
+var _ core.SubAgent = (*Agent)(nil)
+var _ core.Executable = (*Agent)(nil)
+var _ core.Identifier = (*Agent)(nil)

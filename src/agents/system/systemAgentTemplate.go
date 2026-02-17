@@ -1,4 +1,4 @@
-package agents
+package system
 
 import (
 	"fmt"
@@ -204,18 +204,32 @@ func (t *SystemAgentTemplate) Troubleshooting() string {
 	return t.troubleshooting
 }
 
-// ToAgentConfig converts the template to an AgentConfig ready for agent creation.
+// Config represents the configuration fields extracted from a template.
+// This can be used by the agents package to create an AgentConfig.
+type Config struct {
+	LLMEngine          llms.LLMEngine
+	AgentName          string
+	Trace              string
+	SystemPrompt       string
+	Description        string
+	AdvanceDescription string
+	Troubleshooting    string
+	MainAgent          bool
+	Tone               string
+}
+
+// ToConfig converts the template to a Config that can be used to create an agent.
 //
-// This method creates an AgentConfig populated with the template's fields,
+// This method creates a Config populated with the template's fields,
 // allowing easy instantiation of an agent from the template.
 //
 // Parameters:
 //   - llmEngine: The LLM engine to use for this agent
 //
 // Returns:
-//   - AgentConfig: Configuration ready to pass to NewAgent()
-func (t *SystemAgentTemplate) ToAgentConfig(llmEngine llms.LLMEngine) AgentConfig {
-	return AgentConfig{
+//   - Config: Configuration ready to convert to AgentConfig
+func (t *SystemAgentTemplate) ToConfig(llmEngine llms.LLMEngine) Config {
+	return Config{
 		LLMEngine:          llmEngine,
 		AgentName:          t.Name,
 		Trace:              t.Trace,

@@ -150,9 +150,30 @@ func main() {
 
 ### Creating Agents
 
-Agents can be created programmatically using `AgentConfig` or from YAML configuration files. See the [Builder Configuration Guide](src/builder/README.md) for details on creating agents from configuration files.
+Agents can be created using the **Builder pattern** (recommended) or `AgentConfig` for advanced use cases. See the [Agent Builder Guide](docs/AGENT_BUILDER.md) for comprehensive documentation.
 
-Agents are created using `AgentConfig`:
+**Using Builder Pattern (Recommended):**
+
+```go
+agent, err := agents.NewBuilder(llm, "my-agent").
+    WithDescription("Agent description").
+    WithSystemPrompt("You are...").
+    WithTools(tool1, tool2).
+    AsMainAgent().
+    WithPersistence("json").
+    WithContextWindow(128000).        // Enables history truncation
+    WithTracer(telemetry.NewLogTracer()). // Optional: Observability
+    Build()
+if err != nil {
+    log.Fatal(err)
+}
+
+// Add system agents after creation
+reasoningAgent := agents.ReasoningAgent(llm)
+agent.AddSystemAgent(reasoningAgent)
+```
+
+**Using AgentConfig (Advanced):**
 
 ```go
 agent := agents.NewAgent(&agents.AgentConfig{
@@ -163,16 +184,13 @@ agent := agents.NewAgent(&agents.AgentConfig{
     Tools:             []llms.Tool{},     // Optional: Available tools
     MainAgent:         true,              // Optional: Is this the main agent?
     Persistence:       "json",            // Optional: Enable conversation history
-    Plugins:           []core.Plugin{},   // Optional: Plugins
     Tone:              "keep-it-short",  // Optional: Response tone
     Trace:             "response",        // Optional: Trace identifier
-    CanExpand:         true,              // Optional: Enable tool/agent expansion
-    SubAgents:         []*core.SubAgent{}, // Optional: Sub-agents for delegation
+    SubAgents:         []core.SubAgent{}, // Optional: Sub-agents for delegation
+    MaxContextTokens:   128000,          // Optional: Context window size
+    TruncationStrategy: strategy,        // Optional: Custom truncation strategy
+    Tracer:            tracer,           // Optional: Telemetry tracer
 })
-
-// Add system agents after creation
-reasoningAgent := agents.ReasoningAgent(llm)
-agent.AddSystemAgent(reasoningAgent)
 ```
 
 ### Creating Tools
@@ -587,7 +605,7 @@ POST /api/server/{agentName}/chat?conversationId={uuid}
 }
 ```
 
-### Hook System
+### Hook System & Observability
 
 Hooks are registered through plugins. Plugins can register hooks for various lifecycle events:
 
@@ -606,10 +624,60 @@ Available hook events include:
 - `EventNewChunk` - For each streaming chunk
 - And more (see `core.Events` for complete list)
 
+### Telemetry & Observability
+
+Built-in telemetry system for debugging and monitoring:
+
+```go
+import "github.com/thinktwiceco/agent-forge/src/telemetry"
+
+// Log-based tracer (structured logs)
+agent, err := agents.NewBuilder(llm, "assistant").
+    WithTracer(telemetry.NewLogTracer()).
+    Build()
+
+// Metrics tracer (OpenTelemetry/Prometheus)
+agent, err := agents.NewBuilder(llm, "assistant").
+    WithTracer(telemetry.NewMetricsTracer(meter)).
+    Build()
+```
+
+**Events tracked:**
+- Tool execution duration and success/failure
+- Token usage per LLM call
+- History truncation events
+- Agent lifecycle timing
+
+See [Telemetry Documentation](src/telemetry/README.md) for integration details.
+
 ## Plugins
 
-Plugins extend agent functionality by providing tools, hooks, and system prompt enhancements.
+Plugins extend agent functionality by providing tools, hooks, and system prompt enhancements. The plugin system uses **interface segregation** - plugins only implement the interfaces they need:
 
+```go
+// Minimal plugin (just a name)
+type Plugin interface {
+    Name() string
+}
+
+// Optional interfaces
+type HookProvider interface {
+    Plugin
+    Hooks() map[Event]AgentHookFn
+}
+
+type ToolProvider interface {
+    Plugin
+    Tools() []llms.Tool
+}
+
+type PromptProvider interface {
+    Plugin
+    SystemPrompt() string
+}
+```
+
+**Available Plugins:**
 - **[Logger Plugin](src/plugins/logger/README.md)** - Configurable output formatting for agent responses
 - **[Todo Plugin](src/plugins/todo/README.md)** - Task management and todo list functionality
 
@@ -694,8 +762,16 @@ Set via `.env` file or system environment variables. Environment variables take 
 ```
 src/
 ├── agents/          # Agent implementation
+│   ├── context/     # Context management & truncation strategies
+│   ├── execution/   # Chat loop & tool execution engine
+│   ├── handlers/    # System event handlers
+│   ├── mocks/       # Mock implementations for testing
+│   ├── prompts/     # Prompt building
+│   └── system/      # System agent templates
+├── core/            # Core interfaces (SubAgent, Plugin, Tool)
+├── history/         # Conversation history management
 ├── llms/            # LLM engine implementations
-├── core/            # Core interfaces and implementations
+├── telemetry/       # Observability (tool exec, tokens, truncation)
 ├── tools/           # Tool implementations
 ├── persistence/     # Conversation persistence
 ├── integrations/    # External integrations (Milvus, embeddings)
@@ -703,6 +779,14 @@ src/
     ├── logger/      # Logger plugin
     └── todo/        # Todo plugin
 ```
+
+**Key Improvements:**
+- **Modular Design**: Separated concerns (execution, context, prompts, handlers)
+- **Interface-Based**: All major components have interfaces for testing & flexibility
+- **Extensible**: Strategy patterns for truncation, plugin system, telemetry
+- **Testable**: Mock implementations available for all interfaces
+
+See [File Structure Documentation](docs/FILE_STRUCTURE.md) for details.
 
 ## Python SDK Usage
 

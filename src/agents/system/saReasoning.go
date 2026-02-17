@@ -1,9 +1,4 @@
-package agents
-
-import (
-	"github.com/thinktwiceco/agent-forge/src/core"
-	"github.com/thinktwiceco/agent-forge/src/llms"
-)
+package system
 
 // ReasoningAgentTemplate defines the system agent template for general-purpose reasoning.
 //
@@ -11,7 +6,8 @@ import (
 // the main agent responds. It helps identify ambiguities, detect assumptions, spot nuances,
 // and guide the main agent toward objective, direct responses without condescension or excessive politeness.
 
-func createReasoningAgentTemplate() *SystemAgentTemplate {
+// CreateReasoningAgentTemplate creates the template for reasoning agent.
+func CreateReasoningAgentTemplate() *SystemAgentTemplate {
 	template, err := NewSystemAgentTemplate(AgentNameSystemReasoning, TraceReasoning)
 	if err != nil {
 		panic(err)
@@ -158,11 +154,4 @@ Troubleshooting:
   * Agent provides map, you drive`)
 
 	return template
-}
-
-func ReasoningAgent(llmEngine llms.LLMEngine) core.SubAgent {
-	raTemplate := createReasoningAgentTemplate()
-	raConfig := raTemplate.ToAgentConfig(llmEngine)
-	ra := NewAgent(&raConfig)
-	return ra.AgentAsSubAgent()
 }

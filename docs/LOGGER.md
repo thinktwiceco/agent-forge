@@ -8,6 +8,7 @@ The Agent Forge logger provides leveled logging functionality that respects the 
 
 - **Leveled Logging**: DEBUG, INFO, WARN, ERROR
 - **Configuration-based**: Reads log level from `AF_LOG_LEVEL` environment variable
+- **File Logging**: Optional `AF_LOG_FILE` streams logs to both console and file
 - **Thread-safe**: Safe for concurrent use across goroutines
 - **Global and Instance APIs**: Use package-level functions or create custom logger instances
 - **Runtime Configuration**: Change log levels at runtime
@@ -265,6 +266,20 @@ AF_LOG_LEVEL=ERROR go run main.go
 
 Valid values: `DEBUG`, `INFO`, `WARN`, `ERROR` (case-insensitive)
 
+### File Logging (AF_LOG_FILE)
+
+When `AF_LOG_FILE` is set to a file path, logs are written to both stdout and the file. The file is created if it does not exist, and new logs are appended. If the file cannot be opened, a warning is printed and logging falls back to stdout only.
+
+```bash
+# In .env file
+AF_LOG_FILE=logs/app.log
+
+# Or as environment variable
+export AF_LOG_FILE=./app.log
+```
+
+Note: This only affects the agentforge logger. The standard `log` package used for startup errors writes to stderr; use shell redirection (`2>&1`) if you want those in the file as well.
+
 ## Log Output Format
 
 Log messages are output in the following format:
@@ -380,5 +395,4 @@ func main() {
 ## See Also
 
 - [Configuration Guide](CONFIG.md) - For setting up `AF_LOG_LEVEL`
-- [Examples](examples/logger_example.go) - Complete working examples
 

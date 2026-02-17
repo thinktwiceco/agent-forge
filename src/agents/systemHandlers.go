@@ -9,6 +9,7 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
+//nolint:unused // Reserved for hook registration via handlers package
 var handleNewSystemAgentAdded = OnAddedSystemAgentHook(func(a *Agent, subAgent core.SubAgent) error {
 	if subAgent == nil {
 		return errors.New("sub agent is nil")
@@ -24,6 +25,7 @@ var handleNewSystemAgentAdded = OnAddedSystemAgentHook(func(a *Agent, subAgent c
 	return nil
 })
 
+//nolint:unused // Reserved for hook registration via handlers package
 var handleNewToolsAdded = OnAddedToolsHook(func(a *Agent, tools []llms.Tool) error {
 	if tools == nil {
 		return errors.New("tools slice is nil")
@@ -61,6 +63,7 @@ var handleNewToolsAdded = OnAddedToolsHook(func(a *Agent, tools []llms.Tool) err
 // 	return nil
 // })
 
+//nolint:unused // Replaced by createPluginInitializationHandler in agentInit
 var handlePluginInitialization = OnAgentInitializationHook(func(a *Agent, config *AgentConfig) error {
 	agentforge.Debug("🔌 [handlePluginInitialization] START for agent %s", a.config.AgentName)
 	agentforge.Debug("🔌 [handlePluginInitialization] Plugins count: %d", len(a.config.Plugins))
@@ -72,34 +75,42 @@ var handlePluginInitialization = OnAgentInitializationHook(func(a *Agent, config
 
 	systemPromptAdded := false
 
-	// Register all the plugins
+	// Register all the plugins using interface segregation
 	for i, plugin := range a.config.Plugins {
 		agentforge.Debug("🔌 [handlePluginInitialization] Processing plugin %d: %s", i+1, plugin.Name())
-		// Register the events
-		for _, event := range core.Events {
-			hook := plugin.On(event)
-			if hook != nil {
-				agentforge.Debug("🔌 [handlePluginInitialization] Registering hook for event: %s", event)
-				a.hooks.on(event, hook)
+
+		// Check if plugin provides hooks
+		if hp, ok := plugin.(core.HookProvider); ok {
+			hooks := hp.Hooks()
+			for event, hook := range hooks {
+				if hook != nil {
+					agentforge.Debug("🔌 [handlePluginInitialization] Registering hook for event: %s", event)
+					a.hooks.on(event, hook)
+				}
 			}
-		}
-		// Register the tools
-		tools := plugin.Tools()
-		for _, tool := range tools {
-			agentforge.Debug("🔌 [handlePluginInitialization] Registering tool: %s", tool.GetName())
-			a.config.Tools = append(a.config.Tools, tool)
 		}
 
-		// Update the system prompt
-		sp := plugin.SystemPrompt()
-		if sp != "" {
-			if !systemPromptAdded {
-				a.config.SystemPrompt += "[PLUGIN TOOLS INSTRUCTIONS]"
+		// Check if plugin provides tools
+		if tp, ok := plugin.(core.ToolProvider); ok {
+			tools := tp.Tools()
+			for _, tool := range tools {
+				agentforge.Debug("🔌 [handlePluginInitialization] Registering tool: %s", tool.GetName())
+				a.config.Tools = append(a.config.Tools, tool)
 			}
-			agentforge.Debug("🔌 [handlePluginInitialization] Adding system prompt from plugin")
-			a.config.SystemPrompt += fmt.Sprintf("\n [%s plugin]:\n%s\n\n", plugin.Name(), sp)
-			a.ensureSystemPrompt()
-			systemPromptAdded = true
+		}
+
+		// Check if plugin provides system prompt
+		if pp, ok := plugin.(core.PromptProvider); ok {
+			sp := pp.SystemPrompt()
+			if sp != "" {
+				if !systemPromptAdded {
+					a.config.SystemPrompt += "[PLUGIN TOOLS INSTRUCTIONS]"
+				}
+				agentforge.Debug("🔌 [handlePluginInitialization] Adding system prompt from plugin")
+				a.config.SystemPrompt += fmt.Sprintf("\n [%s plugin]:\n%s\n\n", plugin.Name(), sp)
+				a.ensureSystemPrompt()
+				systemPromptAdded = true
+			}
 		}
 	}
 
