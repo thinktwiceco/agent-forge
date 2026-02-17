@@ -191,7 +191,7 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 				var err error
 				completedChunkBytes, err = json.Marshal(completionChunk)
 				if err != nil {
-					return fmt.Errorf("failed to marshal completion chunk: %v", err)
+					return fmt.Errorf("failed to marshal completion chunk: %w", err)
 				}
 			}
 
