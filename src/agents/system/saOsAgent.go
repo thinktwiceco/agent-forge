@@ -1,17 +1,12 @@
-package agents
-
-import (
-	"github.com/thinktwiceco/agent-forge/src/core"
-	"github.com/thinktwiceco/agent-forge/src/llms"
-	"github.com/thinktwiceco/agent-forge/src/tools/fs"
-)
+package system
 
 // OsAgentTemplate defines the system agent template for OS-related operations.
 //
 // This agent handles file system operations, executing executables, and other OS-level tasks.
 // It specializes in reading files, writing files, executing commands, and managing file system resources.
 
-func createOsAgentTemplate() *SystemAgentTemplate {
+// CreateOsAgentTemplate creates the template for OS operations agent.
+func CreateOsAgentTemplate() *SystemAgentTemplate {
 	template, err := NewSystemAgentTemplate(AgentNameSystemOS, TraceOS)
 	if err != nil {
 		panic(err)
@@ -99,24 +94,4 @@ Troubleshooting:
   * Include file metadata in responses when reading files`)
 
 	return template
-}
-
-// OsAgent creates an OS operations agent with file system tools.
-//
-// Parameters:
-//   - llmEngine: The LLM engine to use for this agent
-//   - root: The root directory path that restricts all file operations
-//
-// Returns:
-//   - *core.SubAgent: The OS agent as a sub-agent
-func OsAgent(llmEngine llms.LLMEngine, root string) core.SubAgent {
-	osTemplate := createOsAgentTemplate()
-	osConfig := osTemplate.ToAgentConfig(llmEngine)
-
-	// Add FsTool as the first tool
-	fsTool := fs.NewFsTool(root)
-	osConfig.Tools = []llms.Tool{fsTool}
-
-	os := NewAgent(&osConfig)
-	return os.AgentAsSubAgent()
 }

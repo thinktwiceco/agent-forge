@@ -1,10 +1,4 @@
-package agents
-
-import (
-	"github.com/thinktwiceco/agent-forge/src/core"
-	"github.com/thinktwiceco/agent-forge/src/llms"
-	"github.com/thinktwiceco/agent-forge/src/tools/vector"
-)
+package system
 
 // VectorAgentTemplate defines the system agent template for vector database operations.
 //
@@ -12,7 +6,8 @@ import (
 // semantic search, and deleting documents. It specializes in vector operations
 // and provides guidance on how to structure vector database requests.
 
-func createVectorAgentTemplate() *SystemAgentTemplate {
+// CreateVectorAgentTemplate creates the template for vector database operations agent.
+func CreateVectorAgentTemplate() *SystemAgentTemplate {
 	template, err := NewSystemAgentTemplate(AgentNameSystemVector, TraceVector)
 	if err != nil {
 		panic(err)
@@ -180,25 +175,4 @@ Troubleshooting:
   * Understand that semantic search finds similar meanings, not exact matches`)
 
 	return template
-}
-
-// VectorAgent creates a vector database operations agent with vector_db tool.
-//
-// Parameters:
-//   - llmEngine: The LLM engine to use for this agent
-//   - vectorDB: The vector database implementation
-//   - embeddingGenerator: The embedding generator for creating embeddings
-//
-// Returns:
-//   - *core.SubAgent: The Vector agent as a sub-agent
-func VectorAgent(llmEngine llms.LLMEngine, vectorDB core.VectorDB, embeddingGenerator core.EmbeddingGenerator) core.SubAgent {
-	vectorTemplate := createVectorAgentTemplate()
-	vectorConfig := vectorTemplate.ToAgentConfig(llmEngine)
-
-	// Add vector_db tool
-	vectorTool := vector.NewVectorTool(vectorDB, embeddingGenerator)
-	vectorConfig.Tools = []llms.Tool{vectorTool}
-
-	vector := NewAgent(&vectorConfig)
-	return vector.AgentAsSubAgent()
 }

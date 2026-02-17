@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/core"
 )
 
@@ -28,6 +29,13 @@ func (s *Server) handleChat(c *gin.Context) {
 	}
 
 	conversationID := c.Query("conversationId")
+
+	// Log conversation ID for debugging context loss issues
+	if conversationID == "" {
+		agentforge.Debug("No conversationID provided - starting new conversation")
+	} else {
+		agentforge.Debug("Continuing conversation with ID: %s", conversationID)
+	}
 
 	// Create a context with cancel for this request
 	ctx, cancel := context.WithCancel(c.Request.Context())

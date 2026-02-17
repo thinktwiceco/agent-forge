@@ -41,17 +41,18 @@ var defaultOnTodoUpdate = func(todos []*TodoItem) {
 	fmt.Println("========================")
 }
 
+// Name implements the core.Plugin interface
 func (p *TodoPlugin) Name() string {
 	return PLUGIN_NAME
 }
 
-func (p *TodoPlugin) On(event core.Event) core.AgentHookFn {
-	switch event {
-	case core.EventToolExecution:
-		return agents.OnToolExecutionHook(p.handleToolExecution)
+// Hooks implements the core.HookProvider interface
+func (p *TodoPlugin) Hooks() map[core.Event]core.AgentHookFn {
+	return map[core.Event]core.AgentHookFn{
+		core.EventToolExecution: agents.OnToolExecutionHook(p.handleToolExecution),
 	}
-	return nil
 }
+
 func (p *TodoPlugin) handleToolExecution(a *agents.Agent, toolResult *llms.ToolResult) error {
 	// Only handle todo_handler tool executions
 	if toolResult.ToolName != TODO_HANDLER_TOOL {
@@ -70,12 +71,14 @@ func (p *TodoPlugin) handleToolExecution(a *agents.Agent, toolResult *llms.ToolR
 	return nil
 }
 
+// Tools implements the core.ToolProvider interface
 func (p *TodoPlugin) Tools() []llms.Tool {
 	return []llms.Tool{
 		newTodoHandlerTool(p),
 	}
 }
 
+// SystemPrompt implements the core.PromptProvider interface
 func (p *TodoPlugin) SystemPrompt() string {
 	return `
 	Use the todo_handler tool in combination with the reasoning agent.

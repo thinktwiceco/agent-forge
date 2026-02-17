@@ -17,46 +17,48 @@ func TestLoggerPlugin_Name(t *testing.T) {
 	}
 }
 
-func TestLoggerPlugin_Tools(t *testing.T) {
+func TestLoggerPlugin_Hooks(t *testing.T) {
 	plugin := NewPlugin(DefaultColorRules(), DefaultLabelRules(), nil)
-	if len(plugin.Tools()) != 0 {
-		t.Errorf("Expected 0 tools, got %d", len(plugin.Tools()))
-	}
-}
+	hooks := plugin.Hooks()
 
-func TestLoggerPlugin_SystemPrompt(t *testing.T) {
-	plugin := NewPlugin(DefaultColorRules(), DefaultLabelRules(), nil)
-	if plugin.SystemPrompt() != "" {
-		t.Errorf("Expected empty system prompt, got '%s'", plugin.SystemPrompt())
+	// Should have at least one hook
+	if len(hooks) == 0 {
+		t.Error("Expected at least one hook")
 	}
-}
-
-func TestLoggerPlugin_On(t *testing.T) {
-	plugin := NewPlugin(DefaultColorRules(), DefaultLabelRules(), nil)
 
 	// Should handle EventNewChunk
-	if plugin.On(core.EventNewChunk) == nil {
+	if hooks[core.EventNewChunk] == nil {
 		t.Error("Expected handler for EventNewChunk")
 	}
 
-	// Should not handle random event
-	if plugin.On("random_event") != nil {
-		t.Error("Expected nil for random event")
+	// Should not have other event hooks
+	for event, hook := range hooks {
+		if event != core.EventNewChunk && hook != nil {
+			t.Errorf("Unexpected hook for event: %s", event)
+		}
 	}
+}
+
+func TestLoggerPlugin_ImplementsInterfaces(t *testing.T) {
+	plugin := NewPlugin(DefaultColorRules(), DefaultLabelRules(), nil)
+
+	// Should implement Plugin interface
+	var _ core.Plugin = plugin
+
+	// Should implement HookProvider interface
+	var _ core.HookProvider = plugin
+
+	// Should NOT implement ToolProvider or PromptProvider
+	// (compile-time check would fail if it did)
 }
 
 func TestLoggerPlugin_HandleNewChunk(t *testing.T) {
 	buf := new(bytes.Buffer)
 	plugin := NewPlugin(DefaultColorRules(), DefaultLabelRules(), buf)
 
-	// Create a mock hook function manually since we can't easily execute the private handler directly
-	// without reflection or export. However, HandleNewChunk is private.
-	// We can access it via the hook returned by On(EventNewChunk)
-
-	// Better way: use the hook returned by On() which is a typed wrapper
-	// core.AgentHookFn is 'any', but we know it's func(*Agent, *ExtendedChunkResponse) error
-
-	hookFn := plugin.On(core.EventNewChunk)
+	// Get the hook from Hooks() map
+	hooks := plugin.Hooks()
+	hookFn := hooks[core.EventNewChunk]
 	handler, ok := hookFn.(agents.OnNewChunkHook)
 	if !ok {
 		t.Fatal("Failed to cast hook function")

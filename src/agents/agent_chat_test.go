@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/history"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 	"github.com/thinktwiceco/agent-forge/src/mocks"
 )
@@ -109,9 +110,7 @@ func TestAgent_ChatWithTools(t *testing.T) {
 	}
 
 	// Create a history instance for this request (per-request pattern)
-	history := &History{
-		history: []*llms.UnifiedMessage{},
-	}
+	hm := history.NewConversationHistory()
 
 	// Verify channels are ready
 	if agent.responseCh == nil {
@@ -146,7 +145,7 @@ func TestAgent_ChatWithTools(t *testing.T) {
 	}()
 
 	// Trigger the chat with the history instance
-	err := agent.executeChatWithTools(context.Background(), history)
+	err := agent.executeChatWithTools(context.Background(), hm)
 
 	_ = err // Ignore error in this test context as we consume output in goroutine
 
@@ -156,7 +155,7 @@ func TestAgent_ChatWithTools(t *testing.T) {
 	}
 
 	// Verify history contains tool result
-	hist := history.History()
+	hist := hm.Messages()
 	foundToolResult := false
 	for _, msg := range hist {
 		// Check for Tool role

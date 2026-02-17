@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/thinktwiceco/agent-forge/src/history"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 	"github.com/thinktwiceco/agent-forge/src/mocks"
 )
@@ -30,9 +31,7 @@ func TestAgent_ToolError_InHistory(t *testing.T) {
 	})
 
 	// Create a history instance for this request
-	history := &History{
-		history: []*llms.UnifiedMessage{},
-	}
+	hm := history.NewConversationHistory()
 
 	// Manually simulate a tool call and execution (to avoid multi-turn complexity)
 	toolCall := llms.ToolCall{
@@ -58,10 +57,10 @@ func TestAgent_ToolError_InHistory(t *testing.T) {
 			content = "Error: " + toolResult.Error
 		}
 	}
-	history.addToolMessage(toolCall.ID, content, toolResult.Ephemeral)
+	hm.AddToolMessage(toolCall.ID, content, toolResult.Ephemeral)
 
 	// Now check the history to verify the error is included
-	messages := history.History()
+	messages := hm.Messages()
 
 	// Find the tool message in history
 	var toolMessage *llms.UnifiedMessage

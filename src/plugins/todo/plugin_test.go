@@ -51,26 +51,45 @@ func TestTodoPlugin_Tools(t *testing.T) {
 	}
 }
 
-// TestTodoPlugin_On tests the On() method for hook registration
-func TestTodoPlugin_On(t *testing.T) {
+// TestTodoPlugin_Hooks tests the Hooks() method for hook registration
+func TestTodoPlugin_Hooks(t *testing.T) {
 	plugin := NewTodoPlugin(nil)
 
-	// Test EventToolExecution hook
-	hook := plugin.On(core.EventToolExecution)
-	if hook == nil {
+	hooks := plugin.Hooks()
+
+	// Should have at least one hook
+	if len(hooks) == 0 {
+		t.Error("Expected at least one hook")
+	}
+
+	// Should have EventToolExecution hook
+	if hooks[core.EventToolExecution] == nil {
 		t.Error("Expected non-nil hook for EventToolExecution")
 	}
 
-	// Test other events should return nil
-	hook = plugin.On(core.EventNewUserMessage)
-	if hook != nil {
-		t.Error("Expected nil hook for EventNewUserMessage")
+	// Should only have EventToolExecution hook
+	for event, hook := range hooks {
+		if event != core.EventToolExecution && hook != nil {
+			t.Errorf("Unexpected hook for event: %s", event)
+		}
 	}
+}
 
-	hook = plugin.On(core.EventAgentInitialization)
-	if hook != nil {
-		t.Error("Expected nil hook for EventAgentInitialization")
-	}
+// TestTodoPlugin_ImplementsInterfaces tests that the plugin implements the correct interfaces
+func TestTodoPlugin_ImplementsInterfaces(t *testing.T) {
+	plugin := NewTodoPlugin(nil)
+
+	// Should implement Plugin interface
+	var _ core.Plugin = plugin
+
+	// Should implement HookProvider interface
+	var _ core.HookProvider = plugin
+
+	// Should implement ToolProvider interface
+	var _ core.ToolProvider = plugin
+
+	// Should implement PromptProvider interface
+	var _ core.PromptProvider = plugin
 }
 
 // TestTodoPlugin_AddTodoItem tests adding a single todo item

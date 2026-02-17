@@ -254,13 +254,7 @@ No adapter is needed - agents can be used directly as sub-agents.
 Run the expand tool tests:
 
 ```bash
-go test ./src/tools -v -run TestExpandTool
-```
-
-Run the example:
-
-```bash
-go run examples/expand_tool_example.go
+go test ./src/tools/expand -v
 ```
 
 ## See Also

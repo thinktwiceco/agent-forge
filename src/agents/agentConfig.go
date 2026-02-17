@@ -3,8 +3,10 @@ package agents
 import (
 	"fmt"
 
+	agentctx "github.com/thinktwiceco/agent-forge/src/agents/context"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/telemetry"
 )
 
 const defaultMaxToolIterations = 30
@@ -74,6 +76,35 @@ type AgentConfig struct {
 
 	// Plugins is the list of plugins to use for the agent
 	Plugins []core.Plugin
+
+	// MaxContextTokens is the model's context window size in tokens.
+	// Used for intelligent history truncation. Set to 0 to disable truncation.
+	// Example: 128000 for models like Kimi-K2.5
+	MaxContextTokens int
+
+	// ReservedOutputTokens reserves token space for LLM completion.
+	// Deducted from MaxContextTokens when truncating history.
+	// Defaults to 4000 if MaxContextTokens > 0
+	ReservedOutputTokens int
+
+	// MinRecentMessages ensures the last N messages are always kept.
+	// Prevents over-aggressive truncation of recent conversation context.
+	// Defaults to 10 if MaxContextTokens > 0
+	MinRecentMessages int
+
+	// EnableSummarization generates summaries of truncated messages
+	// instead of discarding them entirely. Requires MaxContextTokens > 0.
+	// Defaults to false
+	EnableSummarization bool
+
+	// TruncationStrategy determines how history is truncated when it exceeds MaxContextTokens.
+	// If nil and MaxContextTokens > 0, defaults to SlidingWindowStrategy.
+	// Set to NoTruncationStrategy to disable truncation.
+	TruncationStrategy agentctx.TruncationStrategy
+
+	// Tracer provides structured observability (tool execution, token usage, truncation).
+	// If nil, defaults to telemetry.NoopTracer.
+	Tracer telemetry.Tracer
 }
 
 // validate validates that all required fields in AgentConfig are set.
@@ -106,6 +137,21 @@ func (c *AgentConfig) validate() error {
 
 	if c.SubAgents == nil {
 		c.SubAgents = []core.SubAgent{}
+	}
+
+	// Set defaults for context window management
+	if c.MaxContextTokens > 0 {
+		if c.ReservedOutputTokens <= 0 {
+			c.ReservedOutputTokens = 4000
+		}
+		if c.MinRecentMessages <= 0 {
+			c.MinRecentMessages = 10
+		}
+	}
+
+	// Default to no-op tracer if not set
+	if c.Tracer == nil {
+		c.Tracer = telemetry.NewNoopTracer()
 	}
 
 	return nil

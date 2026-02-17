@@ -13,6 +13,7 @@ type Subagent string
 const (
 	GIT_AGENT       Subagent = "git"
 	REASONING_AGENT Subagent = "reasoning"
+	CODING_AGENT    Subagent = "coding"
 	OS_AGENT        Subagent = "os"
 	WEB_AGENT       Subagent = "web"
 	VECTOR_DB_AGENT Subagent = "vector"
@@ -29,6 +30,8 @@ func (s Subagent) getSubagent(
 		return agents.GitAgent(llmEngine, workingDir), nil
 	case REASONING_AGENT:
 		return agents.ReasoningAgent(llmEngine), nil
+	case CODING_AGENT:
+		return agents.CodingAgent(llmEngine, workingDir), nil
 	case OS_AGENT:
 		return agents.OsAgent(llmEngine, workingDir), nil
 	case WEB_AGENT:

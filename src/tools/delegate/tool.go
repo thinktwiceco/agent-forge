@@ -8,13 +8,21 @@ import (
 const DELEGATE_TOOL = "delegate"
 
 // Delegate represents a delegation tool with sub agents.
+// Uses map[string]Executable for lookup-by-name and execution-only dependency.
 type Delegate struct {
-	subAgents []core.SubAgent
+	agents map[string]core.Executable
 }
 
 // NewDelegateTool creates a new DelegateTool with the given sub agents.
+// Accepts SubAgent (which embeds Identifier+Executable) to build the lookup map.
 func NewDelegateTool(subAgents []core.SubAgent) llms.Tool {
-	delegate := &Delegate{subAgents: subAgents}
+	agents := make(map[string]core.Executable)
+	for _, sa := range subAgents {
+		if sa != nil {
+			agents[sa.Name()] = sa
+		}
+	}
+	delegate := &Delegate{agents: agents}
 
 	return &core.Tool{
 		Name:        DELEGATE_TOOL,

@@ -1,16 +1,45 @@
-package agents
+package prompts
 
 import (
 	"fmt"
 	"strings"
 )
 
-// ==============================
-// ===== System Prompt Management
-// ==============================
+// Ensure Builder implements agents.PromptBuilder interface at compile time
+// This is a forward declaration - the actual interface check is done
+// in the agents package to avoid circular dependencies
 
-// getTonePrompt returns the default system prompt instructions for the given tone.
-// Returns empty string if tone is empty or unknown.
+// Tone constants for prompt building.
+const (
+	ToneKeepItShort = "keep-it-short"
+	ToneSystemAgent = "system-agent"
+)
+
+// Builder constructs system prompts.
+type Builder struct {
+	config Config
+}
+
+// NewBuilder creates a new prompt Builder.
+func NewBuilder(config Config) *Builder {
+	return &Builder{config: config}
+}
+
+// UpdateConfig updates the builder's configuration (call when tools or sub-agents change).
+func (b *Builder) UpdateConfig(cfg interface{}) {
+	if config, ok := cfg.(Config); ok {
+		b.config = config
+	}
+}
+
+// Build returns the complete system prompt.
+func (b *Builder) Build() string {
+	prompt := b.addSystemPrompt()
+	prompt = b.buildSubAgentsSystemPrompt(prompt)
+	prompt = b.buildToolsDescriptions(prompt)
+	return normalizePromptIndentation(prompt)
+}
+
 func getTonePrompt(tone string) string {
 	switch tone {
 	case ToneKeepItShort:
@@ -35,15 +64,15 @@ func getTonePrompt(tone string) string {
 	}
 }
 
-func (a *Agent) addSystemPrompt() {
-	a.systemPrompt = a.config.SystemPrompt
+func (b *Builder) addSystemPrompt() string {
+	prompt := b.config.SystemPrompt
 
-	if a.systemPrompt == "" {
-		a.systemPrompt = `You are an helpful assistant`
+	if prompt == "" {
+		prompt = `You are an helpful assistant`
 	}
 
-	if a.config.MainAgent {
-		a.systemPrompt += `
+	if b.config.MainAgent {
+		prompt += `
 [SYSTEM] You are the MAIN agent coordinating a team of specialized sub-agents.
 
 SUB-AGENTS AS SPECIALIZED TOOLS:
@@ -72,62 +101,58 @@ RESPOND DIRECTLY (no tool calls) for:
 - Questions you can answer from your context
 - Questions about your capabilities or sub-agents list
 `
-		if tonePrompt := getTonePrompt(a.config.Tone); tonePrompt != "" {
-			a.systemPrompt += "\n" + tonePrompt
+		if tonePrompt := getTonePrompt(b.config.Tone); tonePrompt != "" {
+			prompt += "\n" + tonePrompt
 		}
 	} else {
-		// For subagents, add tone prompt if configured
-		if tonePrompt := getTonePrompt(a.config.Tone); tonePrompt != "" {
-			a.systemPrompt += "\n" + tonePrompt
+		if tonePrompt := getTonePrompt(b.config.Tone); tonePrompt != "" {
+			prompt += "\n" + tonePrompt
 		}
 	}
+
+	return prompt
 }
 
-func (a *Agent) buildSubAgentsSystemPrompt() {
-	if len(a.subAgents) == 0 || a.subAgents == nil {
-		return
+func (b *Builder) buildSubAgentsSystemPrompt(prompt string) string {
+	if len(b.config.SubAgents) == 0 {
+		return prompt
 	}
 
-	var saPrompt = `
+	saPrompt := `
 === AVAILABLE SUB-AGENTS ===
 Specialized tools for complex problems. Use "delegate" tool to access them.
 
 [SUB AGENTS]:
-	`
-
-	for _, sa := range a.subAgents {
-		// Use BasicDescription() to ensure only basic info is injected into system prompt
+`
+	for _, sa := range b.config.SubAgents {
 		saPrompt += fmt.Sprintf("📌 %s: %s\n\n", sa.Name(), sa.BasicDescription())
 	}
 
-	a.systemPrompt += "Use the 'expand' if you need to use one of the sub-agents."
-
-	a.systemPrompt += saPrompt
+	prompt += "Use the 'expand' if you need to use one of the sub-agents."
+	prompt += saPrompt
+	return prompt
 }
 
-func (a *Agent) buildToolsDescrptions() {
-	if len(a.tools) == 0 || a.tools == nil {
-		return
+func (b *Builder) buildToolsDescriptions(prompt string) string {
+	if len(b.config.Tools) == 0 {
+		return prompt
 	}
 
-	var toolsPrompt = `
+	toolsPrompt := `
 === AVAILABLE TOOLS ===
 Tools available to the agent. Use "tool" tool to access them.
 
 [TOOLS]:
-	`
-
-	for _, tool := range a.tools {
+`
+	for _, tool := range b.config.Tools {
 		toolsPrompt += fmt.Sprintf("📌 %s: %s\n\n", tool.GetName(), tool.GetFunctionDefinition().Description)
 	}
 
-	a.systemPrompt += toolsPrompt
+	prompt += toolsPrompt
+	return prompt
 }
 
-// normalizePromptIndentation normalizes the indentation of a prompt string.
-// It converts tabs to spaces, removes trailing whitespace, and normalizes indentation
-// by detecting the minimum indentation level and preserving relative indentation.
-// It also handles cases where indentation is inconsistent by normalizing to the most common base level.
+// NormalizePromptIndentation normalizes the indentation of a prompt string.
 func normalizePromptIndentation(prompt string) string {
 	if prompt == "" {
 		return prompt
@@ -138,17 +163,13 @@ func normalizePromptIndentation(prompt string) string {
 		return prompt
 	}
 
-	// First pass: convert tabs to spaces and trim trailing whitespace
 	normalized := make([]string, 0, len(lines))
 	for _, line := range lines {
-		// Convert tabs to spaces (assuming 4 spaces per tab)
 		line = strings.ReplaceAll(line, "\t", "    ")
-		// Remove trailing whitespace
 		line = strings.TrimRight(line, " ")
 		normalized = append(normalized, line)
 	}
 
-	// Find minimum indentation (excluding empty lines)
 	minIndent := -1
 	hasIndentedLines := false
 	for _, line := range normalized {
@@ -164,8 +185,6 @@ func normalizePromptIndentation(prompt string) string {
 		}
 	}
 
-	// If minimum indent is 0 but we have indented lines, those are likely
-	// accidental indentation from source code formatting - remove all indentation
 	if minIndent == 0 && hasIndentedLines {
 		for i := range normalized {
 			if normalized[i] != "" {
@@ -175,14 +194,12 @@ func normalizePromptIndentation(prompt string) string {
 		return strings.Join(normalized, "\n")
 	}
 
-	// Normalize all lines by removing the minimum indent (preserves relative indentation)
 	result := make([]string, 0, len(normalized))
 	for _, line := range normalized {
 		if line == "" {
 			result = append(result, "")
 			continue
 		}
-		// Remove the minimum indent from each line
 		currentIndent := len(line) - len(strings.TrimLeft(line, " "))
 		if currentIndent >= minIndent && len(line) >= minIndent {
 			line = line[minIndent:]
@@ -191,12 +208,4 @@ func normalizePromptIndentation(prompt string) string {
 	}
 
 	return strings.Join(result, "\n")
-}
-
-func (a *Agent) ensureSystemPrompt() {
-	a.addSystemPrompt()
-	a.buildSubAgentsSystemPrompt()
-	a.buildToolsDescrptions()
-	// Normalize indentation before finalizing
-	a.systemPrompt = normalizePromptIndentation(a.systemPrompt)
 }

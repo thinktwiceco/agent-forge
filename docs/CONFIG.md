@@ -2,20 +2,64 @@
 
 ## Overview
 
-The `config.go` file provides a centralized configuration system for the Agent Forge application. Configuration values are loaded from environment variables and `.env` files.
+Agent Forge provides configuration at two levels:
 
-## Configuration Structure
+1. **Application Configuration** (`config.go`) - System-wide settings (logging, etc.)
+2. **Agent Configuration** (`AgentConfig`) - Per-agent settings (LLM, tools, behavior, etc.)
 
-The `Config` struct contains the following fields:
+## Application Configuration
+
+The `Config` struct contains system-wide settings loaded from environment variables and `.env` files:
 
 - `AF_LOG_LEVEL`: Logging level for the application
   - Valid values: `DEBUG`, `INFO`, `WARN`, `ERROR`
   - Default: `INFO`
   - See [Logger Documentation](LOGGER.md) for details on how logging works
+- `AF_LOG_FILE`: Optional path to a log file. When set, logs are written to both stdout and the file
+
+## Agent Configuration
+
+The `AgentConfig` struct configures individual agents. Use the [Builder Pattern](AGENT_BUILDER.md) for easier construction:
+
+### Required Fields
+- `LLMEngine`: The LLM engine (OpenAI, DeepSeek, TogetherAI, etc.)
+- `AgentName`: Unique identifier for the agent
+
+### Optional Fields
+
+#### Basic Settings
+- `Description`: Short description of the agent
+- `AdvanceDescription`: Detailed capability information
+- `Troubleshooting`: Common issues and debugging guidance
+- `SystemPrompt`: System prompt for the agent
+- `Trace`: Trace identifier (default: `{agentName}-trace`)
+
+#### Behavioral Settings
+- `MainAgent`: Mark as main coordinator (default: `false`)
+- `Tone`: Response tone (`ToneKeepItShort`, `ToneSystemAgent`, or empty)
+- `CanExpand`: Enable expand tool for discovering capabilities (default: `true`)
+- `Reasoning`: Enable reasoning sub-agent (default: `false`)
+
+#### Tools & Sub-Agents
+- `Tools`: List of tools available to the agent
+- `SubAgents`: List of sub-agents for delegation
+- `Plugins`: List of plugins to load
+- `MaxToolIterations`: Max tool execution iterations (default: `30`)
+
+#### History & Persistence
+- `Persistence`: Persistence layer (`"json"` or `""` for none)
+- `MaxContextTokens`: Context window size (enables truncation when > 0)
+- `ReservedOutputTokens`: Token reserve for completion (default: `4000`)
+- `MinRecentMessages`: Minimum recent messages to keep (default: `10`)
+- `EnableSummarization`: Summarize truncated messages (default: `false`)
+- `TruncationStrategy`: Custom truncation strategy (optional)
+
+#### Observability
+- `Tracer`: Telemetry tracer for tool execution, tokens, truncation events
 
 ## Usage
 
-### Basic Usage
+### Application Configuration
 
 ```go
 import agentforge "github.com/thinktwiceco/agent-forge/src"
@@ -33,6 +77,54 @@ agentforge.InitLogger(config)
 
 // Now you can use the logger
 agentforge.Info("Application started with log level: %s", config.AFLogLevel)
+```
+
+### Agent Configuration (Builder Pattern)
+
+**Recommended approach:**
+
+```go
+import (
+    "github.com/thinktwiceco/agent-forge/src/agents"
+    "github.com/thinktwiceco/agent-forge/src/telemetry"
+)
+
+agent, err := agents.NewBuilder(llmEngine, "my-agent").
+    WithDescription("Helpful assistant").
+    WithSystemPrompt("You are helpful and concise").
+    WithTools(tool1, tool2).
+    AsMainAgent().
+    WithTone(agents.ToneKeepItShort).
+    WithPersistence("json").
+    WithContextWindow(128000).           // Enables truncation
+    WithTracer(telemetry.NewLogTracer()). // Optional telemetry
+    Build()
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Agent Configuration (Manual)
+
+**For advanced use cases:**
+
+```go
+import "github.com/thinktwiceco/agent-forge/src/agents"
+
+agent := agents.NewAgent(&agents.AgentConfig{
+    LLMEngine:            llmEngine,
+    AgentName:            "my-agent",
+    Description:          "Helpful assistant",
+    SystemPrompt:         "You are helpful and concise",
+    Tools:                []llms.Tool{tool1, tool2},
+    MainAgent:            true,
+    Tone:                 agents.ToneKeepItShort,
+    Persistence:          "json",
+    MaxContextTokens:     128000,
+    ReservedOutputTokens: 4000,
+    MinRecentMessages:    10,
+    Tracer:              telemetry.NewLogTracer(),
+})
 ```
 
 ## Environment Variables
@@ -87,6 +179,9 @@ The configuration system automatically validates all values:
 # Valid values: DEBUG, INFO, WARN, ERROR
 # Default: INFO
 AF_LOG_LEVEL=INFO
+
+# Optional: stream logs to a file (in addition to stdout)
+# AF_LOG_FILE=logs/app.log
 ```
 
 ## Adding New Configuration Fields
@@ -123,9 +218,62 @@ func NewConfig() (*Config, error) {
 }
 ```
 
+## Truncation Strategies
+
+When `MaxContextTokens` is set, the agent automatically truncates conversation history to fit within the context window:
+
+```go
+import "github.com/thinktwiceco/agent-forge/src/agents/context"
+
+// Use default sliding window strategy
+agent, err := agents.NewBuilder(llm, "agent").
+    WithContextWindow(128000).  // Automatically sets defaults
+    Build()
+
+// Or use a custom strategy
+customStrategy := context.NewSlidingWindowStrategy(
+    tokenCounter,
+    10,      // min recent messages
+    context.ToolCallPairPreservation(), // preserve tool call/result pairs
+)
+
+agent, err := agents.NewBuilder(llm, "agent").
+    WithTruncationStrategy(customStrategy).
+    Build()
+```
+
+**Built-in Strategies:**
+- `SlidingWindowStrategy`: Keeps recent N messages (default)
+- `NoTruncationStrategy`: Disables truncation
+
+## Telemetry Configuration
+
+Add observability for debugging and monitoring:
+
+```go
+import "github.com/thinktwiceco/agent-forge/src/telemetry"
+
+// Log-based tracer
+agent, err := agents.NewBuilder(llm, "agent").
+    WithTracer(telemetry.NewLogTracer()).
+    Build()
+
+// Noop tracer (no overhead)
+agent, err := agents.NewBuilder(llm, "agent").
+    WithTracer(telemetry.NewNoopTracer()).
+    Build()
+
+// Custom tracer
+type CustomTracer struct{}
+func (t *CustomTracer) TraceToolExecution(ctx context.Context, event telemetry.ToolExecutionEvent) {
+    // Your implementation
+}
+// ... implement other methods
+```
+
 ## See Also
 
+- [Agent Builder Documentation](AGENT_BUILDER.md) - Fluent API for agent construction
+- [Interfaces Documentation](INTERFACES.md) - Internal interfaces and architecture
 - [Logger Documentation](LOGGER.md) - Comprehensive guide to using the logger system
-- [Logger Example](examples/logger_example.go) - Working examples of logger usage
-- [Config Example](examples/config_example.go) - Working examples of config usage
 

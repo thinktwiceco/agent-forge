@@ -19,6 +19,10 @@ type Config struct {
 	// Default: INFO
 	AFLogLevel string
 
+	// AF_LOG_FILE is the optional path to a log file. When set, logs are written
+	// to both stdout and the file. When empty, logs go to stdout only.
+	AFLogFile string
+
 	// AF_DEEPSEEK_API_KEY is the API key for DeepSeek LLM provider.
 	// Optional - only required if using DeepSeek models
 	AFDeepSeekAPIKey string
@@ -71,6 +75,7 @@ func NewConfig() (*Config, error) {
 
 	config := &Config{
 		AFLogLevel:         logLevel,
+		AFLogFile:          getEnv("AF_LOG_FILE", ""),
 		AFDeepSeekAPIKey:   getEnv("AF_DEEPSEEK_API_KEY", ""),
 		AFTogetherAIAPIKey: getEnv("AF_TOGETHERAI_API_KEY", ""),
 		AFOpenAIAPIKey:     getEnv("AF_OPENAI_API_KEY", ""),

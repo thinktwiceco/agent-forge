@@ -1,11 +1,4 @@
-package agents
-
-import (
-	"github.com/thinktwiceco/agent-forge/src/core"
-	"github.com/thinktwiceco/agent-forge/src/llms"
-	"github.com/thinktwiceco/agent-forge/src/tools/expand"
-	"github.com/thinktwiceco/agent-forge/src/tools/fs"
-)
+package system
 
 // CodingAgentTemplate defines the system agent template for coding-related operations.
 //
@@ -13,7 +6,8 @@ import (
 // understanding code structure, and discovering tool/agent capabilities. It specializes in
 // code-related file operations and progressive discovery of available tools and agents.
 
-func createCodingAgentTemplate() *SystemAgentTemplate {
+// CreateCodingAgentTemplate creates the template for coding operations agent.
+func CreateCodingAgentTemplate() *SystemAgentTemplate {
 	template, err := NewSystemAgentTemplate(AgentNameSystemCoding, TraceCoding)
 	if err != nil {
 		panic(err)
@@ -175,25 +169,4 @@ Troubleshooting:
   * Include code analysis in responses when reading code files`)
 
 	return template
-}
-
-// CodingAgent creates a coding operations agent with file system and expand tools.
-//
-// Parameters:
-//   - llmEngine: The LLM engine to use for this agent
-//   - root: The root directory path that restricts all file operations
-//
-// Returns:
-//   - *core.SubAgent: The Coding agent as a sub-agent
-func CodingAgent(codingllmEngine llms.LLMEngine, root string) core.SubAgent {
-	codingTemplate := createCodingAgentTemplate()
-	codingConfig := codingTemplate.ToAgentConfig(codingllmEngine)
-
-	// Add fs and expand tools
-	fsTool := fs.NewFsTool(root)
-	expandTool := expand.NewExpandTool()
-	codingConfig.Tools = []llms.Tool{fsTool, expandTool}
-
-	coding := NewAgent(&codingConfig)
-	return coding.AgentAsSubAgent()
 }

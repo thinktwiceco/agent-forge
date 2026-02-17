@@ -44,9 +44,11 @@ agent := agents.NewAgent(&agents.AgentConfig{
 - **read**: Read file contents
 - **write**: Write or create files
 - **list**: List directory contents
-- **info**: Get file/directory information
+- **get_file_info**: Get detailed file/directory information
 - **delete**: Delete files or directories
 - **get_root**: Get root directory information
+- **ripgrep**: Search for patterns in files (requires ripgrep)
+- **grep_logs**: Search the application log file (requires `AF_LOG_FILE` to be set; see [Logger](LOGGER.md))
 
 ### Security
 

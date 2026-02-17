@@ -21,16 +21,9 @@ func (d *Delegate) delegate(ctx map[string]any, subAgentName string, message str
 
 	parentResponseCh := agentContext.ResponseCh
 
-	// Find the sub agent
-	var assignedSubAgent core.SubAgent
-	for _, subAgent := range d.subAgents {
-		if subAgent != nil && subAgent.Name() == subAgentName {
-			assignedSubAgent = subAgent
-			break
-		}
-	}
-
-	if assignedSubAgent == nil {
+	// Find the sub agent by name (stored as map[name]Executable)
+	assignedSubAgent, ok := d.agents[subAgentName]
+	if !ok || assignedSubAgent == nil {
 		return core.NewErrorResponse(fmt.Sprintf("sub agent '%s' not found", subAgentName))
 	}
 

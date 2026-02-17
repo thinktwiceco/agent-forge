@@ -1,16 +1,11 @@
-package agents
-
-import (
-	"github.com/thinktwiceco/agent-forge/src/core"
-	"github.com/thinktwiceco/agent-forge/src/llms"
-	"github.com/thinktwiceco/agent-forge/src/tools/web"
-)
+package system
 
 // WebAgentTemplate defines the system agent template for web navigation and content pulling operations.
 //
 // This agent handles web operations including navigating to URLs, clicking buttons, and pulling page content.
 
-func createWebAgentTemplate() *SystemAgentTemplate {
+// CreateWebAgentTemplate creates the template for web operations agent.
+func CreateWebAgentTemplate() *SystemAgentTemplate {
 	template, err := NewSystemAgentTemplate(AgentNameSystemWeb, TraceWeb)
 	if err != nil {
 		panic(err)
@@ -220,30 +215,4 @@ Troubleshooting:
   * Understand that browser context persists across tool calls`)
 
 	return template
-}
-
-// WebAgent creates a web navigation and content pulling agent with web_browser tool.
-//
-// The agent supports four core operations:
-//   - navigate: Navigate to URLs
-//   - click: Click buttons and links
-//   - get_content: Pull page content (only when explicitly requested)
-//   - save_content: Pull and save page content to text files (default workflow)
-//
-// Parameters:
-//   - llmEngine: The LLM engine to use for this agent
-//   - workingDir: The working directory where save_content will save files (to workingDir/web)
-//
-// Returns:
-//   - *core.SubAgent: The Web agent as a sub-agent
-func WebAgent(llmEngine llms.LLMEngine, workingDir string) core.SubAgent {
-	webTemplate := createWebAgentTemplate()
-	webConfig := webTemplate.ToAgentConfig(llmEngine)
-
-	// Add web_browser tool
-	webTool := web.NewWebTool(workingDir)
-	webConfig.Tools = []llms.Tool{webTool}
-
-	webAgent := NewAgent(&webConfig)
-	return webAgent.AgentAsSubAgent()
 }

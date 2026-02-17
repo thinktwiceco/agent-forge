@@ -25,7 +25,7 @@ func NewFsTool(root string) llms.Tool {
 		Description: "Perform file system operations (read, write, delete, list, ripgrep) on files within a restricted directory.",
 		AdvanceDesc: `Advanced Details:
 - Parameters:
-  * operation (string, required): The operation to perform - "read", "write", "delete", "list", "get_file_info", "get_root", or "ripgrep"
+  * operation (string, required): The operation to perform - "read", "write", "delete", "list", "get_file_info", "get_root", "ripgrep", or "grep_logs"
   * path (string, required for read/write/delete/list/get_file_info/ripgrep): File or directory path relative to the root directory
   * content (string, optional): File content - required for "write" operation
   * pattern (string, required for ripgrep): Search pattern for ripgrep operation
@@ -40,6 +40,7 @@ func NewFsTool(root string) llms.Tool {
   * GetFileInfo operation returns detailed file information (permissions, ownership, size, timestamps)
   * GetRoot operation returns the sandbox root directory path
   * Ripgrep operation searches for patterns in files using ripgrep (rg must be installed)
+  * GrepLogs operation searches the application log file for a pattern - only available when AF_LOG_FILE is set
 - Usage:
   * Use "read" to read file contents
   * Use "write" to create or update files (provide content parameter)
@@ -48,6 +49,7 @@ func NewFsTool(root string) llms.Tool {
   * Use "get_file_info" to retrieve detailed file information (permissions, ownership, size, timestamps)
   * Use "get_root" to retrieve the sandbox root directory path (no path parameter needed)
   * Use "ripgrep" to search for patterns in files (provide pattern parameter, optional flags array)
+  * Use "grep_logs" to search the application log file (provide pattern parameter, optional flags array; requires AF_LOG_FILE)
 - Security: All operations are sandboxed to the root directory to prevent unauthorized access`,
 		TroubleshootingInfo: `Troubleshooting:
 - "path traversal detected": The provided path attempts to escape the root directory - use relative paths only
@@ -57,21 +59,22 @@ func NewFsTool(root string) llms.Tool {
 - "missing required parameter: content": Content parameter is required for write operations
 - "missing required parameter: pattern": Pattern parameter is required for ripgrep operations
 - "ripgrep (rg) is not installed": ripgrep must be installed and in PATH for ripgrep operations
-- "invalid operation": Operation must be exactly "read", "write", "delete", "list", "get_file_info", "get_root", or "ripgrep"
+- "invalid operation": Operation must be exactly "read", "write", "delete", "list", "get_file_info", "get_root", "ripgrep", or "grep_logs"
+- "grep_logs is not available": Set AF_LOG_FILE to enable file logging and grep_logs
 - Permission errors: Ensure the process has read/write/delete permissions for the root directory
 - "failed to create directory": Parent directory creation failed - check permissions
-- "missing required parameter: path": Path parameter is required for read/write/delete/list/get_file_info/ripgrep operations (not needed for get_root)`,
+- "missing required parameter: path": Path parameter is required for read/write/delete/list/get_file_info/ripgrep operations (not needed for get_root, grep_logs)`,
 		Parameters: []core.Parameter{
 			{
 				Name:        "operation",
 				Type:        "string",
-				Description: "The operation to perform: 'read', 'write', 'delete', 'list', 'get_file_info', 'get_root', or 'ripgrep'",
+				Description: "The operation to perform: 'read', 'write', 'delete', 'list', 'get_file_info', 'get_root', 'ripgrep', or 'grep_logs'",
 				Required:    true,
 			},
 			{
 				Name:        "path",
 				Type:        "string",
-				Description: "File or directory path relative to the root directory (required for 'read', 'write', 'delete', 'list', 'get_file_info', 'ripgrep'; not needed for 'get_root')",
+				Description: "File or directory path relative to the root directory (required for 'read', 'write', 'delete', 'list', 'get_file_info', 'ripgrep'; not needed for 'get_root', 'grep_logs')",
 				Required:    false,
 			},
 			{
@@ -83,13 +86,13 @@ func NewFsTool(root string) llms.Tool {
 			{
 				Name:        "pattern",
 				Type:        "string",
-				Description: "Search pattern - required for 'ripgrep' operation",
+				Description: "Search pattern - required for 'ripgrep' and 'grep_logs' operations",
 				Required:    false,
 			},
 			{
 				Name:        "flags",
 				Type:        "array",
-				Description: "Additional ripgrep flags - optional for 'ripgrep' operation (e.g., [\"-i\", \"-n\", \"--color=never\"])",
+				Description: "Additional ripgrep flags - optional for 'ripgrep' and 'grep_logs' operations (e.g., [\"-i\", \"-n\", \"--color=never\"])",
 				Required:    false,
 			},
 		},
@@ -97,9 +100,9 @@ func NewFsTool(root string) llms.Tool {
 			operation := args["operation"].(string)
 
 			// Validate operation
-			if operation != "read" && operation != "write" && operation != "delete" && operation != "list" && operation != "get_file_info" && operation != "get_root" && operation != "ripgrep" {
+			if operation != "read" && operation != "write" && operation != "delete" && operation != "list" && operation != "get_file_info" && operation != "get_root" && operation != "ripgrep" && operation != "grep_logs" {
 				return core.NewErrorResponse(fmt.Sprintf(
-					"invalid operation '%s'. Must be 'read', 'write', 'delete', 'list', 'get_file_info', 'get_root', or 'ripgrep'",
+					"invalid operation '%s'. Must be 'read', 'write', 'delete', 'list', 'get_file_info', 'get_root', 'ripgrep', or 'grep_logs'",
 					operation,
 				))
 			}
@@ -107,6 +110,35 @@ func NewFsTool(root string) llms.Tool {
 			// Handle get_root operation (doesn't require path)
 			if operation == "get_root" {
 				info, err := fs.getRoot()
+				if err != nil {
+					return core.NewErrorResponse(err.Error())
+				}
+				return core.NewSuccessResponse(info)
+			}
+
+			// Handle grep_logs operation (doesn't require path, uses AF_LOG_FILE)
+			if operation == "grep_logs" {
+				pattern, ok := args["pattern"]
+				if !ok {
+					return core.NewErrorResponse("missing required parameter: pattern (required for grep_logs operation)")
+				}
+				patternStr, ok := pattern.(string)
+				if !ok {
+					return core.NewErrorResponse("pattern parameter must be a string")
+				}
+
+				var flags []string
+				if flagsArg, ok := args["flags"]; ok {
+					if flagsArray, ok := flagsArg.([]interface{}); ok {
+						for _, flag := range flagsArray {
+							if flagStr, ok := flag.(string); ok {
+								flags = append(flags, flagStr)
+							}
+						}
+					}
+				}
+
+				info, err := fs.grepLogs(patternStr, flags)
 				if err != nil {
 					return core.NewErrorResponse(err.Error())
 				}
