@@ -57,8 +57,9 @@ yarn-error.log
 __pycache__/
 *.pyc
 
-# History
+# History (runtime data - exclude src/history package)
 history/
+!src/history/
 
 agentforge-server
 *.db
