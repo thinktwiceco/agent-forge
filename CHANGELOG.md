@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [0.4.6] - 2026-02-18
+### Fixed
+- fix: stop gitignoring go.work (module workspace)
+
 ## [0.4.4] - 2026-02-16
 - [eec4bdf](http://github.com/thinktwiceco/agent-forge/commit/eec4bdf43b89b21df3777829ab748438f1f04e36) - chore(release): prepare release v0.4.4 (#22)
 

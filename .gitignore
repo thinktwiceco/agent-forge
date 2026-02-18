@@ -11,9 +11,6 @@
 /python-sdk/bin/
 
 
-# Go workspace
-go.work
-
 # Data
 /data/
 *.db
