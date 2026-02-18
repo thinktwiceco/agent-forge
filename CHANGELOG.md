@@ -3,6 +3,10 @@
 ## [0.4.6] - 2026-02-18
 ### Fixed
 - fix: stop gitignoring go.work (module workspace)
+- [0fb186c](http://github.com/thinktwiceco/agent-forge/commit/0fb186cc949bbecd8d918391f17e97dbc24c2870) - fix(agents): use %w for error wrapping in executor (#25)
+- [4aa8e2a](http://github.com/thinktwiceco/agent-forge/commit/4aa8e2a360cd271d0f00897f3f0913688ca1d07a) - Release/v0.4.5 (#27)
+- [590a1e8](http://github.com/thinktwiceco/agent-forge/commit/590a1e8b73f45d4781fa2326b164e6ea0682eb27) - chore(release): prepare release v0.4.6 (#26)
+- [9c9445a](http://github.com/thinktwiceco/agent-forge/commit/9c9445a293673527baa34a0ca123108d149fec10) - chore(release): prepare release v0.4.6 - fix gitignore for go.work module
 
 ## [0.4.4] - 2026-02-16
 - [eec4bdf](http://github.com/thinktwiceco/agent-forge/commit/eec4bdf43b89b21df3777829ab748438f1f04e36) - chore(release): prepare release v0.4.4 (#22)
