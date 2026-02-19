@@ -160,7 +160,7 @@ func TestSlidingWindowStrategy_PreservesToolCallPairs(t *testing.T) {
 		llms.UserMessage("Old message that might get truncated"),
 		llms.AssistantMessage("Old response", 0, 0, 0),
 		llms.UserMessage("Search for something"),
-		llms.AssistantMessageWithToolCalls("Searching", toolCalls, 0, 0, 0),
+		llms.AssistantMessageWithToolCalls("Searching", "", toolCalls, 0, 0, 0),
 		llms.ToolMessage("call-1", "Found results", false),
 		llms.AssistantMessage("Here are the results", 0, 0, 0),
 	}

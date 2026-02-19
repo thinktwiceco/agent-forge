@@ -9,7 +9,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
-CONFIG="${1:-cmd/app/config-test.yaml}"
+CONFIG="${1:-cmd/app/config.yaml}"
 if [ ! -f "$CONFIG" ]; then
   CONFIG="cmd/app/config.example.yaml"
   if [ ! -f "$CONFIG" ]; then

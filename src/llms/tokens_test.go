@@ -111,7 +111,7 @@ func TestApproximateTokenCounter_CountMessageTokens(t *testing.T) {
 				},
 			},
 		}
-		msg := AssistantMessageWithToolCalls("Let me search for that", toolCalls, 0, 0, 0)
+		msg := AssistantMessageWithToolCalls("Let me search for that", "", toolCalls, 0, 0, 0)
 		result := counter.CountMessageTokens(msg)
 
 		// Expect: message overhead + content + tool call overhead + arguments

@@ -83,6 +83,44 @@ Status: %s
 	return result
 }
 
+// webSearchResult represents a single search result.
+type webSearchResult struct {
+	Title       string
+	URL         string
+	Description string
+}
+
+// webSearchResponse represents a web_search operation result.
+type webSearchResponse struct {
+	Query   string
+	Results []webSearchResult
+	Success bool
+	Error   string
+}
+
+// String formats the web search response as a string.
+func (r *webSearchResponse) String() string {
+	if !r.Success || len(r.Results) == 0 {
+		result := fmt.Sprintf("Web Search Operation: web_search\nQuery: %s\nStatus: Failed\n", r.Query)
+		if r.Error != "" {
+			result += fmt.Sprintf("Error: %s\n", r.Error)
+		} else {
+			result += "No results found.\n"
+		}
+		return result
+	}
+
+	out := fmt.Sprintf("Web Search Operation: web_search\nQuery: %s\nStatus: Success\nResults (%d):\n\n", r.Query, len(r.Results))
+	for i, res := range r.Results {
+		out += fmt.Sprintf("%d. %s\n   URL: %s\n", i+1, res.Title, res.URL)
+		if res.Description != "" {
+			out += fmt.Sprintf("   %s\n", res.Description)
+		}
+		out += "\n"
+	}
+	return out
+}
+
 // saveContentResponse represents a save_content operation result.
 type saveContentResponse struct {
 	Operation string

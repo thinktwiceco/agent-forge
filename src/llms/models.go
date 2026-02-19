@@ -32,6 +32,7 @@ type ChunkResponse struct {
 	Content          string       `json:"content"`                    // Current chunk content
 	Delta            string       `json:"delta"`                      // Incremental delta
 	FullContent      string       `json:"fullContent"`                // Accumulated full content
+	ReasoningContent string       `json:"reasoningContent,omitempty"` // Accumulated reasoning/thinking content (e.g. DeepSeek Reasoner)
 	Status           string       `json:"status"`                     // Status: see Status* constants (StatusStreaming, StatusCompleted, etc.)
 	Type             string       `json:"type"`                       // Response type: see Type* constants (TypeContent, TypeCompletion, etc.)
 	ToolCalls        []ToolCall   `json:"toolCalls,omitempty"`        // Tool calls (when Type is "tool-call")

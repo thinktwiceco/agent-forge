@@ -64,7 +64,7 @@ func TestConversationHistory_ToolMessages(t *testing.T) {
 	h := NewConversationHistory()
 	tokens := TokenUsage{}
 
-	h.AddAssistantMessageWithToolCalls("calling tool", []llms.ToolCall{{ID: "1"}}, tokens)
+	h.AddAssistantMessageWithToolCalls("calling tool", "", []llms.ToolCall{{ID: "1"}}, tokens)
 	if len(h.Messages()) != 1 {
 		t.Error("Failed to add tool call message")
 	}

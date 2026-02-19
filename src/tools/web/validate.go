@@ -15,9 +15,10 @@ func validateAction(value any) error {
 		"click":        true,
 		"get_content":  true,
 		"save_content": true,
+		"web_search":   true,
 	}
 	if !validActions[action] {
-		return fmt.Errorf("invalid action: %s. Must be one of: navigate, click, get_content, save_content", action)
+		return fmt.Errorf("invalid action: %s. Must be one of: navigate, click, get_content, save_content, web_search", action)
 	}
 	return nil
 }

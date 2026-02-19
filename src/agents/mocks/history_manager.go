@@ -10,7 +10,7 @@ type MockHistoryManager struct {
 	AddUserMessageFunc                   func(msg string)
 	AddSystemMessageFunc                 func(msg string)
 	AddAssistantMessageFunc              func(msg string, tokens history.TokenUsage)
-	AddAssistantMessageWithToolCallsFunc func(content string, toolCalls []llms.ToolCall, tokens history.TokenUsage)
+	AddAssistantMessageWithToolCallsFunc func(content string, reasoningContent string, toolCalls []llms.ToolCall, tokens history.TokenUsage)
 	AddToolMessageFunc                   func(toolCallID, result string, ephemeral bool)
 	MessagesFunc                         func() []*llms.UnifiedMessage
 	SetMessagesFunc                      func(messages []*llms.UnifiedMessage)
@@ -40,9 +40,9 @@ func (m *MockHistoryManager) AddAssistantMessage(msg string, tokens history.Toke
 	}
 }
 
-func (m *MockHistoryManager) AddAssistantMessageWithToolCalls(content string, toolCalls []llms.ToolCall, tokens history.TokenUsage) {
+func (m *MockHistoryManager) AddAssistantMessageWithToolCalls(content string, reasoningContent string, toolCalls []llms.ToolCall, tokens history.TokenUsage) {
 	if m.AddAssistantMessageWithToolCallsFunc != nil {
-		m.AddAssistantMessageWithToolCallsFunc(content, toolCalls, tokens)
+		m.AddAssistantMessageWithToolCallsFunc(content, reasoningContent, toolCalls, tokens)
 	}
 }
 

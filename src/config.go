@@ -34,6 +34,10 @@ type Config struct {
 	// AF_OPENAI_API_KEY is the API key for OpenAI LLM provider.
 	// Optional - only required if using OpenAI models
 	AFOpenAIAPIKey string
+
+	// AF_BRAVE_API_KEY is the API key for the Brave Search API.
+	// Optional - only required when using the web_search action of the web tool.
+	AFBraveAPIKey string
 }
 
 // NewConfig creates a new Config instance by loading environment variables.
@@ -79,6 +83,7 @@ func NewConfig() (*Config, error) {
 		AFDeepSeekAPIKey:   getEnv("AF_DEEPSEEK_API_KEY", ""),
 		AFTogetherAIAPIKey: getEnv("AF_TOGETHERAI_API_KEY", ""),
 		AFOpenAIAPIKey:     getEnv("AF_OPENAI_API_KEY", ""),
+		AFBraveAPIKey:      getEnv("AF_BRAVE_API_KEY", ""),
 	}
 
 	// Validate the configuration

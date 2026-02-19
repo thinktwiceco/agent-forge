@@ -70,7 +70,7 @@ func TestUnifiedMessage_Constructors(t *testing.T) {
 		t.Error("ToolMessage constructor failed")
 	}
 
-	aw := AssistantMessageWithToolCalls("content", []ToolCall{{ID: "1"}}, 1, 1, 2)
+	aw := AssistantMessageWithToolCalls("content", "", []ToolCall{{ID: "1"}}, 1, 1, 2)
 	if aw.Role() != MessageRoleAssistant || len(aw.ToolCalls()) != 1 {
 		t.Error("AssistantMessageWithToolCalls constructor failed")
 	}
