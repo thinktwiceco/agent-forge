@@ -104,13 +104,18 @@ func toOpenAIMessages(messages []*UnifiedMessage) ([]openai.ChatCompletionMessag
 						},
 					}
 				}
-				openaiMessages[i] = openai.ChatCompletionMessageParamUnion{
-					OfAssistant: &openai.ChatCompletionAssistantMessageParam{
-						Content: openai.ChatCompletionAssistantMessageParamContentUnion{
-							OfString: openai.String(message.Content()),
-						},
-						ToolCalls: toolCalls,
+				assistantMsg := &openai.ChatCompletionAssistantMessageParam{
+					Content: openai.ChatCompletionAssistantMessageParamContentUnion{
+						OfString: openai.String(message.Content()),
 					},
+					ToolCalls: toolCalls,
+				}
+				// DeepSeek Reasoner requires reasoning_content to be sent back in tool call turns
+				if rc := message.ReasoningContent(); rc != "" {
+					assistantMsg.SetExtraFields(map[string]any{"reasoning_content": rc})
+				}
+				openaiMessages[i] = openai.ChatCompletionMessageParamUnion{
+					OfAssistant: assistantMsg,
 				}
 			} else {
 				openaiMessages[i] = openai.AssistantMessage(message.Content())
@@ -170,6 +175,7 @@ func (a *openAILLM) streamResponse(messages []*UnifiedMessage, tools []Tool, res
 	}()
 
 	var fullContent string
+	var fullReasoningContent string
 	var promptTokens, completionTokens, totalTokens int
 	// Track tool calls - map of tool call index to accumulated data
 	toolCallsMap := make(map[int]*struct {
@@ -193,6 +199,14 @@ func (a *openAILLM) streamResponse(messages []*UnifiedMessage, tools []Tool, res
 
 		for _, choice := range chunk.Choices {
 			delta := choice.Delta
+
+			// Capture reasoning_content from thinking models (e.g. DeepSeek Reasoner)
+			if rcField, ok := delta.JSON.ExtraFields["reasoning_content"]; ok && rcField.Valid() {
+				var rcStr string
+				if err := json.Unmarshal([]byte(rcField.Raw()), &rcStr); err == nil && rcStr != "" {
+					fullReasoningContent += rcStr
+				}
+			}
 
 			// Handle content streaming
 			if delta.Content != "" {
@@ -284,12 +298,13 @@ func (a *openAILLM) streamResponse(messages []*UnifiedMessage, tools []Tool, res
 
 		// Send tool call chunk
 		toolCallChunk := ChunkResponse{
-			Content:     "",
-			Delta:       "",
-			FullContent: fullContent,
-			Status:      StatusToolCall,
-			Type:        TypeToolCall,
-			ToolCalls:   toolCalls,
+			Content:          "",
+			Delta:            "",
+			FullContent:      fullContent,
+			ReasoningContent: fullReasoningContent,
+			Status:           StatusToolCall,
+			Type:             TypeToolCall,
+			ToolCalls:        toolCalls,
 		}
 
 		jsonBytes, err := serializeChunk(toolCallChunk)
@@ -312,6 +327,7 @@ func (a *openAILLM) streamResponse(messages []*UnifiedMessage, tools []Tool, res
 		Content:          "",
 		Delta:            "",
 		FullContent:      fullContent,
+		ReasoningContent: fullReasoningContent,
 		Status:           StatusCompleted,
 		Type:             TypeCompletion,
 		PromptTokens:     promptTokens,

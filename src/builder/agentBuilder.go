@@ -172,17 +172,18 @@ func (b *AgentBuilder) Build() (*agents.Agent, error) {
 	}
 
 	agentConfig := &agents.AgentConfig{
-		LLMEngine:   b.llmEngine,
-		AgentName:   b.name,
-		Description: "Main Agent",
-		Tone:        agents.ToneKeepItShort,
-		Trace:       fmt.Sprintf("%s-trace", b.name),
-		CanExpand:   true,
-		MainAgent:   true,
-		Persistence: b.persistence,
-		SubAgents:   subagents,
-		Tools:       tools,
-		Plugins:     plugins,
+		LLMEngine:    b.llmEngine,
+		AgentName:    b.name,
+		Description:  "Main Agent",
+		Tone:         agents.ToneKeepItShort,
+		Trace:        fmt.Sprintf("%s-trace", b.name),
+		CanExpand:    true,
+		MainAgent:    true,
+		Persistence:  b.persistence,
+		SubAgents:    subagents,
+		Tools:        tools,
+		Plugins:      plugins,
+		SystemPrompt: b.systemPrompt,
 	}
 
 	agent := agents.NewAgent(agentConfig)

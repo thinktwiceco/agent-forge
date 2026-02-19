@@ -20,6 +20,7 @@ const (
 type UnifiedMessage struct {
 	role             MessageRole
 	content          string
+	reasoningContent string     // For assistant messages - reasoning content from thinking models (e.g. DeepSeek Reasoner)
 	toolCallID       string     // For tool messages - the ID of the tool call this responds to
 	toolCalls        []ToolCall // For assistant messages - tool calls made by the assistant
 	promptTokens     int        // Input tokens consumed
@@ -38,6 +39,10 @@ func (m *UnifiedMessage) Content() string {
 
 func (m *UnifiedMessage) ToolCallID() string {
 	return m.toolCallID
+}
+
+func (m *UnifiedMessage) ReasoningContent() string {
+	return m.reasoningContent
 }
 
 func (m *UnifiedMessage) ToolCalls() []ToolCall {
@@ -97,10 +102,11 @@ func ToolMessage(toolCallID, content string, ephemeral bool) *UnifiedMessage {
 	}
 }
 
-func AssistantMessageWithToolCalls(content string, toolCalls []ToolCall, promptTokens, completionTokens, totalTokens int) *UnifiedMessage {
+func AssistantMessageWithToolCalls(content string, reasoningContent string, toolCalls []ToolCall, promptTokens, completionTokens, totalTokens int) *UnifiedMessage {
 	return &UnifiedMessage{
 		role:             MessageRoleAssistant,
 		content:          content,
+		reasoningContent: reasoningContent,
 		toolCalls:        toolCalls,
 		promptTokens:     promptTokens,
 		completionTokens: completionTokens,
@@ -113,6 +119,7 @@ func (m UnifiedMessage) MarshalJSON() ([]byte, error) {
 	type Alias struct {
 		Role             MessageRole `json:"role"`
 		Content          string      `json:"content"`
+		ReasoningContent string      `json:"reasoningContent,omitempty"`
 		ToolCallID       string      `json:"toolCallId,omitempty"`
 		ToolCalls        []ToolCall  `json:"toolCalls,omitempty"`
 		PromptTokens     int         `json:"promptTokens,omitempty"`
@@ -122,6 +129,7 @@ func (m UnifiedMessage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(Alias{
 		Role:             m.role,
 		Content:          m.content,
+		ReasoningContent: m.reasoningContent,
 		ToolCallID:       m.toolCallID,
 		ToolCalls:        m.toolCalls,
 		PromptTokens:     m.promptTokens,
@@ -135,6 +143,7 @@ func (m *UnifiedMessage) UnmarshalJSON(data []byte) error {
 	type Alias struct {
 		Role             MessageRole `json:"role"`
 		Content          string      `json:"content"`
+		ReasoningContent string      `json:"reasoningContent,omitempty"`
 		ToolCallID       string      `json:"toolCallId,omitempty"`
 		ToolCalls        []ToolCall  `json:"toolCalls,omitempty"`
 		PromptTokens     int         `json:"promptTokens,omitempty"`
@@ -147,6 +156,7 @@ func (m *UnifiedMessage) UnmarshalJSON(data []byte) error {
 	}
 	m.role = alias.Role
 	m.content = alias.Content
+	m.reasoningContent = alias.ReasoningContent
 	m.toolCallID = alias.ToolCallID
 	m.toolCalls = alias.ToolCalls
 	m.promptTokens = alias.PromptTokens

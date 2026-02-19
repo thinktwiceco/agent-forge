@@ -47,6 +47,7 @@ export class ChatManager {
     this.stopBtn = document.getElementById("stop-btn");
     this.currentAssistantEl = null;
     this.currentIteration = null; // Track current iteration for message grouping
+    this.currentAgentName = null; // Track current agent for message grouping
     this.abortController = null; // AbortController for cancelling streams
 
     this.formEl.addEventListener("submit", (event) => {
@@ -133,6 +134,7 @@ export class ChatManager {
     // This ensures each response creates a new message bubble
     this.currentAssistantEl = null;
     this.currentIteration = null;
+    this.currentAgentName = null;
     
     await this.startStream(message);
   }
@@ -142,6 +144,7 @@ export class ChatManager {
     localStorage.removeItem('currentConversationId');
     this.currentAssistantEl = null;
     this.currentIteration = null;
+    this.currentAgentName = null;
     this.setStatus("Idle");
     this.clearMessages();
   }
@@ -151,6 +154,7 @@ export class ChatManager {
     localStorage.setItem('currentConversationId', conversationId);
     this.currentAssistantEl = null;
     this.currentIteration = null;
+    this.currentAgentName = null;
     this.clearMessages();
     this.setStatus("Loading");
 
@@ -304,11 +308,14 @@ export class ChatManager {
       return;
     }
     
-    // Check if iteration has changed (new response turn)
+    // Create a new bubble when iteration or agent changes
     const iteration = payload.iteration !== undefined ? payload.iteration : null;
-    if (iteration !== null && iteration !== this.currentIteration) {
-      // New iteration detected, create a new message bubble
+    const agentName = payload.agentName || null;
+    const iterChanged = iteration !== null && iteration !== this.currentIteration;
+    const agentChanged = agentName !== null && agentName !== this.currentAgentName;
+    if (iterChanged || agentChanged) {
       this.currentIteration = iteration;
+      this.currentAgentName = agentName;
       this.currentAssistantEl = null;
     }
     
@@ -341,6 +348,7 @@ export class ChatManager {
     ]);
     // Reset assistant element so next content appears after tool calls
     this.currentAssistantEl = null;
+    this.currentAgentName = null;
   }
 
   handleToolExecutingEvent(payload) {

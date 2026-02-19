@@ -18,7 +18,7 @@ type Manager interface {
 	AddUserMessage(msg string)
 	AddSystemMessage(msg string)
 	AddAssistantMessage(msg string, tokens TokenUsage)
-	AddAssistantMessageWithToolCalls(content string, toolCalls []llms.ToolCall, tokens TokenUsage)
+	AddAssistantMessageWithToolCalls(content string, reasoningContent string, toolCalls []llms.ToolCall, tokens TokenUsage)
 	AddToolMessage(toolCallID, result string, ephemeral bool)
 	Messages() []*llms.UnifiedMessage
 	SetMessages(messages []*llms.UnifiedMessage)
@@ -82,8 +82,8 @@ func (ch *ConversationHistory) AddAssistantMessage(msg string, tokens TokenUsage
 }
 
 // AddAssistantMessageWithToolCalls adds an assistant message with tool calls.
-func (ch *ConversationHistory) AddAssistantMessageWithToolCalls(content string, toolCalls []llms.ToolCall, tokens TokenUsage) {
-	ch.messages = append(ch.messages, llms.AssistantMessageWithToolCalls(content, toolCalls, tokens.PromptTokens, tokens.CompletionTokens, tokens.TotalTokens))
+func (ch *ConversationHistory) AddAssistantMessageWithToolCalls(content string, reasoningContent string, toolCalls []llms.ToolCall, tokens TokenUsage) {
+	ch.messages = append(ch.messages, llms.AssistantMessageWithToolCalls(content, reasoningContent, toolCalls, tokens.PromptTokens, tokens.CompletionTokens, tokens.TotalTokens))
 }
 
 // AddToolMessage adds a tool result message.

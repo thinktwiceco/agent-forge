@@ -90,6 +90,7 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 		llmResponseCh := e.llmEngine.ChatStream(messages, e.tools)
 
 		var fullContent string
+		var fullReasoningContent string
 		var toolCalls []llms.ToolCall
 		var hasToolCalls bool
 		var completedChunkBytes []byte
@@ -134,6 +135,7 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 				if chunk.Status == llms.StatusToolCall && len(chunk.ToolCalls) > 0 {
 					toolCalls = chunk.ToolCalls
 					hasToolCalls = true
+					fullReasoningContent = chunk.ReasoningContent
 					agentforge.Debug("Tool calls detected: %d tool calls", len(toolCalls))
 					if !responseCh.TrySend(chunkBytes) {
 						return nil
@@ -251,7 +253,7 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 			}
 		}
 
-		hm.AddAssistantMessageWithToolCalls(fullContent, toolCalls, history.TokenUsage{
+		hm.AddAssistantMessageWithToolCalls(fullContent, fullReasoningContent, toolCalls, history.TokenUsage{
 			PromptTokens:     promptTokens,
 			CompletionTokens: completionTokens,
 			TotalTokens:      totalTokens,
