@@ -50,23 +50,23 @@ func (r *apiResponse) String() string {
 	var builder strings.Builder
 
 	builder.WriteString("API Response\n")
-	builder.WriteString(fmt.Sprintf("Endpoint: %s\n", r.Endpoint))
-	builder.WriteString(fmt.Sprintf("Method: %s\n", r.Method))
-	builder.WriteString(fmt.Sprintf("URL: %s\n", r.URL))
-	builder.WriteString(fmt.Sprintf("Status: %d\n", r.StatusCode))
+	fmt.Fprintf(&builder, "Endpoint: %s\n", r.Endpoint)
+	fmt.Fprintf(&builder, "Method: %s\n", r.Method)
+	fmt.Fprintf(&builder, "URL: %s\n", r.URL)
+	fmt.Fprintf(&builder, "Status: %d\n", r.StatusCode)
 
 	if r.Error != "" {
-		builder.WriteString(fmt.Sprintf("Error: %s\n", r.Error))
+		fmt.Fprintf(&builder, "Error: %s\n", r.Error)
 	}
 
 	if len(r.Headers) > 0 {
 		builder.WriteString("\nResponse Headers:\n")
 		for key, value := range r.Headers {
-			builder.WriteString(fmt.Sprintf("  %s: %s\n", key, value))
+			fmt.Fprintf(&builder, "  %s: %s\n", key, value)
 		}
 	}
 
-	builder.WriteString(fmt.Sprintf("\nResponse Body:\n%s\n", r.Body))
+	fmt.Fprintf(&builder, "\nResponse Body:\n%s\n", r.Body)
 
 	return builder.String()
 }

@@ -60,35 +60,35 @@ func (a *Api) generateAdvancedDescription() string {
 	var builder strings.Builder
 
 	builder.WriteString("Advanced Details:\n")
-	builder.WriteString(fmt.Sprintf("- Tool: %s\n", a.name))
-	builder.WriteString(fmt.Sprintf("- Total Endpoints: %d\n\n", len(a.endpoints)))
+	fmt.Fprintf(&builder, "- Tool: %s\n", a.name)
+	fmt.Fprintf(&builder, "- Total Endpoints: %d\n\n", len(a.endpoints))
 
 	builder.WriteString("Available Endpoints:\n")
 	for i, endpoint := range a.endpoints {
-		builder.WriteString(fmt.Sprintf("\n%d. Endpoint: %s\n", i+1, endpoint.Name))
-		builder.WriteString(fmt.Sprintf("   Description: %s\n", endpoint.Description))
-		builder.WriteString(fmt.Sprintf("   Method: %s\n", endpoint.Method))
-		builder.WriteString(fmt.Sprintf("   URL: %s\n", endpoint.URL))
+		fmt.Fprintf(&builder, "\n%d. Endpoint: %s\n", i+1, endpoint.Name)
+		fmt.Fprintf(&builder, "   Description: %s\n", endpoint.Description)
+		fmt.Fprintf(&builder, "   Method: %s\n", endpoint.Method)
+		fmt.Fprintf(&builder, "   URL: %s\n", endpoint.URL)
 
 		if endpoint.URLParameters != "" {
 			builder.WriteString("   URL Parameters:\n")
 			// Split by lines and indent
 			for _, line := range strings.Split(strings.TrimSpace(endpoint.URLParameters), "\n") {
-				builder.WriteString(fmt.Sprintf("     %s\n", strings.TrimSpace(line)))
+				fmt.Fprintf(&builder, "     %s\n", strings.TrimSpace(line))
 			}
 		}
 
 		if endpoint.QueryParams != "" {
 			builder.WriteString("   Query Parameters:\n")
 			for _, line := range strings.Split(strings.TrimSpace(endpoint.QueryParams), "\n") {
-				builder.WriteString(fmt.Sprintf("     %s\n", strings.TrimSpace(line)))
+				fmt.Fprintf(&builder, "     %s\n", strings.TrimSpace(line))
 			}
 		}
 
 		if endpoint.Payload != "" {
 			builder.WriteString("   Request Body:\n")
 			for _, line := range strings.Split(strings.TrimSpace(endpoint.Payload), "\n") {
-				builder.WriteString(fmt.Sprintf("     %s\n", strings.TrimSpace(line)))
+				fmt.Fprintf(&builder, "     %s\n", strings.TrimSpace(line))
 			}
 		}
 	}

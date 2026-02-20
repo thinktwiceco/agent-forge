@@ -20,27 +20,27 @@ type PostgresResponse struct {
 func (r *PostgresResponse) String() string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("Operation: %s\n", r.Operation))
-	sb.WriteString(fmt.Sprintf("Table: %s\n", r.Table))
+	fmt.Fprintf(&sb, "Operation: %s\n", r.Operation)
+	fmt.Fprintf(&sb, "Table: %s\n", r.Table)
 
 	if r.RowsAffected > 0 {
-		sb.WriteString(fmt.Sprintf("Rows Affected: %d\n", r.RowsAffected))
+		fmt.Fprintf(&sb, "Rows Affected: %d\n", r.RowsAffected)
 	}
 
 	if r.RowsReturned > 0 {
-		sb.WriteString(fmt.Sprintf("Rows Returned: %d\n", r.RowsReturned))
+		fmt.Fprintf(&sb, "Rows Returned: %d\n", r.RowsReturned)
 	}
 
 	if r.Message != "" {
-		sb.WriteString(fmt.Sprintf("Message: %s\n", r.Message))
+		fmt.Fprintf(&sb, "Message: %s\n", r.Message)
 	}
 
 	if r.ExecutedSQL != "" {
-		sb.WriteString(fmt.Sprintf("\nExecuted Query (parameterized):\n%s\n", r.ExecutedSQL))
+		fmt.Fprintf(&sb, "\nExecuted Query (parameterized):\n%s\n", r.ExecutedSQL)
 	}
 
 	if r.DataPreview != "" {
-		sb.WriteString(fmt.Sprintf("\nData Preview:\n%s\n", r.DataPreview))
+		fmt.Fprintf(&sb, "\nData Preview:\n%s\n", r.DataPreview)
 	}
 
 	return sb.String()
@@ -78,7 +78,7 @@ func formatDataPreview(columns []string, rows [][]interface{}, maxRows int) stri
 	}
 
 	if len(rows) > maxRows {
-		sb.WriteString(fmt.Sprintf("\n... and %d more rows (use limit/offset to view more)\n", len(rows)-maxRows))
+		fmt.Fprintf(&sb, "\n... and %d more rows (use limit/offset to view more)\n", len(rows)-maxRows)
 	}
 
 	return sb.String()

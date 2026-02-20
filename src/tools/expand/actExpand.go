@@ -65,7 +65,7 @@ func (e *Expand) expand(agentContext map[string]any, subjectType string, subject
 
 	// Build the response
 	var response strings.Builder
-	response.WriteString(fmt.Sprintf("=== %s: %s ===\n\n", strings.ToUpper(subjectType), subjectName))
+	fmt.Fprintf(&response, "=== %s: %s ===\n\n", strings.ToUpper(subjectType), subjectName)
 
 	// Basic description
 	response.WriteString("📄 Basic Description:\n")

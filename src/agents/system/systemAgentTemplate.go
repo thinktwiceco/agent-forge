@@ -87,7 +87,7 @@ func (t *SystemAgentTemplate) AddSystemPrompt(incipit string, steps []string, ou
 	if len(steps) > 0 {
 		builder.WriteString("STEPS:\n")
 		for i, step := range steps {
-			builder.WriteString(fmt.Sprintf("- Step %d: %s\n", i+1, step))
+			fmt.Fprintf(&builder, "- Step %d: %s\n", i+1, step)
 		}
 		builder.WriteString("\n")
 	}
