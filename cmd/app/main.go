@@ -39,6 +39,9 @@ func main() {
 
 	server := NewServer(agentMgr, configMgr, todoMgr)
 
+	// Route background-drain chunks (sub-agent responses) to the push SSE endpoint.
+	agentMgr.SetChunkRouter(server.pushRegistry.Push)
+
 	shutdownCh := make(chan os.Signal, 1)
 	signal.Notify(shutdownCh, syscall.SIGINT, syscall.SIGTERM)
 

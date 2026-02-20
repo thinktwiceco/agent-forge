@@ -49,6 +49,8 @@ export class ChatManager {
     this.currentIteration = null; // Track current iteration for message grouping
     this.currentAgentName = null; // Track current agent for message grouping
     this.abortController = null; // AbortController for cancelling streams
+    this.pushController = null;  // AbortController for the persistent push SSE connection
+    this.pushChatId = null;      // chatId the push listener is currently subscribed to
 
     this.formEl.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -118,6 +120,61 @@ export class ChatManager {
     ]);
   }
 
+  // startPushListener opens a persistent SSE connection to /api/chat/push for chatId.
+  // It automatically reconnects on network errors and stays alive across user messages.
+  startPushListener(chatId) {
+    if (this.pushChatId === chatId && this.pushController) {
+      return; // Already listening for this conversation.
+    }
+    this.stopPushListener();
+    this.pushChatId = chatId;
+    this.pushController = new AbortController();
+    const controller = this.pushController;
+
+    (async () => {
+      while (!controller.signal.aborted) {
+        try {
+          const res = await fetch(
+            `/api/chat/push?conversationId=${encodeURIComponent(chatId)}`,
+            { signal: controller.signal }
+          );
+          if (!res.ok || !res.body) break;
+          await parseSSEStream(res.body, (eventType, payload) => {
+            this.handlePushEvent(eventType, payload);
+          });
+        } catch (err) {
+          if (err.name === "AbortError") break;
+          // Brief pause before reconnecting after an unexpected error.
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      }
+    })();
+  }
+
+  stopPushListener() {
+    if (this.pushController) {
+      this.pushController.abort();
+      this.pushController = null;
+      this.pushChatId = null;
+    }
+  }
+
+  // handlePushEvent processes chunks that arrive via the persistent push connection.
+  // It renders content/tool events but intentionally ignores "completed" and "error"
+  // to avoid interfering with the main stream's UI state (status bar, stop button).
+  handlePushEvent(eventType, payload) {
+    if (!payload) return;
+    if (eventType === "content") {
+      this.handleContentEvent(payload);
+    } else if (eventType === "tool_call") {
+      this.handleToolCallEvent(payload);
+    } else if (eventType === "tool_executing") {
+      this.handleToolExecutingEvent(payload);
+    } else if (eventType === "tool_result") {
+      this.handleToolResultEvent(payload);
+    }
+  }
+
   clearMessages() {
     this.messagesEl.innerHTML = "";
   }
@@ -145,6 +202,7 @@ export class ChatManager {
     this.currentAssistantEl = null;
     this.currentIteration = null;
     this.currentAgentName = null;
+    this.stopPushListener();
     this.setStatus("Idle");
     this.clearMessages();
   }
@@ -155,6 +213,7 @@ export class ChatManager {
     this.currentAssistantEl = null;
     this.currentIteration = null;
     this.currentAgentName = null;
+    this.startPushListener(conversationId);
     this.clearMessages();
     this.setStatus("Loading");
 
@@ -274,6 +333,8 @@ export class ChatManager {
           detail: { id: payload.chatId },
         })
       );
+      // Open (or reuse) the persistent push channel for background responses.
+      this.startPushListener(payload.chatId);
     }
 
     if (eventType === "content") {

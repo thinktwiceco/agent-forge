@@ -6,12 +6,14 @@ import (
 
 	"github.com/thinktwiceco/agent-forge/src/agents"
 	"github.com/thinktwiceco/agent-forge/src/builder"
+	"github.com/thinktwiceco/agent-forge/src/core"
 )
 
 type AgentManager struct {
-	mu        sync.RWMutex
-	agent     *agents.Agent
-	configMgr *ConfigManager
+	mu          sync.RWMutex
+	agent       *agents.Agent
+	configMgr   *ConfigManager
+	chunkRouter func(chatId string, chunk core.ExtendedChunkResponse)
 }
 
 func NewAgentManager(configMgr *ConfigManager) (*AgentManager, error) {
@@ -30,6 +32,18 @@ func (am *AgentManager) GetAgent() *agents.Agent {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
 	return am.agent
+}
+
+// SetChunkRouter sets the callback used to route background-drain chunks to the push registry.
+// The router is preserved across Reload calls so it is applied to newly built agents.
+func (am *AgentManager) SetChunkRouter(fn func(chatId string, chunk core.ExtendedChunkResponse)) {
+	am.mu.Lock()
+	am.chunkRouter = fn
+	agent := am.agent
+	am.mu.Unlock()
+	if agent != nil {
+		agent.SetChunkRouter(fn)
+	}
 }
 
 func (am *AgentManager) GetAgentName() string {
@@ -51,6 +65,9 @@ func (am *AgentManager) Reload() error {
 
 	am.mu.Lock()
 	am.agent = agent
+	if am.chunkRouter != nil {
+		agent.SetChunkRouter(am.chunkRouter)
+	}
 	am.mu.Unlock()
 	return nil
 }

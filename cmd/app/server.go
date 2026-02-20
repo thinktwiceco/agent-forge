@@ -19,6 +19,7 @@ type Server struct {
 	todoMgr      *TodoManager
 	httpSrv      *http.Server
 	convRegistry *ConversationRegistry
+	pushRegistry *PushRegistry
 }
 
 func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoManager) *Server {
@@ -31,6 +32,7 @@ func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoMa
 		configMgr:    configMgr,
 		todoMgr:      todoMgr,
 		convRegistry: NewConversationRegistry(),
+		pushRegistry: NewPushRegistry(),
 	}
 	server.setupRoutes()
 	return server
@@ -55,6 +57,7 @@ func (s *Server) setupRoutes() {
 	api := s.engine.Group("/api")
 	api.POST("/chat", s.handleChat)
 	api.POST("/chat/stop", s.handleStopChat)
+	api.GET("/chat/push", s.handlePush)
 	api.GET("/conversations", s.handleListConversations)
 	api.GET("/conversations/:id", s.handleGetConversation)
 	api.DELETE("/conversations/:id", s.handleDeleteConversation)

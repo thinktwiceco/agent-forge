@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/queue"
 )
 
 func (s *Server) handleChat(c *gin.Context) {
@@ -48,7 +49,8 @@ func (s *Server) handleChat(c *gin.Context) {
 	writer := NewSSEWriter(c)
 	writer.SetHeaders()
 
-	responseCh := agent.ChatStream(ctx, req.Message, conversationID)
+	enriched := queue.FormatHeaders(req.Message, map[string]string{"sender": "user"})
+	responseCh := agent.ChatStream(ctx, enriched, conversationID)
 	stream := responseCh.Start()
 
 	// Clean up function
