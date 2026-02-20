@@ -131,7 +131,7 @@ func (a *Agent) loadDelegateTool() {
 		}
 	}
 
-	dt := delegate.NewDelegateTool(a.subAgents)
+	dt := delegate.NewDelegateTool(a.subAgents, a.inbox)
 	a.tools = append(a.tools, dt)
 }
 

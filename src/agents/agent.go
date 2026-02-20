@@ -11,6 +11,7 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/history"
 	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/queue"
 )
 
 // Agent represents an advanced agent with an LLM engine.
@@ -50,6 +51,16 @@ type Agent struct {
 	tokenCounter         llms.TokenCounter
 	// History factory creates a new history Manager for each ChatStream call
 	historyFactory func(chatId string) history.Manager
+	// inbox is the agent's message queue.
+	// Created automatically at construction time; replaced when Drain is called with an external queue.
+	// The delegate tool uses this to enqueue sub-agent responses for async correlation.
+	inbox *queue.Queue
+	// inboxCancel cancels the current background inbox drain goroutine.
+	// Called when Drain replaces the internal queue with an external one.
+	inboxCancel context.CancelFunc
+	// chunkRouter is an optional callback that receives each chunk produced by the background drain.
+	// The HTTP layer sets this to route background responses to the appropriate push SSE connection.
+	chunkRouter func(chatId string, chunk core.ExtendedChunkResponse)
 }
 
 // ===== Constructor =====
@@ -128,6 +139,14 @@ func NewAgent(config *AgentConfig) *Agent {
 
 	// Create executor
 	a.executor = a.createExecutor()
+
+	// Initialize the internal inbox queue and start a background drain goroutine.
+	// This ensures the delegate tool always has a queue available, even when the agent
+	// is used via HTTP without an explicit Drain call.
+	a.inbox = queue.New(64)
+	a.loadDelegateTool()
+	a.executor.UpdateTools(a.tools)
+	a.startBackgroundDrain()
 
 	// System Callbacks are defined in systemHandlers.go
 	a.registerSystemCallbacks()
@@ -355,6 +374,87 @@ func (a *Agent) EnsureSystemPrompt() {
 // This is part of the handlers.AgentOperations interface.
 func (a *Agent) InitAgentContext() {
 	a.initAgentContext()
+}
+
+// SetChunkRouter sets a callback that receives each chunk produced by the background drain.
+// The HTTP layer uses this to forward background responses to the appropriate push SSE connection.
+func (a *Agent) SetChunkRouter(fn func(chatId string, chunk core.ExtendedChunkResponse)) {
+	a.chunkRouter = fn
+}
+
+// routeChunk forwards a chunk through the chunk router if one is set and the chunk has a chatId.
+func (a *Agent) routeChunk(chunk core.ExtendedChunkResponse) {
+	if a.chunkRouter != nil && chunk.ChatId != "" {
+		a.chunkRouter(chunk.ChatId, chunk)
+	}
+}
+
+// startBackgroundDrain starts an internal goroutine that drains a.inbox.
+// It is cancelled by calling a.inboxCancel(). Used for the automatic internal queue
+// created at agent construction time.
+func (a *Agent) startBackgroundDrain() {
+	ctx, cancel := context.WithCancel(context.Background())
+	a.inboxCancel = cancel
+	q := a.inbox
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-q.C():
+				if !ok {
+					return
+				}
+				responseCh := a.ChatStream(ctx, msg.Format(), msg.ChatId)
+				for chunk := range responseCh.Start() {
+					a.routeChunk(chunk)
+				}
+			}
+		}
+	}()
+}
+
+// Drain replaces the internal inbox queue with q and drains it in the calling goroutine,
+// blocking until ctx is cancelled or q is closed.
+//
+// Each message is routed to its own conversation via the ChatId embedded in the message.
+// The formatted message content (headers + body) is what the agent receives, allowing it
+// to observe metadata such as the sender identity, timestamp, and reqId.
+//
+// Calling Drain stops the internal background drain goroutine (started automatically at
+// construction) and switches to the provided queue. This is useful when the caller needs
+// direct control over the inbox, e.g. to inject messages from the web UI.
+//
+// Example:
+//
+//	q := queue.New(32)
+//	go agent.Drain(ctx, q)
+//	q.Enqueue("Ciao!", "conv-1", map[string]string{"sender": "user"})
+func (a *Agent) Drain(ctx context.Context, q *queue.Queue) {
+	// Cancel the background drain goroutine that was started at construction.
+	if a.inboxCancel != nil {
+		a.inboxCancel()
+		a.inboxCancel = nil
+	}
+	// Replace inbox and sync the delegate tool with the new queue reference.
+	a.inbox = q
+	a.loadDelegateTool()
+	a.executor.UpdateTools(a.tools)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-q.C():
+			if !ok {
+				return
+			}
+			responseCh := a.ChatStream(ctx, msg.Format(), msg.ChatId)
+			for chunk := range responseCh.Start() {
+				a.routeChunk(chunk)
+			}
+		}
+	}
 }
 
 // ===== Compile-time Interface Assertions =====
