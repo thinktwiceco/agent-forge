@@ -24,9 +24,16 @@
 !*.example
 
 # Local config (contains secrets/user paths)
-cmd/app/config.yaml
-cmd/app/config-test.yaml
+cmd/localforge/config.yaml
+cmd/localforge/config-test.yaml
+cmd/localforge/.env
 agent_config.yaml
+
+# localforge runtime dirs
+cmd/localforge/bin/*
+!cmd/localforge/bin/.gitkeep
+cmd/localforge/sandbox/*
+!cmd/localforge/sandbox/.gitkeep
 
 # Node.js
 node_modules/

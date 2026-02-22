@@ -2,22 +2,22 @@
 set -euo pipefail
 
 # Start the agent-forge app in dev mode
-# Run from project root; uses DEBUG logging and config from cmd/app
+# Run from project root; uses DEBUG logging and config from cmd/localforge
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-cd "$PROJECT_ROOT"
+cd "$PROJECT_ROOT/cmd/localforge"
 
-CONFIG="${1:-cmd/app/config.yaml}"
+CONFIG="${1:-config.yaml}"
 if [ ! -f "$CONFIG" ]; then
-  CONFIG="cmd/app/config.example.yaml"
+  CONFIG="config.example.yaml"
   if [ ! -f "$CONFIG" ]; then
-    echo "No config found. Create cmd/app/config-test.yaml or config.example.yaml"
+    echo "No config found. Create cmd/localforge/config.yaml or config.example.yaml"
     exit 1
   fi
-  echo "Using $CONFIG (config-test.yaml not found)"
+  echo "Using $CONFIG (config.yaml not found)"
 fi
 
-echo "Starting agent-forge (config: $CONFIG, port: 8080)..."
-AF_LOG_LEVEL=DEBUG go run ./cmd/app -config "$CONFIG" -port 8080
+echo "Starting Local Forge (config: $CONFIG, port: 8080)..."
+AF_LOG_LEVEL=DEBUG go run "$PROJECT_ROOT/cmd/localforge/src" -config "$CONFIG" -port 8080 -dev

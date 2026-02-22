@@ -4,7 +4,7 @@
 
 ```mermaid
 graph TB
-    cmd[cmd/app] --> agents[src/agents]
+    cmd[cmd/localforge] --> agents[src/agents]
     agents --> core[src/core]
     agents --> llms[src/llms]
     agents --> history[src/history]

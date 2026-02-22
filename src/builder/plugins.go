@@ -6,14 +6,16 @@ import (
 
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/plugins/logger"
+	"github.com/thinktwiceco/agent-forge/src/plugins/procedures"
 	"github.com/thinktwiceco/agent-forge/src/plugins/todo"
 )
 
 type Plugin string
 
 const (
-	LOGGER_PLUGIN Plugin = "logger"
-	TODO_PLUGIN   Plugin = "todo"
+	LOGGER_PLUGIN     Plugin = "logger"
+	TODO_PLUGIN       Plugin = "todo"
+	PROCEDURES_PLUGIN Plugin = "procedures"
 )
 
 // Global callback for todo plugin (can be set by applications)
@@ -35,6 +37,8 @@ func (p Plugin) getPlugin() (core.Plugin, error) {
 	case TODO_PLUGIN:
 		// Use global callback if set, otherwise use nil
 		return todo.NewTodoPlugin(globalTodoCallback), nil
+	case PROCEDURES_PLUGIN:
+		return procedures.NewProceduresPlugin(""), nil
 	}
 	return nil, fmt.Errorf("invalid plugin: %s", p)
 }

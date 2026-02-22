@@ -5,11 +5,13 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 )
 
-//go:embed static/*
+//go:embed static
 var embeddedStatic embed.FS
 
 type Server struct {
@@ -20,9 +22,11 @@ type Server struct {
 	httpSrv      *http.Server
 	convRegistry *ConversationRegistry
 	pushRegistry *PushRegistry
+	devMode      bool
+	appDir       string
 }
 
-func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoManager) *Server {
+func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoManager, devMode bool, appDir string) *Server {
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery(), corsMiddleware())
 
@@ -33,13 +37,22 @@ func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoMa
 		todoMgr:      todoMgr,
 		convRegistry: NewConversationRegistry(),
 		pushRegistry: NewPushRegistry(),
+		devMode:      devMode,
+		appDir:       appDir,
 	}
 	server.setupRoutes()
 	return server
 }
 
+func (s *Server) staticFileSystem() (fs.FS, error) {
+	if s.devMode {
+		return os.DirFS(filepath.Join(s.appDir, "src", "static")), nil
+	}
+	return fs.Sub(embeddedStatic, "static")
+}
+
 func (s *Server) setupRoutes() {
-	staticFS, err := fs.Sub(embeddedStatic, "static")
+	staticFS, err := s.staticFileSystem()
 	if err != nil {
 		panic(err)
 	}

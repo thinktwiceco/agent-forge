@@ -41,66 +41,39 @@ func (b *Builder) Build() string {
 }
 
 func getTonePrompt(tone string) string {
+	var name string
 	switch tone {
 	case ToneKeepItShort:
-		return `RESPONSE TONE:
-- Remain concise and to the point
-- Answer only what is asked, nothing more
-- Keep responses brief while maintaining accuracy
-- Avoid unnecessary elaboration or verbose explanations
-- Stay focused on the specific question or task at hand
-`
+		name = "tone-keep-it-short"
 	case ToneSystemAgent:
-		return `RESPONSE TONE:
-- You are a system agent. Execute operations silently.
-- Do NOT provide commentary, explanations, or announcements.
-- Do NOT use phrases like "I'll", "Let me", "I will", etc.
-- Only return the requested results or data.
-- No greetings, no explanations, just results.
-- Perform your duty as a good system agent without unnecessary noise.
-`
+		name = "tone-system-agent"
 	default:
 		return ""
 	}
+	s, err := LoadMainPrompt(name)
+	if err != nil {
+		panic(err)
+	}
+	return s + "\n"
 }
 
 func (b *Builder) addSystemPrompt() string {
 	prompt := b.config.SystemPrompt
 
 	if prompt == "" {
-		prompt = `You are an helpful assistant`
+		defaultPrompt, err := LoadMainPrompt("default")
+		if err != nil {
+			panic(err)
+		}
+		prompt = defaultPrompt
 	}
 
 	if b.config.MainAgent {
-		prompt += `
-[SYSTEM] You are the MAIN agent coordinating a team of specialized sub-agents.
-
-SUB-AGENTS AS SPECIALIZED TOOLS:
-Sub-agents are specialized tools for complex problems. Use the "delegate" tool ONLY when:
-- The problem requires specialized expertise beyond your direct knowledge
-- The task benefits from systematic analysis or reasoning
-- You cannot answer directly from your context
-
-DELEGATION WORKFLOW:
-1. Understand the problem scope - identify what needs to be solved
-2. Find the correct sub-agent - match the problem to the right specialization
-3. Formalize the request - craft a clear, specific task description
-4. Delegate via tool call - use the "delegate" tool with the chosen agent
-5. Evaluate the response - assess if it fully addresses the problem
-6. Iterate if needed - refine your request and delegate again if the response is incomplete
-
-IMPORTANT - EXECUTION BEHAVIOR:
-- Execute operations silently without revealing your internal decision-making process
-- Do NOT announce that you are delegating to sub-agents or using tools
-- Do NOT mention which sub-agent you are using or what actions you are taking
-- Simply execute the requested operation and present the final result to the user
-- Only mention sub-agents or capabilities if the user explicitly asks about them
-
-RESPOND DIRECTLY (no tool calls) for:
-- Greetings, casual conversation, simple Q&A
-- Questions you can answer from your context
-- Questions about your capabilities or sub-agents list
-`
+		mainAgent, err := LoadMainPrompt("main-agent")
+		if err != nil {
+			panic(err)
+		}
+		prompt += "\n\n" + mainAgent
 		if tonePrompt := getTonePrompt(b.config.Tone); tonePrompt != "" {
 			prompt += "\n" + tonePrompt
 		}
@@ -118,17 +91,14 @@ func (b *Builder) buildSubAgentsSystemPrompt(prompt string) string {
 		return prompt
 	}
 
-	saPrompt := `
-=== AVAILABLE SUB-AGENTS ===
-Specialized tools for complex problems. Use "delegate" tool to access them.
-
-[SUB AGENTS]:
-`
+	header, err := LoadMainPrompt("sub-agents-header")
+	if err != nil {
+		panic(err)
+	}
+	saPrompt := "\n" + header + "\n"
 	for _, sa := range b.config.SubAgents {
 		saPrompt += fmt.Sprintf("📌 %s: %s\n\n", sa.Name(), sa.BasicDescription())
 	}
-
-	prompt += "Use the 'expand' if you need to use one of the sub-agents."
 	prompt += saPrompt
 	return prompt
 }
@@ -138,16 +108,14 @@ func (b *Builder) buildToolsDescriptions(prompt string) string {
 		return prompt
 	}
 
-	toolsPrompt := `
-=== AVAILABLE TOOLS ===
-Tools available to the agent. Use "tool" tool to access them.
-
-[TOOLS]:
-`
+	header, err := LoadMainPrompt("tools-header")
+	if err != nil {
+		panic(err)
+	}
+	toolsPrompt := "\n" + header + "\n"
 	for _, tool := range b.config.Tools {
 		toolsPrompt += fmt.Sprintf("📌 %s: %s\n\n", tool.GetName(), tool.GetFunctionDefinition().Description)
 	}
-
 	prompt += toolsPrompt
 	return prompt
 }

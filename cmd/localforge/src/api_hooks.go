@@ -12,10 +12,14 @@ import (
 func RegisterApiHooks() {
 	// Register HelpCrunch authentication hook
 	// Reads API key from HELPCRUNCH_API_KEY environment variable
-	api.RegisterHook("helpcrunch_auth", func(url string, headers map[string]string, body string) (map[string]string, error) {
-		apiKey := os.Getenv("HELPCRUNCH_API_KEY")
+
+	// This is an example of how to register an API authentication hook
+	// for the api tool.
+	// You can reference the hook name in the YAML configuration.
+	api.RegisterHook("api_auth", func(url string, headers map[string]string, body string) (map[string]string, error) {
+		apiKey := os.Getenv("API_AUTH_KEY")
 		if apiKey == "" {
-			return nil, fmt.Errorf("HELPCRUNCH_API_KEY environment variable not set")
+			return nil, fmt.Errorf("API_AUTH_KEY environment variable not set")
 		}
 
 		if headers == nil {

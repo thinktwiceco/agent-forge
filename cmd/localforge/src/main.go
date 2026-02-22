@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -14,12 +15,24 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "agent_config.yaml", "path to agent config")
+	configPath := flag.String("config", "config.yaml", "path to agent config")
 	port := flag.String("port", "8080", "server port")
+	devMode := flag.Bool("dev", false, "serve static files from disk instead of embedded FS")
 	flag.Parse()
 
-	// Load .env file (ignore error if file doesn't exist)
+	// appDir is the directory containing the config — used to resolve .env and static assets.
+	appDir := filepath.Dir(*configPath)
+
+	// Load .env from the app directory, then fall back to cwd.
+	_ = godotenv.Load(filepath.Join(appDir, ".env"))
 	_ = godotenv.Load()
+
+	cwd, _ := os.Getwd()
+	log.Printf("Working directory : %s", cwd)
+	log.Printf("App directory     : %s", appDir)
+	log.Printf("Config            : %s", *configPath)
+	log.Printf("Dev mode          : %v", *devMode)
+	log.Printf("Port              : %s", *port)
 
 	// Register API hooks before creating agent
 	RegisterApiHooks()
@@ -28,6 +41,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("config error: %v", err)
 	}
+	cfg := configMgr.GetConfig()
+	log.Printf("Agent name        : %s", cfg.Agent.Name)
+	log.Printf("Agent model       : %s", cfg.Agent.Model)
 
 	// Create TodoManager and set its callback globally before building the agent
 	todoMgr := NewTodoManager()
@@ -37,7 +53,7 @@ func main() {
 		log.Fatalf("agent error: %v", err)
 	}
 
-	server := NewServer(agentMgr, configMgr, todoMgr)
+	server := NewServer(agentMgr, configMgr, todoMgr, *devMode, appDir)
 
 	// Route background-drain chunks (sub-agent responses) to the push SSE endpoint.
 	agentMgr.SetChunkRouter(server.pushRegistry.Push)

@@ -370,6 +370,14 @@ func (a *Agent) EnsureSystemPrompt() {
 	a.ensureSystemPrompt()
 }
 
+// AppendSystemPrompt appends text to the agent's system prompt and rebuilds it.
+// Plugins that load data asynchronously (e.g. during EventAgentInitialized) can
+// call this after their data is ready to inject their prompt contribution.
+func (a *Agent) AppendSystemPrompt(text string) {
+	a.config.SystemPrompt += text
+	a.ensureSystemPrompt()
+}
+
 // InitAgentContext rebuilds the agent context when tools or sub-agents change.
 // This is part of the handlers.AgentOperations interface.
 func (a *Agent) InitAgentContext() {
