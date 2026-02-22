@@ -23,15 +23,15 @@ func LoadMainPrompt(name string) (string, error) {
 
 // SystemAgentContent holds parsed sections from a system agent markdown file.
 type SystemAgentContent struct {
-	Incipit            string
-	Steps              []string
-	Output             string
-	Examples           []string
-	Critical           []string
-	DescriptionIncipit string
+	Incipit             string
+	Steps               []string
+	Output              string
+	Examples            []string
+	Critical            []string
+	DescriptionIncipit  string
 	DescriptionExamples []string
-	AdvanceDescription string
-	Troubleshooting    string
+	AdvanceDescription  string
+	Troubleshooting     string
 }
 
 // sectionHeader matches "## SectionName" at start of line.
@@ -147,4 +147,3 @@ func parseSystemAgentMarkdown(content string) (*SystemAgentContent, error) {
 
 	return result, nil
 }
-

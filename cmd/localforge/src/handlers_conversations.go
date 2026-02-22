@@ -11,6 +11,15 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/persistence"
 )
 
+func (s *Server) conversationsBaseDir() string {
+	cfg := s.configMgr.GetConfig()
+	agentName := s.agentMgr.GetAgentName()
+	if cfg.Agent.WorkingDir != "" {
+		return filepath.Join(cfg.Agent.WorkingDir, "data", "conversations", agentName)
+	}
+	return filepath.Join("data", "conversations", agentName)
+}
+
 func (s *Server) handleListConversations(c *gin.Context) {
 	cfg := s.configMgr.GetConfig()
 	if cfg.Agent.Persistence != "json" {
@@ -18,7 +27,7 @@ func (s *Server) handleListConversations(c *gin.Context) {
 		return
 	}
 
-	baseDir := filepath.Join("data", "conversations", s.agentMgr.GetAgentName())
+	baseDir := s.conversationsBaseDir()
 	entries, err := os.ReadDir(baseDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -81,7 +90,7 @@ func (s *Server) handleGetConversation(c *gin.Context) {
 		return
 	}
 
-	baseDir := filepath.Join("data", "conversations", s.agentMgr.GetAgentName())
+	baseDir := s.conversationsBaseDir()
 	store := persistence.NewJSONPersistence(baseDir)
 	history := store.GetHistory(chatID, 0, 0)
 	c.JSON(http.StatusOK, history)
@@ -100,7 +109,7 @@ func (s *Server) handleDeleteConversation(c *gin.Context) {
 		return
 	}
 
-	baseDir := filepath.Join("data", "conversations", s.agentMgr.GetAgentName())
+	baseDir := s.conversationsBaseDir()
 	path := filepath.Join(baseDir, chatID+".json")
 	if err := os.Remove(path); err != nil {
 		if os.IsNotExist(err) {

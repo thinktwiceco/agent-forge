@@ -12,7 +12,6 @@ func (s *Server) handleGetConfig(c *gin.Context) {
 	for _, tool := range cfg.Agent.Tools {
 		tools = append(tools, ToolConfigResponse{
 			Name:           tool.Name,
-			Root:           tool.Root,
 			PostgresURL:    tool.PostgresURL,
 			Mode:           tool.Mode,
 			AllowedTables:  tool.AllowedTables,

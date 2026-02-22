@@ -2,23 +2,26 @@ package git
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
-// Git represents a git tool with a restricted root directory.
+// Git represents a git tool operating within a specific directory.
 type Git struct {
-	root string
+	// dir is the directory this tool operates in (agent working_dir/repos).
+	dir string
 }
 
 // NewGitTool creates a git tool that provides git operations.
-// All git operations are restricted to the specified root directory for security.
+// All git operations are restricted to dir.
 //
 // Parameters:
-//   - root: The root directory path that restricts all git operations
-func NewGitTool(root string) llms.Tool {
-	git := &Git{root: root}
+//   - dir: The directory this tool operates in (agent working_dir/repos).
+func NewGitTool(dir string) llms.Tool {
+	_ = os.MkdirAll(dir, 0755)
+	git := &Git{dir: dir}
 
 	return &core.Tool{
 		Name:        "git",

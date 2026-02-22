@@ -66,7 +66,7 @@ The `agent` section defines the main agent configuration.
 - **model**: Required LLM model specification. Format: `provider::model-name` (e.g., `deepseek::deepseek-chat`).
 - **working_dir**: Optional fallback directory for tools that don't specify their own `root` parameter. For backwards compatibility only.
 - **persistence**: 
-  - `"json"`: Stores conversation history as JSON files in `data/conversations/`
+  - `"json"`: Stores conversation history as JSON files. When `working_dir` is set: `working_dir/data/conversations/{agentName}`. Otherwise: `data/conversations/{agentName}` relative to process CWD.
   - `""` (empty): No persistence, conversations are not saved
 - **tools**: Array of tool configurations. Tools can be specified as:
   - **Object format** (recommended): `{name: "fs", root: "/path"}` - Allows per-tool configuration
@@ -476,20 +476,6 @@ if err != nil {
 agent, err := agentBuilder.Build()
 if err != nil {
     log.Fatalf("Failed to build agent: %v", err)
-}
-```
-
-### Using Server API
-
-```go
-import "github.com/thinktwiceco/agent-forge/src/apis"
-
-server := apis.NewServer()
-
-// Initialize agent from config file
-err := server.InitializeAgentFromConfig("my-agent", "agent_config.yaml")
-if err != nil {
-    log.Fatalf("Failed to initialize agent: %v", err)
 }
 ```
 

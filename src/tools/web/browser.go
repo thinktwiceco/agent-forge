@@ -146,13 +146,14 @@ func stripUnwantedContent(ctx context.Context) error {
 // WebBrowser represents the web browser tool instance.
 type WebBrowser struct {
 	sessionManager *SessionManager
-	workingDir     string
+	// dir is the directory this tool operates in (agent working_dir/web).
+	dir string
 }
 
 // NewWebBrowser creates a new web browser tool instance.
-func NewWebBrowser(workingDir string) *WebBrowser {
+func NewWebBrowser(dir string) *WebBrowser {
 	return &WebBrowser{
 		sessionManager: globalSessionManager,
-		workingDir:     workingDir,
+		dir:            dir,
 	}
 }

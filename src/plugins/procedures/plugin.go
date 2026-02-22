@@ -1,7 +1,9 @@
 package procedures
 
 import (
+	"embed"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,8 +14,14 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/agents"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/plugins/registry"
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed default
+var defaultProcedure embed.FS
+
+const defaultProcedureDir = "create-procedure"
 
 const PLUGIN_NAME = "procedures"
 
@@ -27,28 +35,33 @@ type Procedure struct {
 	Name        string
 	Description string
 	PhaseCount  int
-	BaseDir     string // absolute/relative path to the procedure folder
+	Dir         string // directory containing this procedure's phase folders
 }
 
-// ProceduresPlugin discovers procedures from a base directory and provides a
+// ProceduresPlugin discovers procedures from a directory and provides a
 // tool that lets the agent walk through them phase by phase.
 type ProceduresPlugin struct {
-	baseDir         string
+	// dir is the directory this plugin scans for procedures (agent working_dir/procedures).
+	dir             string
 	procedures      map[string]*Procedure
 	activeProcedure *Procedure
 	currentPhase    int
 }
 
 // NewProceduresPlugin creates a new ProceduresPlugin.
-// If baseDir is empty it defaults to "procedures/".
-func NewProceduresPlugin(baseDir string) *ProceduresPlugin {
-	if baseDir == "" {
-		baseDir = "procedures"
-	}
-	return &ProceduresPlugin{
-		baseDir:    baseDir,
+// The plugin operates in the "procedures" subdirectory of workingDir.
+//
+// Parameters:
+//   - workingDir: The agent working directory. The plugin will use workingDir/procedures.
+func NewProceduresPlugin(workingDir string) *ProceduresPlugin {
+	dir := filepath.Join(workingDir, "procedures")
+	_ = os.MkdirAll(dir, 0755)
+	p := &ProceduresPlugin{
+		dir:        dir,
 		procedures: make(map[string]*Procedure),
 	}
+	p.ensureDefaultProcedure()
+	return p
 }
 
 // Name implements core.Plugin.
@@ -81,10 +94,11 @@ func (p *ProceduresPlugin) SystemPrompt() string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("## Available Procedures\n\n")
-	sb.WriteString("You have access to structured procedures that guide you through multi-step tasks.\n")
-	sb.WriteString("Use the `procedure` tool to execute them.\n\n")
-	sb.WriteString("Procedures:\n")
+	sb.WriteString("[PROCEDURES]\n")
+	sb.WriteString("- Tool: procedure\n")
+	sb.WriteString("- Structured multi-step tasks. Actions: start_procedure, next_step, goto_step (jump to step by number).\n")
+	sb.WriteString("- Procedures live in procedures/ folder. When creating procedures, always use paths under procedures/ (e.g. procedures/my-procedure/).\n\n")
+	sb.WriteString("[AVAILABLE]\n")
 
 	// Sort names for deterministic output
 	names := make([]string, 0, len(p.procedures))
@@ -95,7 +109,7 @@ func (p *ProceduresPlugin) SystemPrompt() string {
 
 	for _, name := range names {
 		proc := p.procedures[name]
-		sb.WriteString(fmt.Sprintf("- **%s** (%d phases): %s\n", proc.Name, proc.PhaseCount, proc.Description))
+		sb.WriteString(fmt.Sprintf("- %s (%d phases): %s\n", proc.Name, proc.PhaseCount, proc.Description))
 	}
 
 	return sb.String()
@@ -110,13 +124,13 @@ func (p *ProceduresPlugin) Tools() []llms.Tool {
 
 // loadProcedures scans baseDir for procedure subfolders and parses their manifests.
 func (p *ProceduresPlugin) loadProcedures() error {
-	entries, err := os.ReadDir(p.baseDir)
+	entries, err := os.ReadDir(p.dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			agentforge.Info("procedures plugin: directory '%s' not found, no procedures loaded", p.baseDir)
+			agentforge.Info("procedures plugin: directory '%s' not found, no procedures loaded", p.dir)
 			return nil
 		}
-		return fmt.Errorf("procedures plugin: failed to read directory '%s': %w", p.baseDir, err)
+		return fmt.Errorf("procedures plugin: failed to read directory '%s': %w", p.dir, err)
 	}
 
 	for _, entry := range entries {
@@ -124,7 +138,7 @@ func (p *ProceduresPlugin) loadProcedures() error {
 			continue
 		}
 
-		procDir := filepath.Join(p.baseDir, entry.Name())
+		procDir := filepath.Join(p.dir, entry.Name())
 		proc, err := loadProcedure(procDir)
 		if err != nil {
 			agentforge.Info("procedures plugin: skipping '%s': %v", procDir, err)
@@ -163,8 +177,49 @@ func loadProcedure(dir string) (*Procedure, error) {
 		Name:        m.Name,
 		Description: m.Description,
 		PhaseCount:  phaseCount,
-		BaseDir:     dir,
+		Dir:         dir,
 	}, nil
+}
+
+// ensureDefaultProcedure copies the embedded default procedure to the procedures
+// directory when the default procedure folder does not exist.
+func (p *ProceduresPlugin) ensureDefaultProcedure() {
+	destDir := filepath.Join(p.dir, defaultProcedureDir)
+	if _, err := os.Stat(destDir); err == nil {
+		return // default procedure already exists
+	}
+
+	fsys, err := fs.Sub(defaultProcedure, "default")
+	if err != nil {
+		agentforge.Info("procedures plugin: failed to open default procedure: %v", err)
+		return
+	}
+
+	if err := fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		destPath := filepath.Join(destDir, path)
+		if d.IsDir() {
+			return os.MkdirAll(destPath, 0755)
+		}
+		data, err := fs.ReadFile(fsys, path)
+		if err != nil {
+			return err
+		}
+		_ = os.MkdirAll(filepath.Dir(destPath), 0755)
+		return os.WriteFile(destPath, data, 0644)
+	}); err != nil {
+		agentforge.Info("procedures plugin: failed to copy default procedure: %v", err)
+		return
+	}
+	agentforge.Info("procedures plugin: copied default procedure to %s", destDir)
+}
+
+func init() {
+	registry.Register(PLUGIN_NAME, func(workingDir string) core.Plugin {
+		return NewProceduresPlugin(workingDir)
+	})
 }
 
 // countPhaseFolders counts how many sequentially numbered folders exist (0, 1, 2, …).
@@ -184,7 +239,7 @@ func countPhaseFolders(dir string) int {
 // loadPhaseContent reads all files in the numbered phase folder and returns
 // their concatenated content.
 func (p *ProceduresPlugin) loadPhaseContent(proc *Procedure, phase int) (string, error) {
-	phaseDir := filepath.Join(proc.BaseDir, strconv.Itoa(phase))
+	phaseDir := filepath.Join(proc.Dir, strconv.Itoa(phase))
 
 	entries, err := os.ReadDir(phaseDir)
 	if err != nil {

@@ -82,7 +82,27 @@ func toOpenAIMessages(messages []*UnifiedMessage) ([]openai.ChatCompletionMessag
 		if message.Role() == "system" {
 			openaiMessages[i] = openai.SystemMessage(message.Content())
 		} else if message.Role() == "user" {
-			openaiMessages[i] = openai.UserMessage(message.Content())
+			if parts := message.ContentParts(); len(parts) > 0 {
+				contentParts := make([]openai.ChatCompletionContentPartUnionParam, 0, len(parts))
+				for _, p := range parts {
+					switch p.Type {
+					case ContentPartTypeText:
+						contentParts = append(contentParts, openai.TextContentPart(p.Text))
+					case ContentPartTypeImageURL:
+						contentParts = append(contentParts, openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{
+							URL: p.ImageURL,
+						}))
+					}
+				}
+				openaiMessages[i] = openai.ChatCompletionMessageParamUnion{
+					OfUser: &openai.ChatCompletionUserMessageParam{
+						Role:    "user",
+						Content: openai.ChatCompletionUserMessageParamContentUnion{OfArrayOfContentParts: contentParts},
+					},
+				}
+			} else {
+				openaiMessages[i] = openai.UserMessage(message.Content())
+			}
 		} else if message.Role() == "assistant" {
 			// Check if assistant message has tool calls
 			if len(message.ToolCalls()) > 0 {

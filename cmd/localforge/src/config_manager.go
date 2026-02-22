@@ -105,8 +105,7 @@ func (cm *ConfigManager) ConfigPath() string {
 }
 
 func (cm *ConfigManager) UpdateToolConfig(toolName string, update UpdateToolConfigRequest) error {
-	if update.Root == nil &&
-		update.PostgresURL == nil &&
+	if update.PostgresURL == nil &&
 		update.Mode == nil &&
 		update.AllowedTables == nil &&
 		update.AllowedSchemas == nil {
@@ -121,9 +120,6 @@ func (cm *ConfigManager) UpdateToolConfig(toolName string, update UpdateToolConf
 			continue
 		}
 
-		if update.Root != nil {
-			cm.config.Agent.Tools[i].Root = *update.Root
-		}
 		if update.PostgresURL != nil {
 			cm.config.Agent.Tools[i].PostgresURL = *update.PostgresURL
 		}

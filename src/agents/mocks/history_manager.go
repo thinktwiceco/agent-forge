@@ -8,6 +8,7 @@ import (
 // MockHistoryManager is a mock implementation of history.Manager for testing.
 type MockHistoryManager struct {
 	AddUserMessageFunc                   func(msg string)
+	AddUserMessageWithImagesFunc         func(text string, imageURLs ...string)
 	AddSystemMessageFunc                 func(msg string)
 	AddAssistantMessageFunc              func(msg string, tokens history.TokenUsage)
 	AddAssistantMessageWithToolCallsFunc func(content string, reasoningContent string, toolCalls []llms.ToolCall, tokens history.TokenUsage)
@@ -25,6 +26,12 @@ var _ history.Manager = (*MockHistoryManager)(nil)
 func (m *MockHistoryManager) AddUserMessage(msg string) {
 	if m.AddUserMessageFunc != nil {
 		m.AddUserMessageFunc(msg)
+	}
+}
+
+func (m *MockHistoryManager) AddUserMessageWithImages(text string, imageURLs ...string) {
+	if m.AddUserMessageWithImagesFunc != nil {
+		m.AddUserMessageWithImagesFunc(text, imageURLs...)
 	}
 }
 

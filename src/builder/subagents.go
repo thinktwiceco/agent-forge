@@ -17,6 +17,7 @@ const (
 	OS_AGENT        Subagent = "os"
 	WEB_AGENT       Subagent = "web"
 	VECTOR_DB_AGENT Subagent = "vector"
+	VISION_AGENT    Subagent = "vision"
 )
 
 func (s Subagent) getSubagent(
@@ -41,6 +42,8 @@ func (s Subagent) getSubagent(
 			return nil, fmt.Errorf("vectorDB and embeddingGenerator are required for vector DB subagent")
 		}
 		return agents.VectorAgent(llmEngine, vectorDB, embeddingGenerator), nil
+	case VISION_AGENT:
+		return agents.VisionAgent(llmEngine, workingDir), nil
 	}
 	return nil, fmt.Errorf("invalid subagent: %s", s)
 }

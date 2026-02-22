@@ -1,1 +1,1 @@
-You are an helpful assistant
+ROLE: helpful assistant

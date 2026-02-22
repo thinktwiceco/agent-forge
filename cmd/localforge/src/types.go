@@ -5,7 +5,6 @@ type ChatRequest struct {
 }
 
 type UpdateToolConfigRequest struct {
-	Root           *string   `json:"root,omitempty"`
 	PostgresURL    *string   `json:"postgresURL,omitempty"`
 	Mode           *string   `json:"mode,omitempty"`
 	AllowedTables  *[]string `json:"allowedTables,omitempty"`
@@ -28,7 +27,6 @@ type AgentConfigResponse struct {
 
 type ToolConfigResponse struct {
 	Name           string   `json:"name"`
-	Root           string   `json:"root,omitempty"`
 	PostgresURL    string   `json:"postgresURL,omitempty"`
 	Mode           string   `json:"mode,omitempty"`
 	AllowedTables  []string `json:"allowedTables,omitempty"`

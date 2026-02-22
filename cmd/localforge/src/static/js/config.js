@@ -44,6 +44,12 @@ export class ConfigPanel {
       }
       const config = await res.json();
       this.state.agentName = config.name || null;
+
+      // Update sidebar brand label and page title
+      const nameLabel = document.getElementById("agent-name-label");
+      if (nameLabel && config.name) nameLabel.textContent = config.name;
+      if (config.name) document.title = config.name;
+
       this.render(config);
     } catch (err) {
       this.container.textContent = "Failed to load config";

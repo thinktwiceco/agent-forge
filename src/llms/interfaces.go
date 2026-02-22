@@ -28,13 +28,18 @@ type FunctionDefinition struct {
 func ToOpenAITool(tool Tool) openai.ChatCompletionToolUnionParam {
 	fnDef := tool.GetFunctionDefinition()
 
+	required := fnDef.Parameters.Required
+	if required == nil {
+		required = []string{}
+	}
+
 	return openai.ChatCompletionFunctionTool(shared.FunctionDefinitionParam{
 		Name:        fnDef.Name,
 		Description: param.Opt[string]{Value: fnDef.Description},
 		Parameters: openai.FunctionParameters{
 			"type":       fnDef.Parameters.Type_,
 			"properties": fnDef.Parameters.Properties,
-			"required":   fnDef.Parameters.Required,
+			"required":   required,
 		},
 	})
 

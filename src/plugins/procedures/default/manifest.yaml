@@ -1,0 +1,2 @@
+name: "create-procedure"
+description: "Create a new Procedure for the agent - use a neutral tone while creating the procedure. Use the procedure tool to navigate through the steps. All procedures MUST be created inside the procedures/ folder."

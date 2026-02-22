@@ -2,23 +2,26 @@ package fs
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
-// Fs represents a file system tool with a restricted root directory.
+// Fs represents a file system tool operating within a specific directory.
 type Fs struct {
-	root string
+	// dir is the directory this tool is sandboxed to (agent working_dir).
+	dir string
 }
 
 // NewFsTool creates a file system tool that provides read, write, and delete operations.
-// All file operations are restricted to the specified root directory for security.
+// All file operations are restricted to dir.
 //
 // Parameters:
-//   - root: The root directory path that restricts all file operations
-func NewFsTool(root string) llms.Tool {
-	fs := &Fs{root: root}
+//   - dir: The directory this tool operates in (agent working_dir).
+func NewFsTool(dir string) llms.Tool {
+	_ = os.MkdirAll(dir, 0755)
+	fs := &Fs{dir: dir}
 
 	return &core.Tool{
 		Name:        "fs",

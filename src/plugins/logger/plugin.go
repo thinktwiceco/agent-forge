@@ -9,6 +9,7 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/agents"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/plugins/registry"
 	"github.com/thinktwiceco/agent-forge/src/tools/delegate"
 )
 
@@ -178,9 +179,12 @@ func (p *LoggerPlugin) FormatAgentLabel(agentName, trace string) string {
 // Global instance for convenience functions (used when plugin instance is not available)
 var defaultPlugin *LoggerPlugin
 
-// init initializes the default plugin with default rules
+// init initializes the default plugin with default rules and registers the plugin factory.
 func init() {
 	defaultPlugin = NewPlugin(DefaultColorRules(), DefaultLabelRules(), nil)
+	registry.Register(PLUGIN_NAME, func(_ string) core.Plugin {
+		return NewPlugin(DefaultColorRules(), DefaultLabelRules(), os.Stdout)
+	})
 }
 
 // GetColor returns the color code for the given agent name and trace using default rules

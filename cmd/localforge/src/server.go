@@ -57,7 +57,23 @@ func (s *Server) setupRoutes() {
 		panic(err)
 	}
 
-	s.engine.StaticFS("/static", http.FS(staticFS))
+	// Serve static files. In dev mode wrap the handler to disable browser caching
+	// so file edits are visible immediately without a hard refresh.
+	staticHandler := http.StripPrefix("/static", http.FileServer(http.FS(staticFS)))
+	if s.devMode {
+		original := staticHandler
+		staticHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-store")
+			original.ServeHTTP(w, r)
+		})
+	}
+	s.engine.GET("/static/*filepath", func(c *gin.Context) {
+		staticHandler.ServeHTTP(c.Writer, c.Request)
+	})
+	s.engine.HEAD("/static/*filepath", func(c *gin.Context) {
+		staticHandler.ServeHTTP(c.Writer, c.Request)
+	})
+
 	s.engine.GET("/", func(c *gin.Context) {
 		data, err := fs.ReadFile(staticFS, "index.html")
 		if err != nil {
@@ -70,6 +86,7 @@ func (s *Server) setupRoutes() {
 	api := s.engine.Group("/api")
 	api.POST("/chat", s.handleChat)
 	api.POST("/chat/stop", s.handleStopChat)
+	api.POST("/upload", s.handleUpload)
 	api.GET("/chat/push", s.handlePush)
 	api.GET("/conversations", s.handleListConversations)
 	api.GET("/conversations/:id", s.handleGetConversation)

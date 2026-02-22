@@ -14,6 +14,8 @@ const (
 	AgentNameSystemGit = "system-git"
 	// AgentNameSystemWeb is the name of the system web agent
 	AgentNameSystemWeb = "system-web"
+	// AgentNameSystemVision is the name of the system vision agent
+	AgentNameSystemVision = "system-vision"
 	// SystemAgentPrefix is the prefix used for all system-defined agents
 	SystemAgentPrefix = "system-"
 )
@@ -32,6 +34,8 @@ const (
 	TraceGit = "git"
 	// TraceWeb is the trace identifier for web agent operations
 	TraceWeb = "web"
+	// TraceVision is the trace identifier for vision agent operations
+	TraceVision = "vision"
 )
 
 // ToneSystemAgent instructs the agent to provide detailed responses for system agents

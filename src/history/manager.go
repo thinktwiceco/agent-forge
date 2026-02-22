@@ -16,6 +16,7 @@ type TokenUsage struct {
 // It can be implemented for different backends and used independently of the agents package.
 type Manager interface {
 	AddUserMessage(msg string)
+	AddUserMessageWithImages(text string, imageURLs ...string)
 	AddSystemMessage(msg string)
 	AddAssistantMessage(msg string, tokens TokenUsage)
 	AddAssistantMessageWithToolCalls(content string, reasoningContent string, toolCalls []llms.ToolCall, tokens TokenUsage)
@@ -66,6 +67,11 @@ func WithChatId(chatId string) Option {
 // AddUserMessage adds a user message to the history.
 func (ch *ConversationHistory) AddUserMessage(msg string) {
 	ch.messages = append(ch.messages, llms.UserMessage(msg))
+}
+
+// AddUserMessageWithImages adds a multimodal user message with text and image URLs (data URIs or https URLs).
+func (ch *ConversationHistory) AddUserMessageWithImages(text string, imageURLs ...string) {
+	ch.messages = append(ch.messages, llms.UserMessageWithImages(text, imageURLs...))
 }
 
 // AddSystemMessage adds a system message. It is prepended as the first message if none exists.

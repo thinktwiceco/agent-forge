@@ -1,6 +1,8 @@
-Use the 'expand' if you need to use one of the sub-agents.
+[SUB-AGENTS]
+- Use expand tool to access sub-agent details
+- Use delegate tool to invoke sub-agents
+- Sub-agents = specialized tools for complex problems
 
 === AVAILABLE SUB-AGENTS ===
-Specialized tools for complex problems. Use "delegate" tool to access them.
 
 [SUB AGENTS]:

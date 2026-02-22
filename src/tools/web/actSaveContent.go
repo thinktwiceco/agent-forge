@@ -19,7 +19,7 @@ import (
 // saveContent handles the save_content action for the web browser tool.
 func (w *WebBrowser) saveContent(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 	// Validate working directory
-	if w.workingDir == "" {
+	if w.dir == "" {
 		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse("working directory is not set")
 	}
@@ -88,8 +88,7 @@ func (w *WebBrowser) saveContent(agentContext map[string]any, args map[string]an
 		return core.NewErrorResponse(fmt.Sprintf("failed to generate filename from URL: %v", err))
 	}
 
-	// Create workingdirectory/web directory if it doesn't exist
-	saveDir := filepath.Join(w.workingDir, "web")
+	saveDir := w.dir
 	err = os.MkdirAll(saveDir, 0755)
 	if err != nil {
 		w.sessionManager.RecordOperation(false)

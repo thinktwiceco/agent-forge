@@ -121,6 +121,28 @@ func (r *webSearchResponse) String() string {
 	return out
 }
 
+// fillResponse represents a fill or fill_secret operation result.
+type fillResponse struct {
+	Operation string
+	Selector  string
+	Success   bool
+	Error     string
+}
+
+// String formats the fill response as a string.
+func (r *fillResponse) String() string {
+	result := fmt.Sprintf(`Web Browser Operation: %s
+Selector: %s
+Status: %s
+`, r.Operation, r.Selector, map[bool]string{true: "Success", false: "Failed"}[r.Success])
+
+	if r.Error != "" {
+		result += fmt.Sprintf("Error: %s\n", r.Error)
+	}
+
+	return result
+}
+
 // saveContentResponse represents a save_content operation result.
 type saveContentResponse struct {
 	Operation string

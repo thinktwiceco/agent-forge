@@ -10,7 +10,7 @@ import (
 // This is the path that the agent can safely operate within.
 // Returns detailed information about the root directory.
 func (fs *Fs) getRoot() (string, error) {
-	absRoot, err := filepath.Abs(fs.root)
+	absRoot, err := filepath.Abs(fs.dir)
 	if err != nil {
 		return "", fmt.Errorf("failed to get absolute path of root directory: %w", err)
 	}
@@ -24,7 +24,7 @@ func (fs *Fs) getRoot() (string, error) {
 	// Build detailed response
 	response := &rootDirectoryResponse{
 		AbsolutePath: absRoot,
-		RelativePath: fs.root,
+		RelativePath: fs.dir,
 		IsDirectory:  rootInfo.IsDir(),
 		Permissions:  rootInfo.Mode().String(),
 	}

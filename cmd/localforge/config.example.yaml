@@ -9,10 +9,9 @@ agent:
   persistence: "json"
   tools:
     - name: fs
-      root: "${AGENT_WORKING_DIR}"
     - name: web
-      root: "${AGENT_WORKING_DIR}"
   subagents:
     reasoning: "deepseek::deepseek-reasoner"
   plugins:
     - "todo"
+    - "vault"

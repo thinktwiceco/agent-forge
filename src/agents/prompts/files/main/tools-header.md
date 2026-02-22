@@ -1,4 +1,7 @@
+[TOOLS]
+- Use tool calls to invoke tools
+- Tools available to the agent
+
 === AVAILABLE TOOLS ===
-Tools available to the agent. Use "tool" tool to access them.
 
 [TOOLS]:

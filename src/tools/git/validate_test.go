@@ -35,7 +35,7 @@ func TestGit_ValidatePath(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	git := &Git{root: tmpDir}
+	git := &Git{dir: tmpDir}
 
 	tests := []struct {
 		name    string
@@ -66,7 +66,7 @@ func TestGit_ValidateGitRepo(t *testing.T) {
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Case 1: Not a git repo
-	git := &Git{root: tmpDir}
+	git := &Git{dir: tmpDir}
 	if err := git.validateGitRepo(); err == nil {
 		t.Error("Expected error for non-git repo, got nil")
 	}

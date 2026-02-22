@@ -8,7 +8,7 @@ import (
 
 // diff executes git diff and returns diff output.
 func (git *Git) diff(path string) (string, error) {
-	absRoot, err := filepath.Abs(git.root)
+	absRoot, err := filepath.Abs(git.dir)
 	if err != nil {
 		return "", fmt.Errorf("invalid root directory: %w", err)
 	}

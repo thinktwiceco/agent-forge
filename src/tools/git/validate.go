@@ -36,7 +36,7 @@ func validateOperation(value any) error {
 // It returns the validated absolute path or an error if the path escapes the root.
 func (git *Git) validatePath(filePath string) (string, error) {
 	// Get absolute path of root
-	absRoot, err := filepath.Abs(git.root)
+	absRoot, err := filepath.Abs(git.dir)
 	if err != nil {
 		return "", fmt.Errorf("invalid root directory: %w", err)
 	}
@@ -66,7 +66,7 @@ func (git *Git) validatePath(filePath string) (string, error) {
 
 // validateGitRepo checks if the root directory is a git repository.
 func (git *Git) validateGitRepo() error {
-	absRoot, err := filepath.Abs(git.root)
+	absRoot, err := filepath.Abs(git.dir)
 	if err != nil {
 		return fmt.Errorf("invalid root directory: %w", err)
 	}
@@ -81,7 +81,7 @@ func (git *Git) validateGitRepo() error {
 
 // executeGitCommand executes a git command in the root directory and returns stdout and stderr.
 func (git *Git) executeGitCommand(args ...string) (string, string, error) {
-	absRoot, err := filepath.Abs(git.root)
+	absRoot, err := filepath.Abs(git.dir)
 	if err != nil {
 		return "", "", fmt.Errorf("invalid root directory: %w", err)
 	}

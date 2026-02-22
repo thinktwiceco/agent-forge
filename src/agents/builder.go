@@ -122,6 +122,13 @@ func (b *Builder) WithPersistence(persistence string) *Builder {
 	return b
 }
 
+// WithWorkingDir sets the agent's working directory. Tool and plugin paths are relative to it.
+// When set with persistence "json", conversations are stored in workingDir/data/conversations/{agentName}.
+func (b *Builder) WithWorkingDir(dir string) *Builder {
+	b.config.WorkingDir = dir
+	return b
+}
+
 // WithSubAgents adds sub-agents for delegation.
 func (b *Builder) WithSubAgents(subAgents ...core.SubAgent) *Builder {
 	if b.config.SubAgents == nil {
