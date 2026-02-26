@@ -13,6 +13,11 @@ type Expand struct{}
 // This tool enables agents to retrieve detailed information (AdvanceDescription and
 // Troubleshooting) about tools and sub-agents that are available in their context.
 //
+// Progressive discovery pattern:
+//   - BasicDescription: what the tool does and which actions are available
+//   - AdvanceDescription: how to use the tool (general parameters and workflows)
+//   - DetailsAbout(action): deep-dive on a specific action/operation/endpoint
+//
 // The tool expects the following items in agentContext:
 //   - "tools": []llms.Tool - list of available tools
 //   - "subAgents": []core.SubAgent - list of available sub-agents
@@ -21,20 +26,17 @@ func NewExpandTool() llms.Tool {
 
 	return &core.Tool{
 		Name:        "expand",
-		Description: "Get detailed information about a tool or sub-agent. Use this to discover advanced capabilities and troubleshooting information.",
+		Description: "Get detailed information about a tool or sub-agent. Use this to discover advanced capabilities, troubleshooting information, or per-action details.",
 		AdvanceDesc: `Advanced Details:
 - Parameters:
   * subject_type (string, required): Either "tool" or "agent"
   * subject_name (string, required): The exact name of the tool or agent
-  * troubleshoot (boolean, optional): Include troubleshooting information (default: false)
-- Behavior:
-  * Retrieves AdvanceDescription for the specified tool or agent
-  * Optionally includes Troubleshooting information
-  * Returns formatted information as a string
-- Usage:
-  * Use when you need detailed information about a tool's capabilities
-  * Use when you need to understand an agent's advanced features
-  * Use when troubleshooting issues with tools or agents
+  * details_about (string, optional): Name of a specific action/operation/endpoint to get deep details about
+  * troubleshoot (boolean, optional): Include troubleshooting information (default: false, ignored when details_about is set)
+- Progressive discovery:
+  * Omit details_about to get BasicDescription + AdvanceDescription (overview)
+  * Set details_about="<action>" to get focused detail on that specific action/operation
+  * Set troubleshoot=true to append troubleshooting guidance to the overview
 - Integration: Can be added to any agent that needs discovery capabilities`,
 		TroubleshootingInfo: `Troubleshooting:
 - "Not found" errors: Verify subject_name matches exactly (case-sensitive)
@@ -56,9 +58,15 @@ func NewExpandTool() llms.Tool {
 				Required:    true,
 			},
 			{
+				Name:        "details_about",
+				Type:        "string",
+				Description: "Name of a specific action, operation, or endpoint to get detailed information about (optional)",
+				Required:    false,
+			},
+			{
 				Name:        "troubleshoot",
 				Type:        "boolean",
-				Description: "Whether to include troubleshooting information (default: false)",
+				Description: "Whether to include troubleshooting information in the overview (default: false, ignored when details_about is set)",
 				Required:    false,
 			},
 		},
@@ -66,13 +74,14 @@ func NewExpandTool() llms.Tool {
 			subjectType := args["subject_type"].(string)
 			subjectName := args["subject_name"].(string)
 
-			// Get troubleshoot flag (default to false if not provided)
+			detailsAbout, _ := args["details_about"].(string)
+
 			troubleshoot := false
 			if val, ok := args["troubleshoot"]; ok {
 				troubleshoot = val.(bool)
 			}
 
-			return expand.expand(agentContext, subjectType, subjectName, troubleshoot)
+			return expand.expand(agentContext, subjectType, subjectName, troubleshoot, detailsAbout)
 		},
 	}
 }

@@ -141,7 +141,10 @@ type ripgrepResponse struct {
 	RelativePath string
 	AbsolutePath string
 	Flags        []string
-	MatchCount   int
+	TotalMatches int // total lines returned by rg
+	MatchCount   int // lines actually shown after offset/head_limit
+	Offset       int
+	HeadLimit    int // 0 = no limit
 	Output       string
 	Status       string
 }
@@ -161,6 +164,12 @@ Path (absolute): %s`, r.Pattern, r.RelativePath, r.AbsolutePath)
 
 	if r.Output != "" {
 		result += fmt.Sprintf("\nMatches:\n---\n%s\n---", r.Output)
+	}
+
+	remaining := r.TotalMatches - r.Offset - r.MatchCount
+	if remaining > 0 {
+		nextOffset := r.Offset + r.MatchCount
+		result += fmt.Sprintf("\n... and %d more matches. Use offset=%d (and head_limit) to view more.", remaining, nextOffset)
 	}
 
 	return result

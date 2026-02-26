@@ -323,6 +323,12 @@ func (a *Agent) Troubleshooting() string {
 	return a.config.Troubleshooting
 }
 
+// DetailsAbout returns "Nothing to add about <item>" for agents, as agents do not
+// expose per-item detail. This implements the agentforge.Discoverable interface.
+func (a *Agent) DetailsAbout(item string) string {
+	return fmt.Sprintf("Nothing to add about %s", item)
+}
+
 // AddSystemAgent adds a system agent (sub-agent) to this agent's list of sub-agents.
 //
 // This method allows dynamic addition of sub-agents after agent initialization.

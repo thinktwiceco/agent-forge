@@ -144,6 +144,32 @@ func (sm *SessionManager) StopCleanup() {
 	}
 }
 
+// SessionInfo holds summary information about a single browser session.
+type SessionInfo struct {
+	Key      string
+	Created  time.Time
+	LastUsed time.Time
+	IdleFor  time.Duration
+}
+
+// ListSessions returns info about all currently active browser sessions.
+func (sm *SessionManager) ListSessions() []SessionInfo {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+
+	now := time.Now()
+	infos := make([]SessionInfo, 0, len(sm.sessions))
+	for key, s := range sm.sessions {
+		infos = append(infos, SessionInfo{
+			Key:      key,
+			Created:  s.created,
+			LastUsed: s.lastUsed,
+			IdleFor:  now.Sub(s.lastUsed).Truncate(time.Second),
+		})
+	}
+	return infos
+}
+
 // GetMetrics returns a copy of the current metrics
 func (sm *SessionManager) GetMetrics() SessionMetrics {
 	sm.metrics.mutex.RLock()
@@ -162,13 +188,19 @@ func (sm *SessionManager) GetMetrics() SessionMetrics {
 	}
 }
 
-// getSessionKey generates a unique key for browser sessions
+// getSessionKey generates a unique key for browser sessions.
+// The key is browser_{agentName}_{sessionName}. sessionName defaults to "default"
+// and is set by injecting "browserSession" into agentContext before dispatch.
 func (sm *SessionManager) getSessionKey(agentContext map[string]any) string {
-	agentName, ok := agentContext["agentName"].(string)
-	if !ok || agentName == "" {
+	agentName, _ := agentContext["agentName"].(string)
+	if agentName == "" {
 		agentName = "default"
 	}
-	return fmt.Sprintf("browser_%s", agentName)
+	sessionName, _ := agentContext["browserSession"].(string)
+	if sessionName == "" {
+		sessionName = "default"
+	}
+	return fmt.Sprintf("browser_%s_%s", agentName, sessionName)
 }
 
 // GetOrCreateBrowser gets an existing browser context or creates a new one.

@@ -31,6 +31,28 @@ func (w *WebBrowser) saveContent(agentContext map[string]any, args map[string]an
 		return core.NewErrorResponse(err.Error())
 	}
 
+	// Extract settle_ms (optional, default: 500ms).
+	settleDelay := defaultSettleDelay
+	if sm, ok := args["settle_ms"]; ok {
+		var ms float64
+		switch v := sm.(type) {
+		case float64:
+			ms = v
+		case int:
+			ms = float64(v)
+		case int64:
+			ms = float64(v)
+		default:
+			w.sessionManager.RecordOperation(false)
+			return core.NewErrorResponse("settle_ms parameter must be a number")
+		}
+		if ms < 0 {
+			w.sessionManager.RecordOperation(false)
+			return core.NewErrorResponse("settle_ms must be >= 0")
+		}
+		settleDelay = time.Duration(ms) * time.Millisecond
+	}
+
 	// Get or create browser context
 	ctx, err := getOrCreateBrowser(agentContext)
 	if err != nil {
@@ -42,11 +64,8 @@ func (w *WebBrowser) saveContent(agentContext map[string]any, args map[string]an
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, timeoutDuration)
 	defer timeoutCancel()
 
-	// Ensure current page is ready
-	err = chromedp.Run(timeoutCtx,
-		chromedp.WaitVisible("body", chromedp.ByQuery),
-	)
-	if err != nil {
+	// Ensure current page is fully ready before extracting content
+	if err = waitForPageReady(timeoutCtx, settleDelay); err != nil {
 		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("no page loaded in browser. Use navigate action first: %v", err))
 	}
@@ -61,28 +80,61 @@ func (w *WebBrowser) saveContent(agentContext map[string]any, args map[string]an
 		return core.NewErrorResponse(fmt.Sprintf("failed to get current URL: %v", err))
 	}
 
-	// Strip unwanted content before extraction
-	err = stripUnwantedContent(timeoutCtx)
-	if err != nil {
-		// Log error but don't fail - continue with content extraction
-		agentforge.Info("Warning: failed to strip unwanted content: %v", err)
+	// Extract type (optional, default: "text")
+	contentType := "text"
+	if ct, ok := args["type"].(string); ok && ct != "" {
+		if ct != "text" && ct != "html" {
+			w.sessionManager.RecordOperation(false)
+			return core.NewErrorResponse(fmt.Sprintf("invalid content type: %s. Must be one of: text, html", ct))
+		}
+		contentType = ct
 	}
 
-	// Extract plain text content
+	// strip parameter: default true. Skipped for html to preserve full document.
+	doStrip := contentType == "text"
+	if sv, ok := args["strip"].(bool); ok {
+		doStrip = sv
+	}
+
+	// Strip unwanted content before extraction.
+	var stripRes stripResult
+	if doStrip {
+		stripRes, err = stripUnwantedContent(timeoutCtx)
+		if err != nil {
+			agentforge.Info("Warning: failed to strip unwanted content: %v", err)
+		}
+	}
+
+	// Extract content, falling back to pre-strip text when over-stripped.
 	var content string
-	err = chromedp.Run(timeoutCtx,
-		chromedp.Text("body", &content, chromedp.ByQuery),
-	)
-	if err != nil {
-		w.sessionManager.RecordOperation(false)
-		return core.NewErrorResponse(fmt.Sprintf("failed to get text content: %v", err))
+	if contentType == "text" && stripRes.OverStripped && stripRes.FallbackText != "" {
+		content = stripRes.FallbackText
+	} else {
+		switch contentType {
+		case "html":
+			err = chromedp.Run(timeoutCtx,
+				chromedp.OuterHTML("html", &content, chromedp.ByQuery),
+			)
+		default:
+			err = chromedp.Run(timeoutCtx,
+				chromedp.Text("body", &content, chromedp.ByQuery),
+			)
+		}
+		if err != nil {
+			w.sessionManager.RecordOperation(false)
+			return core.NewErrorResponse(fmt.Sprintf("failed to get %s content: %v", contentType, err))
+		}
 	}
 
 	// Clean up content
 	content = strings.TrimSpace(content)
 
 	// Generate filename from URL domain + timestamp
-	filename, err := generateFilenameFromURL(currentURL)
+	ext := ".txt"
+	if contentType == "html" {
+		ext = ".html"
+	}
+	filename, err := generateFilenameFromURL(currentURL, ext)
 	if err != nil {
 		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to generate filename from URL: %v", err))
@@ -118,7 +170,7 @@ func (w *WebBrowser) saveContent(agentContext map[string]any, args map[string]an
 
 // generateFilenameFromURL generates a filename from a URL by extracting the domain
 // and appending a timestamp. Example: https://example.com/page -> example_com_1234567890.txt
-func generateFilenameFromURL(urlStr string) (string, error) {
+func generateFilenameFromURL(urlStr string, ext string) (string, error) {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return "", fmt.Errorf("invalid URL: %w", err)
@@ -142,8 +194,8 @@ func generateFilenameFromURL(urlStr string) (string, error) {
 	// Generate timestamp
 	timestamp := time.Now().Unix()
 
-	// Create filename: domain_timestamp.txt
-	filename := fmt.Sprintf("%s_%d.txt", domain, timestamp)
+	// Create filename: domain_timestamp.ext
+	filename := fmt.Sprintf("%s_%d%s", domain, timestamp, ext)
 
 	return filename, nil
 }

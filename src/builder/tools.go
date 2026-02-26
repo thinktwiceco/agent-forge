@@ -3,6 +3,7 @@ package builder
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
@@ -24,6 +25,7 @@ type Tool struct {
 	AllowedTables  []string `yaml:"allowedTables,omitempty"`
 	AllowedSchemas []string `yaml:"allowedSchemas,omitempty"`
 	// API-specific configs
+	Headers   []string `yaml:"headers,omitempty"` // List of "Key: Value" header strings; values support ${ENV_VAR} expansion
 	Endpoints []struct {
 		Name          string `yaml:"name"`
 		URL           string `yaml:"url"`
@@ -34,7 +36,6 @@ type Tool struct {
 		URLParameters string `yaml:"urlParameters,omitempty"`
 		Validator     string `yaml:"validator,omitempty"` // Name of registered validator function
 	} `yaml:"endpoints,omitempty"`
-	OnApiCallHook string `yaml:"onApiCallHook,omitempty"` // Name of registered hook
 }
 
 // UnmarshalYAML implements custom unmarshaling to support both string and object formats
@@ -140,10 +141,16 @@ func (t *Tool) getTool(
 			endpoints[i] = endpoint
 		}
 
-		// Get hook from registry or use default
-		hook := api.GetHook(t.OnApiCallHook)
+		// Parse "Key: Value" header strings
+		headers := make(map[string]string)
+		for _, h := range t.Headers {
+			parts := strings.SplitN(h, ":", 2)
+			if len(parts) == 2 {
+				headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+			}
+		}
 
-		return api.NewApiTool(t.Name, endpoints, hook), nil
+		return api.NewApiTool(t.Name, endpoints, headers), nil
 	}
 	return nil, fmt.Errorf("invalid tool: %s", t.Name)
 }

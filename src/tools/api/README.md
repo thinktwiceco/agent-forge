@@ -1,6 +1,6 @@
 # API Tool
 
-A generic, reusable tool for making HTTP API calls with configurable endpoints, authentication hooks, and parameter validation.
+A generic, reusable tool for making HTTP API calls with configurable endpoints, declarative headers, and parameter validation.
 
 ## Features
 
@@ -9,7 +9,7 @@ A generic, reusable tool for making HTTP API calls with configurable endpoints, 
 - **Query Parameters**: Easy query string building (e.g., `?limit=10&offset=0`)
 - **Request Body Support**: Send JSON payloads with POST/PUT/PATCH requests
 - **Custom Validation**: Per-endpoint validation functions to ensure parameter safety
-- **Authentication Hooks**: Inject auth tokens and headers without exposing secrets to the agent
+- **Declarative Headers**: Inject auth tokens and custom headers via config; values support `${ENV_VAR}` expansion
 - **Type Safety**: Built-in parameter validation and type checking
 
 ## Usage
@@ -24,7 +24,6 @@ import (
 )
 
 func main() {
-    // Define endpoints
     endpoints := []api.Endpoint{
         {
             Name:        "get_user",
@@ -47,14 +46,11 @@ func main() {
         },
     }
 
-    // Create authentication hook
-    authHook := func(url string, headers map[string]string, body string) (map[string]string, error) {
-        headers["Authorization"] = "Bearer YOUR_API_TOKEN"
-        return headers, nil
+    headers := map[string]string{
+        "Authorization": "Bearer YOUR_API_TOKEN",
     }
 
-    // Create the tool
-    tool := api.NewApiTool("my_api", endpoints, authHook)
+    tool := api.NewApiTool("my_api", endpoints, headers)
 }
 ```
 
@@ -65,6 +61,9 @@ agent:
   name: "API Agent"
   tools:
     - name: "my_api"
+      headers:
+        - "Authorization: Bearer ${API_TOKEN}"
+        - "X-API-Version: v1"
       endpoints:
         - name: "get_user"
           url: "https://api.example.com/users/{user_id}"
@@ -88,37 +87,9 @@ agent:
             - content: string - The post content
             - tags: array[string] - Optional tags
           validator: "validate_create_post"
-      
-      onApiCallHook: "add_auth_token"
 ```
 
-## Authentication Hooks
-
-Register hooks to add authentication headers:
-
-```go
-package main
-
-import "github.com/thinktwiceco/agent-forge/src/tools/api"
-
-func init() {
-    // Register authentication hook
-    api.RegisterHook("add_auth_token", func(url string, headers map[string]string, body string) (map[string]string, error) {
-        // Add Bearer token
-        headers["Authorization"] = "Bearer " + getAPIToken()
-        
-        // Add custom headers
-        headers["X-API-Version"] = "v1"
-        
-        return headers, nil
-    })
-}
-
-func getAPIToken() string {
-    // Retrieve token from environment, config, or secure storage
-    return os.Getenv("API_TOKEN")
-}
-```
+Header values are expanded at request time using environment variables — `${API_TOKEN}` reads from the process environment, so values like tokens are always fresh.
 
 ## Parameter Validation
 
@@ -245,12 +216,11 @@ The tool provides clear error messages:
 
 - **Parameter validation failed**: Custom validation rules were not satisfied
 - **Missing required URL parameters**: Not all URL placeholders were filled
-- **Authentication hook failed**: Hook returned an error
 - **HTTP 4xx/5xx**: API returned an error status code
 
 ## Security Best Practices
 
-1. **Use Authentication Hooks**: Never hardcode API tokens in endpoint configurations
+1. **Use environment variables for secrets**: Reference tokens as `${MY_TOKEN}` in header values, never hardcode them
 2. **Register Validators**: Always validate user IDs, size limits, and required fields
 3. **Limit Endpoints**: Only expose endpoints that the agent needs
 4. **Monitor API Calls**: Log all API calls for audit purposes
@@ -260,61 +230,15 @@ The tool provides clear error messages:
 
 Complete example with multiple endpoints, validation, and authentication:
 
-```go
-package main
-
-import (
-    "fmt"
-    "os"
-    
-    "github.com/thinktwiceco/agent-forge/src/agents"
-    "github.com/thinktwiceco/agent-forge/src/builder"
-    "github.com/thinktwiceco/agent-forge/src/tools/api"
-)
-
-func init() {
-    // Register authentication hook
-    api.RegisterHook("github_auth", func(url string, headers map[string]string, body string) (map[string]string, error) {
-        token := os.Getenv("GITHUB_TOKEN")
-        if token == "" {
-            return nil, fmt.Errorf("GITHUB_TOKEN not set")
-        }
-        headers["Authorization"] = "Bearer " + token
-        headers["Accept"] = "application/vnd.github.v3+json"
-        return headers, nil
-    })
-    
-    // Register validators
-    api.RegisterValidator("validate_repo_params", 
-        api.ValidateRequiredParams("owner", "repo"))
-    
-    api.RegisterValidator("validate_issue_number", 
-        api.ValidatePositiveIntParam("issue_number"))
-}
-
-func main() {
-    // Build agent with API tool via YAML
-    agent, err := builder.NewAgentBuilder("GitHub Agent", "json").
-        LoadFromFile("agent_config.yaml").
-        Build()
-    
-    if err != nil {
-        panic(err)
-    }
-    
-    // Run agent
-    agent.Chat("List issues in the user/repo repository")
-}
-```
-
-With `agent_config.yaml`:
-
 ```yaml
 agent:
   name: "GitHub Agent"
   model: "gpt-4"
   tools:
     - name: "github_api"
+      headers:
+        - "Authorization: Bearer ${GITHUB_TOKEN}"
+        - "Accept: application/vnd.github.v3+json"
       endpoints:
         - name: "list_issues"
           url: "https://api.github.com/repos/{owner}/{repo}/issues"
@@ -337,20 +261,19 @@ agent:
             - repo: string - Repository name
             - issue_number: int - Issue number
           validator: "validate_issue_number"
-      
-      onApiCallHook: "github_auth"
 ```
+
+Set `GITHUB_TOKEN` in your environment or `.env` file — it is expanded at request time.
 
 ## Architecture
 
 The API tool consists of several components:
 
 - **types.go**: Core data structures (Endpoint, Api, apiResponse)
-- **hooks.go**: Authentication hook registry
 - **validate.go**: Validation functions and registry
 - **url_builder.go**: URL parameter substitution and query string building
 - **request.go**: HTTP client and request execution
-- **handler.go**: Main tool handler
+- **handler.go**: Main tool handler; resolves `${ENV_VAR}` in headers at request time
 - **tool.go**: Tool constructor and description generation
 
 ## Integration

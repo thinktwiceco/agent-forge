@@ -2,6 +2,7 @@ package context
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	agentcore "github.com/thinktwiceco/agent-forge/src/core"
@@ -335,6 +336,10 @@ func (m *mockSubAgent) AdvanceDescription() string {
 
 func (m *mockSubAgent) Troubleshooting() string {
 	return "mock troubleshooting"
+}
+
+func (m *mockSubAgent) DetailsAbout(item string) string {
+	return fmt.Sprintf("Nothing to add about %s", item)
 }
 
 func (m *mockSubAgent) ChatStream(ctx context.Context, message string, chatId string) *agentcore.ResponseCh {

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/thinktwiceco/agent-forge/src/core"
@@ -55,6 +56,9 @@ func (m *mockSubAgent) SystemPrompt() string         { return "" }
 func (m *mockSubAgent) Context() *core.AgentContext  { return nil }
 func (m *mockSubAgent) ResponseCh() *core.ResponseCh { return nil }
 func (m *mockSubAgent) Troubleshooting() string      { return "" }
+func (m *mockSubAgent) DetailsAbout(item string) string {
+	return fmt.Sprintf("Nothing to add about %s", item)
+}
 func (m *mockSubAgent) ChatStream(ctx context.Context, message string, chatId string) *core.ResponseCh {
 	return nil
 }

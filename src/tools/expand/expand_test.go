@@ -2,6 +2,7 @@ package expand
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -82,6 +83,10 @@ func (m *mockDiscoverableAgent) AdvanceDescription() string {
 
 func (m *mockDiscoverableAgent) Troubleshooting() string {
 	return m.troubleshootingInfo
+}
+
+func (m *mockDiscoverableAgent) DetailsAbout(item string) string {
+	return fmt.Sprintf("Nothing to add about %s", item)
 }
 
 // Tests

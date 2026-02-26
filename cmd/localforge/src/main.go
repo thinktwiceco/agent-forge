@@ -34,9 +34,6 @@ func main() {
 	log.Printf("Dev mode          : %v", *devMode)
 	log.Printf("Port              : %s", *port)
 
-	// Register API hooks before creating agent
-	RegisterApiHooks()
-
 	configMgr, err := NewConfigManager(*configPath)
 	if err != nil {
 		log.Fatalf("config error: %v", err)

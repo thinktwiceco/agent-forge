@@ -13,7 +13,7 @@ import (
 // Parameters:
 //   - name: The name of the tool (e.g., "github_api", "stripe_api")
 //   - endpoints: List of endpoint configurations
-//   - onApiCall: Hook function that runs before making API calls (for authentication, etc.)
+//   - headers: Static headers sent with every request; values support ${ENV_VAR} expansion
 //
 // The tool provides a generic interface for making API calls with:
 //   - Dynamic endpoint discovery (agent sees all available endpoints)
@@ -21,21 +21,20 @@ import (
 //   - Query parameter support (e.g., ?limit=10&offset=0)
 //   - Request body support (JSON strings)
 //   - Custom validation per endpoint
-//   - Authentication via hooks
+//   - Authentication via declarative headers
 func NewApiTool(
 	name string,
 	endpoints []Endpoint,
-	onApiCall func(url string, headers map[string]string, body string) (map[string]string, error),
+	headers map[string]string,
 ) llms.Tool {
-	// Use default hook if none provided
-	if onApiCall == nil {
-		onApiCall = defaultHook
+	if headers == nil {
+		headers = map[string]string{}
 	}
 
 	api := &Api{
 		name:      name,
 		endpoints: endpoints,
-		onApiCall: onApiCall,
+		headers:   headers,
 	}
 
 	return &core.Tool{
@@ -43,6 +42,7 @@ func NewApiTool(
 		Description:         api.generateDescription(),
 		AdvanceDesc:         api.generateAdvancedDescription(),
 		TroubleshootingInfo: api.generateTroubleshootingInfo(),
+		DetailsAboutFunc:    api.detailsAbout,
 		Parameters:          api.generateParameters(),
 		Handler:             api.handler,
 	}
@@ -55,7 +55,7 @@ func (a *Api) generateDescription() string {
 		strings.Join(endpointNames, ", "))
 }
 
-// generateAdvancedDescription generates detailed documentation for each endpoint
+// generateAdvancedDescription generates a high-level overview of the tool and its endpoints.
 func (a *Api) generateAdvancedDescription() string {
 	var builder strings.Builder
 
@@ -65,42 +65,55 @@ func (a *Api) generateAdvancedDescription() string {
 
 	builder.WriteString("Available Endpoints:\n")
 	for i, endpoint := range a.endpoints {
-		fmt.Fprintf(&builder, "\n%d. Endpoint: %s\n", i+1, endpoint.Name)
-		fmt.Fprintf(&builder, "   Description: %s\n", endpoint.Description)
-		fmt.Fprintf(&builder, "   Method: %s\n", endpoint.Method)
-		fmt.Fprintf(&builder, "   URL: %s\n", endpoint.URL)
-
-		if endpoint.URLParameters != "" {
-			builder.WriteString("   URL Parameters:\n")
-			// Split by lines and indent
-			for _, line := range strings.Split(strings.TrimSpace(endpoint.URLParameters), "\n") {
-				fmt.Fprintf(&builder, "     %s\n", strings.TrimSpace(line))
-			}
-		}
-
-		if endpoint.QueryParams != "" {
-			builder.WriteString("   Query Parameters:\n")
-			for _, line := range strings.Split(strings.TrimSpace(endpoint.QueryParams), "\n") {
-				fmt.Fprintf(&builder, "     %s\n", strings.TrimSpace(line))
-			}
-		}
-
-		if endpoint.Payload != "" {
-			builder.WriteString("   Request Body:\n")
-			for _, line := range strings.Split(strings.TrimSpace(endpoint.Payload), "\n") {
-				fmt.Fprintf(&builder, "     %s\n", strings.TrimSpace(line))
-			}
-		}
+		fmt.Fprintf(&builder, "  %d. %s — %s [%s %s]\n", i+1, endpoint.Name, endpoint.Description, endpoint.Method, endpoint.URL)
 	}
 
+	builder.WriteString("\nUse expand tool with details_about=\"<endpoint>\" for full parameter details on any endpoint.\n")
 	builder.WriteString("\n- Usage:\n")
 	builder.WriteString("  * Specify the endpoint name in the 'endpoint' parameter\n")
 	builder.WriteString("  * Provide URL parameters in 'url_params' as an object (e.g., {\"user_id\": \"123\"})\n")
 	builder.WriteString("  * Provide query parameters in 'query_params' as an object (e.g., {\"limit\": 10, \"offset\": 0})\n")
 	builder.WriteString("  * Provide request body in 'body' as a JSON string\n")
-	builder.WriteString("  * Authentication is handled automatically via registered hooks\n")
+	builder.WriteString("  * Authentication headers are injected automatically from tool configuration\n")
 
 	return builder.String()
+}
+
+// detailsAbout returns detailed documentation for a specific endpoint.
+func (a *Api) detailsAbout(item string) string {
+	for _, endpoint := range a.endpoints {
+		if endpoint.Name == item {
+			var builder strings.Builder
+			fmt.Fprintf(&builder, "Endpoint: %s\n", endpoint.Name)
+			fmt.Fprintf(&builder, "Description: %s\n", endpoint.Description)
+			fmt.Fprintf(&builder, "Method: %s\n", endpoint.Method)
+			fmt.Fprintf(&builder, "URL: %s\n", endpoint.URL)
+
+			if endpoint.URLParameters != "" {
+				builder.WriteString("URL Parameters:\n")
+				for _, line := range strings.Split(strings.TrimSpace(endpoint.URLParameters), "\n") {
+					fmt.Fprintf(&builder, "  %s\n", strings.TrimSpace(line))
+				}
+			}
+
+			if endpoint.QueryParams != "" {
+				builder.WriteString("Query Parameters:\n")
+				for _, line := range strings.Split(strings.TrimSpace(endpoint.QueryParams), "\n") {
+					fmt.Fprintf(&builder, "  %s\n", strings.TrimSpace(line))
+				}
+			}
+
+			if endpoint.Payload != "" {
+				builder.WriteString("Request Body:\n")
+				for _, line := range strings.Split(strings.TrimSpace(endpoint.Payload), "\n") {
+					fmt.Fprintf(&builder, "  %s\n", strings.TrimSpace(line))
+				}
+			}
+
+			return builder.String()
+		}
+	}
+	return fmt.Sprintf("Nothing to add about %s", item)
 }
 
 // generateTroubleshootingInfo generates troubleshooting information

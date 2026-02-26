@@ -13,7 +13,8 @@ const grepLogsUnavailableMsg = "grep_logs is not available: logs are not streami
 
 // grepLogs searches for a pattern in the application log file.
 // Only available when AF_LOG_FILE is set. Returns an error otherwise.
-func (fs *Fs) grepLogs(pattern string, flags []string) (string, error) {
+// offset skips that many match lines; headLimit caps the number returned (0 = no cap).
+func (fs *Fs) grepLogs(pattern string, flags []string, offset, headLimit int) (string, error) {
 	logFilePath := os.Getenv("AF_LOG_FILE")
 	if logFilePath == "" {
 		return "", fmt.Errorf("%s", grepLogsUnavailableMsg)
@@ -52,7 +53,10 @@ func (fs *Fs) grepLogs(pattern string, flags []string) (string, error) {
 					RelativePath: logFilePath,
 					AbsolutePath: absPath,
 					Flags:        flags,
+					TotalMatches: 0,
 					MatchCount:   0,
+					Offset:       offset,
+					HeadLimit:    headLimit,
 					Output:       "",
 					Status:       "No matches found",
 				}
@@ -63,25 +67,38 @@ func (fs *Fs) grepLogs(pattern string, flags []string) (string, error) {
 		return "", fmt.Errorf("failed to execute ripgrep: %w", err)
 	}
 
-	output := stdout.String()
-	matchCount := 0
-	if output != "" {
-		lines := strings.Split(strings.TrimSpace(output), "\n")
-		for _, line := range lines {
-			if line != "" {
-				matchCount++
-			}
+	// Collect non-empty match lines
+	var lines []string
+	for _, line := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+		if line != "" {
+			lines = append(lines, line)
 		}
 	}
+	totalMatches := len(lines)
 
+	// Apply offset
+	if offset > totalMatches {
+		offset = totalMatches
+	}
+	lines = lines[offset:]
+
+	// Apply head_limit
+	if headLimit > 0 && len(lines) > headLimit {
+		lines = lines[:headLimit]
+	}
+
+	matchCount := len(lines)
 	response := &ripgrepResponse{
 		Pattern:      pattern,
 		RelativePath: logFilePath,
 		AbsolutePath: absPath,
 		Flags:        flags,
+		TotalMatches: totalMatches,
 		MatchCount:   matchCount,
-		Output:       output,
-		Status:       fmt.Sprintf("Found %d matches", matchCount),
+		Offset:       offset,
+		HeadLimit:    headLimit,
+		Output:       strings.Join(lines, "\n"),
+		Status:       fmt.Sprintf("Showing %d of %d matches", matchCount, totalMatches),
 	}
 
 	return response.String(), nil

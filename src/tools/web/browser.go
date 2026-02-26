@@ -2,8 +2,12 @@ package web
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/chromedp/chromedp"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 // Global session manager instance
@@ -31,116 +35,146 @@ func getBrowserContext(agentContext map[string]any) context.Context {
 	return globalSessionManager.GetBrowserContext(agentContext)
 }
 
-// stripUnwantedContent removes common unwanted elements from the webpage before content extraction.
-// This includes navigation, headers, footers, ads, sidebars, cookie banners, etc.
-// Errors are logged but not returned to allow content extraction to continue.
-func stripUnwantedContent(ctx context.Context) error {
-	// JavaScript to remove unwanted elements
+// stripResult is returned by stripUnwantedContent.
+// When FallbackText is non-empty the DOM was over-stripped and the caller
+// should use FallbackText instead of re-reading the (now empty) body.
+type stripResult struct {
+	Skipped      bool
+	OverStripped bool
+	FallbackText string
+}
+
+// stripUnwantedContent removes navigational noise (nav, header, footer, ads, sidebars, etc.)
+// from the page before content extraction.
+//
+// Heuristics applied:
+//  1. <style> and <script> tags are never removed — they do not appear in innerText so
+//     stripping them has no extraction benefit, but removing <style> destroys CSS and
+//     makes the page go visually black.
+//  2. SPA detection runs first. If a JS framework is detected (React, Next.js, Vue,
+//     Nuxt, Remix, Angular) semantic noise stripping is skipped entirely, because SPA
+//     pages rarely use semantic HTML landmarks and the pattern matching would
+//     over-aggressively delete real content.
+//  3. On non-SPA pages the semantic noise selectors are applied, followed by a content
+//     ratio guard: if the visible text shrinks by more than 50 % the stripping is
+//     considered too aggressive. In that case the pre-strip text is returned as
+//     FallbackText so the caller can use it instead of the now-empty DOM.
+func stripUnwantedContent(ctx context.Context) (stripResult, error) {
 	script := `
 		(function() {
-			// Common selectors for unwanted content
+			// --- Signal A: SPA / framework detection ---
+			const isSPA = !!(
+				window.__NEXT_DATA__   ||
+				window.__nuxt__        ||
+				window.__remixContext  ||
+				window.angular         ||
+				document.querySelector('#__next, #app, [data-reactroot], [data-v-app]')
+			);
+
+			if (isSPA) {
+				return { isSPA: true, skipped: true, removedCount: 0, overStripped: false, fallbackText: '' };
+			}
+
+			// --- Capture content before any DOM mutation ---
+			const beforeText = (document.body.innerText || '').trim();
+			const beforeLen  = beforeText.length;
+
+			// Never remove an element that contains interactive children — the agent
+			// needs links, buttons, and inputs to know what to click next.
+			function hasInteractive(el) {
+				return !!el.querySelector('a[href], button, input, select, textarea, [role="button"], [onclick]');
+			}
+
+			function safeRemove(el) {
+				if (el.closest('main, article, [role="main"], [role="article"]')) return false;
+				if (hasInteractive(el)) return false;
+				el.remove();
+				return true;
+			}
+
+			// --- Semantic noise selectors (static / server-rendered pages) ---
+			// nav/header/footer are intentionally excluded — they hold navigation links.
 			const selectors = [
-				// Navigation and headers
-				'nav', 'header', 'footer',
-				// Sidebars
 				'aside', '[role="complementary"]',
-				// Ads and promotional content
-				'[class*="ad"]', '[class*="advertisement"]', '[class*="promo"]',
-				'[id*="ad"]', '[id*="advertisement"]', '[id*="promo"]',
+				'[class*="advertisement"]', '[class*="promo"]',
+				'[id*="advertisement"]', '[id*="promo"]',
 				'[class*="sponsor"]', '[id*="sponsor"]',
-				// Cookie banners and consent
 				'[class*="cookie"]', '[id*="cookie"]',
 				'[class*="consent"]', '[id*="consent"]',
 				'[class*="gdpr"]', '[id*="gdpr"]',
-				// Social media widgets
-				'[class*="social"]', '[id*="social"]',
 				'[class*="share"]', '[id*="share"]',
-				'[class*="follow"]', '[id*="follow"]',
-				// Comments sections
 				'[class*="comment"]', '[id*="comment"]',
 				'[class*="discussion"]', '[id*="discussion"]',
-				// Related/recommended content
-				'[class*="related"]', '[id*="related"]',
-				'[class*="recommend"]', '[id*="recommend"]',
-				'[class*="popular"]', '[id*="popular"]',
-				// Newsletter signups
 				'[class*="newsletter"]', '[id*="newsletter"]',
-				'[class*="subscribe"]', '[id*="subscribe"]',
-				// Breadcrumbs
 				'[class*="breadcrumb"]', '[id*="breadcrumb"]',
 				'nav[aria-label*="breadcrumb"]',
-				// Skip links and accessibility helpers
 				'[class*="skip"]', '[id*="skip"]',
-				// Hidden elements (already hidden but remove for safety)
 				'[style*="display: none"]', '[style*="display:none"]',
 				'[hidden]',
 			];
-			
+
 			let removedCount = 0;
-			
-			// Remove elements matching selectors
 			selectors.forEach(selector => {
 				try {
-					const elements = document.querySelectorAll(selector);
-					elements.forEach(el => {
-						// Don't remove if it's the main content area
-						if (el.closest('main, article, [role="main"], [role="article"]')) {
-							return;
-						}
-						el.remove();
-						removedCount++;
+					document.querySelectorAll(selector).forEach(el => {
+						if (safeRemove(el)) removedCount++;
 					});
-				} catch (e) {
-					// Invalid selector, skip
-				}
+				} catch (e) {}
 			});
-			
-			// Remove script and style tags (they don't contribute to text content)
-			const scripts = document.querySelectorAll('script, style, noscript');
-			scripts.forEach(el => el.remove());
-			
-			// Remove elements with common unwanted classes/IDs (case-insensitive partial match)
+
+			// Pattern-based removal — deliberately conservative patterns only
 			const unwantedPatterns = [
-				/ad[s]?/i, /promo/i, /sponsor/i, /banner/i,
-				/cookie/i, /consent/i, /popup/i, /modal/i,
-				/sidebar/i, /widget/i, /toolbar/i,
+				/\bpromo\b/i, /\bsponsor\b/i, /\bbanner\b/i,
+				/\bcookie\b/i, /\bconsent\b/i,
 			];
-			
-			const allElements = document.querySelectorAll('*');
-			allElements.forEach(el => {
-				const className = el.className || '';
-				const id = el.id || '';
-				const combined = (className + ' ' + id).toLowerCase();
-				
-				// Skip main content areas
-				if (el.closest('main, article, [role="main"], [role="article"]')) {
-					return;
-				}
-				
-				// Check if element matches unwanted patterns
+
+			document.querySelectorAll('*').forEach(el => {
+				const combined = ((el.className || '') + ' ' + (el.id || '')).toLowerCase();
 				for (const pattern of unwantedPatterns) {
-					if (pattern.test(combined)) {
-						el.remove();
-						removedCount++;
-						break;
-					}
+					if (pattern.test(combined) && safeRemove(el)) { removedCount++; break; }
 				}
 			});
-			
-			return removedCount;
+
+			// --- Signal B: content ratio guard ---
+			const afterLen = (document.body.innerText || '').trim().length;
+			const ratio = beforeLen > 0 ? afterLen / beforeLen : 1;
+			const overStripped = ratio < 0.5;
+
+			return {
+				isSPA: false, skipped: false, removedCount,
+				beforeLen, afterLen, ratio,
+				overStripped,
+				fallbackText: overStripped ? beforeText : '',
+			};
 		})();
 	`
 
-	// Execute the script to remove unwanted content
-	var result any
-	err := chromedp.Run(ctx,
-		chromedp.Evaluate(script, &result),
-	)
-	if err != nil {
-		return err
+	var raw any
+	if err := chromedp.Run(ctx, chromedp.Evaluate(script, &raw)); err != nil {
+		return stripResult{}, err
 	}
 
-	return nil
+	m, ok := raw.(map[string]any)
+	if !ok {
+		return stripResult{}, nil
+	}
+
+	res := stripResult{}
+
+	if skipped, _ := m["skipped"].(bool); skipped {
+		res.Skipped = true
+		agentforge.Info("stripUnwantedContent: SPA detected, semantic noise stripping skipped")
+		return res, nil
+	}
+
+	if overStripped, _ := m["overStripped"].(bool); overStripped {
+		res.OverStripped = true
+		ratio, _ := m["ratio"].(float64)
+		agentforge.Info("stripUnwantedContent: content ratio %.2f < 0.50 — using pre-strip text as fallback", ratio)
+		res.FallbackText, _ = m["fallbackText"].(string)
+	}
+
+	return res, nil
 }
 
 // WebBrowser represents the web browser tool instance.
@@ -156,4 +190,36 @@ func NewWebBrowser(dir string) *WebBrowser {
 		sessionManager: globalSessionManager,
 		dir:            dir,
 	}
+}
+
+// listSessions returns information about all currently active browser sessions.
+func (w *WebBrowser) listSessions() llms.ToolReturn {
+	infos := w.sessionManager.ListSessions()
+
+	if len(infos) == 0 {
+		return core.NewSuccessResponse("Active browser sessions: none")
+	}
+
+	out := fmt.Sprintf("Active browser sessions (%d):\n\n", len(infos))
+	for _, s := range infos {
+		out += fmt.Sprintf("  Session: %s\n    Created:   %s\n    Last used: %s\n    Idle for:  %s\n\n",
+			s.Key,
+			s.Created.Format("2006-01-02 15:04:05"),
+			s.LastUsed.Format("2006-01-02 15:04:05"),
+			s.IdleFor,
+		)
+	}
+	return core.NewSuccessResponse(out)
+}
+
+// closeSession closes the browser session resolved from agentContext.
+func (w *WebBrowser) closeSession(agentContext map[string]any) llms.ToolReturn {
+	if err := w.sessionManager.CloseBrowser(agentContext); err != nil {
+		return core.NewErrorResponse(fmt.Sprintf("failed to close session: %v", err))
+	}
+	sessionName, _ := agentContext["browserSession"].(string)
+	if sessionName == "" {
+		sessionName = "default"
+	}
+	return core.NewSuccessResponse(fmt.Sprintf("Browser session '%s' closed successfully.", sessionName))
 }

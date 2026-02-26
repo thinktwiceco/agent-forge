@@ -2,11 +2,21 @@ package api
 
 import (
 	"fmt"
+	"os"
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
+
+// resolveHeaders returns a copy of headers with ${VAR} placeholders expanded via os.Getenv.
+func resolveHeaders(headers map[string]string) map[string]string {
+	resolved := make(map[string]string, len(headers))
+	for k, v := range headers {
+		resolved[k] = os.Expand(v, os.Getenv)
+	}
+	return resolved
+}
 
 // handler is the main tool handler function
 func (a *Api) handler(agentContext map[string]any, args map[string]any) llms.ToolReturn {
@@ -60,11 +70,8 @@ func (a *Api) handler(agentContext map[string]any, args map[string]any) llms.Too
 	// 5. Add query parameters
 	url = a.addQueryParams(url, args["query_params"])
 
-	// 6. Call onApiCall hook for authentication/headers
-	headers, err := a.onApiCall(url, map[string]string{}, body)
-	if err != nil {
-		return core.NewErrorResponse(fmt.Sprintf("authentication hook failed: %v", err))
-	}
+	// 6. Resolve headers, expanding ${ENV_VAR} placeholders
+	headers := resolveHeaders(a.headers)
 
 	// 7. Make HTTP request
 	return a.executeRequest(endpoint, endpoint.Method, url, headers, body)

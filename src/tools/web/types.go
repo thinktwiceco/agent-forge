@@ -143,6 +143,55 @@ Status: %s
 	return result
 }
 
+// uploadFileResponse represents an upload_file operation result.
+type uploadFileResponse struct {
+	Selector string
+	FilePath string
+	Success  bool
+	Error    string
+}
+
+// String formats the upload_file response as a string.
+func (r *uploadFileResponse) String() string {
+	result := fmt.Sprintf(`Web Browser Operation: Upload File
+Selector: %s
+File: %s
+Status: %s
+`, r.Selector, r.FilePath, map[bool]string{true: "Success", false: "Failed"}[r.Success])
+
+	if r.Error != "" {
+		result += fmt.Sprintf("Error: %s\n", r.Error)
+	}
+
+	return result
+}
+
+// refreshResponse represents a refresh operation result.
+type refreshResponse struct {
+	URL     string
+	Title   string
+	Success bool
+	Error   string
+}
+
+// String formats the refresh response as a string.
+func (r *refreshResponse) String() string {
+	result := fmt.Sprintf(`Web Browser Operation: Refresh
+URL: %s
+Status: %s
+`, r.URL, map[bool]string{true: "Success", false: "Failed"}[r.Success])
+
+	if r.Title != "" {
+		result += fmt.Sprintf("Page Title: %s\n", r.Title)
+	}
+
+	if r.Error != "" {
+		result += fmt.Sprintf("Error: %s\n", r.Error)
+	}
+
+	return result
+}
+
 // saveContentResponse represents a save_content operation result.
 type saveContentResponse struct {
 	Operation string

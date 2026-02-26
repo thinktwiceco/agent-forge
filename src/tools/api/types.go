@@ -31,7 +31,7 @@ type Endpoint struct {
 type Api struct {
 	name      string
 	endpoints []Endpoint
-	onApiCall func(url string, headers map[string]string, body string) (map[string]string, error)
+	headers   map[string]string
 }
 
 // apiResponse represents the response from an API call

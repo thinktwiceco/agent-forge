@@ -18,21 +18,30 @@ type ImageTool struct {
 func NewImageTool(dir string) llms.Tool {
 	t := &ImageTool{dir: dir}
 
+	detailsAbout := func(item string) string {
+		switch item {
+		case "load":
+			return `load: Read an image file and return it as a base64 data URI.
+- Required: path (string) — image file path relative to the sandbox root
+- Returns: data URI in the form data:<mime>;base64,<data>
+- Supported formats: jpg, jpeg, png, gif, webp
+- The returned data URI can be passed to the LLM via a multimodal user message`
+		default:
+			return fmt.Sprintf("Nothing to add about %s", item)
+		}
+	}
+
 	return &core.Tool{
 		Name:        "image",
 		Description: "Load an image file and return it as a base64 data URI for vision-capable LLMs.",
 		AdvanceDesc: `Advanced Details:
-- Parameters:
-  * operation (string, required): The operation to perform - currently only "load"
-  * path (string, required): Image file path relative to the sandbox root
+- Available operations: load
+  Use expand tool with details_about="load" for full parameter details.
+- Common parameters:
+  * operation (string, required): the operation to perform
 - Behavior:
-  * Reads the image file and returns a base64-encoded data URI (data:<mime>;base64,<data>)
-  * The returned data URI can be passed to the LLM via a multimodal user message
-  * All paths are validated to stay within the sandbox root directory
-  * Path traversal attempts (e.g., "../") are blocked for security
-- Supported formats: jpg, jpeg, png, gif, webp
-- Usage:
-  * Use "load" to read an image and obtain its data URI`,
+  * All paths are validated and sandboxed to the root directory; path traversal ("../") is blocked`,
+		DetailsAboutFunc: detailsAbout,
 		TroubleshootingInfo: `Troubleshooting:
 - "path traversal detected": The path attempts to escape the root - use relative paths only
 - "image not found": The file does not exist - verify the path is correct

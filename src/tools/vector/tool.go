@@ -23,36 +23,52 @@ func NewVectorTool(vectorDB core.VectorDB, embeddingGenerator core.EmbeddingGene
 		embeddingGenerator: embeddingGenerator,
 	}
 
+	detailsAbout := func(item string) string {
+		switch item {
+		case "index":
+			return `index: Index a document with text content and optional metadata.
+- Required: text (string) — document text to embed and store
+- Optional: document_id (string) — custom ID; auto-generated UUID if omitted
+- Optional: metadata (object) — free-form key-value pairs stored alongside the document
+- The embedding model name is automatically stored in metadata as "_embedding_model"`
+		case "indexFile":
+			return `indexFile: Read a file and index its content as a document.
+- Required: file_path (string) — path to the file to read and index
+- Optional: document_id (string) — custom ID; auto-generated UUID if omitted
+- Optional: metadata (object) — free-form key-value pairs`
+		case "search":
+			return `search: Perform semantic search using a query string.
+- Required: query (string) — search query text
+- Optional: top_k (number, default 10) — number of results to return
+- Optional: filters (object) — exact-match metadata filters, e.g. {"category": "docs"}
+- Returns: results with text, metadata, and similarity scores (highest first)`
+		case "listDocuments":
+			return `listDocuments: List documents from the vector database with pagination.
+- Optional: offset (number, default 0) — number of documents to skip
+- Optional: limit (number, default 10) — maximum number of documents to return
+- Optional: filters (object) — exact-match metadata filters
+- Returns: documents with text, metadata, and total count`
+		case "delete":
+			return `delete: Remove a document from the vector database by its ID.
+- Required: document_id (string) — the ID of the document to delete`
+		default:
+			return fmt.Sprintf("Nothing to add about %s", item)
+		}
+	}
+
 	return &core.Tool{
 		Name:        "vector_db",
 		Description: "Index, search, and delete documents in a vector database using semantic search.",
 		AdvanceDesc: `Advanced Details:
-- Actions:
-  * index: Index a document with text content and optional metadata. Automatically generates embeddings and tracks the embedding model used.
-  * indexFile: Index a document from a file path. Reads file content and indexes it with optional metadata.
-  * search: Perform semantic search using a query string. Returns results with text, metadata, and similarity scores.
-  * listDocuments: List documents from the vector database with pagination. Returns documents with text, metadata, and total count.
-  * delete: Remove a document from the vector database by its document ID.
-- Parameters:
-  * action (required): The action to perform: "index", "indexFile", "search", "listDocuments", or "delete"
-  * text (required for index): The document text to index
-  * file_path (required for indexFile): The file path to read and index
-  * query (required for search): The search query text
-  * metadata (optional): Free-form key-value pairs for document metadata
-  * document_id (optional for index/indexFile): Document ID - auto-generated UUID if not provided
-  * top_k (optional for search): Number of results to return (default: 10)
-  * offset (optional for listDocuments): Number of documents to skip (default: 0)
-  * limit (optional for listDocuments): Maximum number of documents to return (default: 10)
-  * filters (optional for search/listDocuments): Metadata filters for exact-match filtering
+- Available actions: index, indexFile, search, listDocuments, delete
+  Use expand tool with details_about="<action>" for full parameter details on any action.
+- Common parameters:
+  * action (required): the action to perform
 - Behavior:
-  * Embeddings are generated automatically using the configured embedding generator
-  * The embedding model name is automatically stored in metadata as "_embedding_model"
-  * Search results include similarity scores ordered from highest to lowest
-  * Metadata filtering uses exact match on key-value pairs
-- Usage:
-  * Use index to store documents for later retrieval
-  * Use search to find semantically similar documents
-  * Use delete to remove documents when no longer needed`,
+  * Embeddings are generated automatically; model name is stored in metadata as "_embedding_model"
+  * search results are ordered by similarity score (highest first)
+  * Metadata filtering uses exact match on key-value pairs`,
+		DetailsAboutFunc: detailsAbout,
 		TroubleshootingInfo: `Troubleshooting:
 - If index fails: Ensure text parameter is provided and non-empty
 - If indexFile fails: Ensure file_path parameter is provided, file exists, and is readable
