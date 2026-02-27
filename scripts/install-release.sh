@@ -214,7 +214,8 @@ else
     cat > "$LAUNCHER" << 'STARTEOF'
 #!/bin/bash
 set -euo pipefail
-INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+INSTALL_DIR="$SCRIPT_DIR"
 export AGENT_WORKING_DIR="$INSTALL_DIR"
 cd "$INSTALL_DIR"
 exec ./bin/localforge -config config.yaml -port 8080
@@ -229,15 +230,13 @@ fi
 # ─── copy update script ───────────────────────────────────────────────────────
 
 UPDATE_SCRIPT="$INSTALL_DIR/update-release.sh"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_UPDATE_SCRIPT="$SCRIPT_DIR/update-release.sh"
 
-if [ -f "$SOURCE_UPDATE_SCRIPT" ]; then
-  cp "$SOURCE_UPDATE_SCRIPT" "$UPDATE_SCRIPT"
-  chmod +x "$UPDATE_SCRIPT"
-  echo "update-release.sh copied."
+# Attempt to locate update-release.sh script
+# When piped (curl | bash), we fetch it from GitHub; when run locally, copy from scripts/
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL "https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/update-release.sh" -o "$UPDATE_SCRIPT" 2>/dev/null && chmod +x "$UPDATE_SCRIPT" && echo "update-release.sh downloaded." || echo "WARNING: Could not download update-release.sh (skipped)"
 else
-  echo "WARNING: update-release.sh not found at $SOURCE_UPDATE_SCRIPT (skipped)"
+  echo "WARNING: curl not available to download update-release.sh (skipped)"
 fi
 
 # ─── done ────────────────────────────────────────────────────────────────────

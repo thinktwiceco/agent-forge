@@ -25,9 +25,10 @@ func validateOperation(value any) error {
 		"checkout": true,
 		"log":      true,
 		"diff":     true,
+		"clone":    true,
 	}
 	if !validOperations[operation] {
-		return fmt.Errorf("invalid operation: %s. Must be one of: init, status, add, commit, push, pull, branch, checkout, log, diff", operation)
+		return fmt.Errorf("invalid operation: %s. Must be one of: init, status, add, commit, push, pull, branch, checkout, log, diff, clone", operation)
 	}
 	return nil
 }

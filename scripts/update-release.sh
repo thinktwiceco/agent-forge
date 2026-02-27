@@ -98,7 +98,8 @@ echo "Detected OS: $OS / arch: $ARCH"
 # ─── find installation directory ─────────────────────────────────────────────
 
 # If running from ./update-release.sh, the script is in the root of the install dir
-INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+INSTALL_DIR="$SCRIPT_DIR"
 BIN_DIR="$INSTALL_DIR/bin"
 BINARY_PATH="$BIN_DIR/localforge${EXT}"
 

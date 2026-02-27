@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	agentforge "github.com/thinktwiceco/agent-forge/src"
 )
 
 func main() {
@@ -26,6 +27,11 @@ func main() {
 	// Load .env from the app directory, then fall back to cwd.
 	_ = godotenv.Load(filepath.Join(appDir, ".env"))
 	_ = godotenv.Load()
+
+	// Initialize agentforge logger so AF_LOG_LEVEL from .env is respected
+	if config, err := agentforge.NewConfig(); err == nil {
+		agentforge.InitLogger(config)
+	}
 
 	cwd, _ := os.Getwd()
 	log.Printf("Working directory : %s", cwd)
