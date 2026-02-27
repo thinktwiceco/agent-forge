@@ -109,7 +109,7 @@ func (p *ProceduresPlugin) SystemPrompt() string {
 
 	for _, name := range names {
 		proc := p.procedures[name]
-		sb.WriteString(fmt.Sprintf("- %s (%d phases): %s\n", proc.Name, proc.PhaseCount, proc.Description))
+		fmt.Fprintf(&sb, "- %s (%d phases): %s\n", proc.Name, proc.PhaseCount, proc.Description)
 	}
 
 	return sb.String()
@@ -258,7 +258,7 @@ func (p *ProceduresPlugin) loadPhaseContent(proc *Procedure, phase int) (string,
 			return "", fmt.Errorf("cannot read file '%s': %w", filePath, err)
 		}
 
-		sb.WriteString(fmt.Sprintf("=== %s ===\n", entry.Name()))
+		fmt.Fprintf(&sb, "=== %s ===\n", entry.Name())
 		sb.Write(content)
 		sb.WriteString("\n")
 	}

@@ -10,6 +10,8 @@ import (
 )
 
 // getTableSchema retrieves column information for a given table
+//
+//nolint:unused // Reserved for future GET_TABLE_SCHEMA action
 func (pg *Postgres) getTableSchema(table string) (string, error) {
 	// Parse table name: supports "schema.table" or just "table"
 	schema, tableName := parseTableName(table, pg.allowedSchemas)
@@ -104,6 +106,8 @@ func (pg *Postgres) getTableSchema(table string) (string, error) {
 
 // parseTableName parses a table reference in "schema.table" or "table" format
 // Returns (schema, table). If no schema is provided, uses the first allowed schema or "public"
+//
+//nolint:unused // Used by getTableSchema
 func parseTableName(table string, allowedSchemas []string) (string, string) {
 	parts := strings.Split(table, ".")
 	if len(parts) == 2 {
@@ -120,6 +124,8 @@ func parseTableName(table string, allowedSchemas []string) (string, string) {
 }
 
 // isTableAllowed checks if a table is in the allowed list
+//
+//nolint:unused // Used by getTableSchema
 func isTableAllowed(fullTable, tableName string, allowedTables []string) bool {
 	for _, allowed := range allowedTables {
 		// Match both "table" and "schema.table" formats
