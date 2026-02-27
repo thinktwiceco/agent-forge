@@ -164,8 +164,7 @@ if [ -f "$INSTALL_DIR/config.yaml" ]; then
   echo "config.yaml already exists — skipping (delete it to regenerate)."
 else
   cat > "$INSTALL_DIR/config.yaml" << EOF
-# Edit this file to configure your agent.
-# Use dollar-brace syntax for env var interpolation, e.g. \${DATABASE_URL}.
+# Minimal agent configuration - customize as needed
 agent:
   name: "$AGENT_NAME"
   system_prompt: |
@@ -175,12 +174,9 @@ agent:
   persistence: "json"
   tools:
     - name: fs
-    - name: web
+    - name: git
   subagents:
     reasoning: "deepseek::deepseek-reasoner"
-  plugins:
-    - "todo"
-    - "vault"
 EOF
   echo "config.yaml created."
 fi
