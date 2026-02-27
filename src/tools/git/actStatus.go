@@ -8,7 +8,7 @@ import (
 
 // status executes git status and returns formatted status information.
 func (git *Git) status() (string, error) {
-	absRoot, err := filepath.Abs(git.root)
+	absRoot, err := filepath.Abs(git.dir)
 	if err != nil {
 		return "", fmt.Errorf("invalid root directory: %w", err)
 	}

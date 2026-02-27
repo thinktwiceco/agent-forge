@@ -323,6 +323,12 @@ func (a *Agent) Troubleshooting() string {
 	return a.config.Troubleshooting
 }
 
+// DetailsAbout returns "Nothing to add about <item>" for agents, as agents do not
+// expose per-item detail. This implements the agentforge.Discoverable interface.
+func (a *Agent) DetailsAbout(item string) string {
+	return fmt.Sprintf("Nothing to add about %s", item)
+}
+
 // AddSystemAgent adds a system agent (sub-agent) to this agent's list of sub-agents.
 //
 // This method allows dynamic addition of sub-agents after agent initialization.
@@ -367,6 +373,14 @@ func (a *Agent) LoadDelegateTool() {
 // EnsureSystemPrompt rebuilds the system prompt when configuration changes.
 // This is part of the handlers.AgentOperations interface.
 func (a *Agent) EnsureSystemPrompt() {
+	a.ensureSystemPrompt()
+}
+
+// AppendSystemPrompt appends text to the agent's system prompt and rebuilds it.
+// Plugins that load data asynchronously (e.g. during EventAgentInitialized) can
+// call this after their data is ready to inject their prompt contribution.
+func (a *Agent) AppendSystemPrompt(text string) {
+	a.config.SystemPrompt += text
 	a.ensureSystemPrompt()
 }
 

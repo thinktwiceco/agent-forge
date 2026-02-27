@@ -28,6 +28,11 @@ func (fs *Fs) readFile(path string) (string, error) {
 		return "", err
 	}
 
+	// Restrict to text documents only (no images, PDFs, etc.)
+	if err := fs.validateTextFile(path); err != nil {
+		return "", err
+	}
+
 	content, err := os.ReadFile(validatedPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file '%s': %w", path, err)

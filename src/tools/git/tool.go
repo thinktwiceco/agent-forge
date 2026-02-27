@@ -2,52 +2,77 @@ package git
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
-// Git represents a git tool with a restricted root directory.
+// Git represents a git tool operating within a specific directory.
 type Git struct {
-	root string
+	// dir is the directory this tool operates in (agent working_dir/repos).
+	dir string
 }
 
 // NewGitTool creates a git tool that provides git operations.
-// All git operations are restricted to the specified root directory for security.
+// All git operations are restricted to dir.
 //
 // Parameters:
-//   - root: The root directory path that restricts all git operations
-func NewGitTool(root string) llms.Tool {
-	git := &Git{root: root}
+//   - dir: The directory this tool operates in (agent working_dir/repos).
+func NewGitTool(dir string) llms.Tool {
+	_ = os.MkdirAll(dir, 0755)
+	git := &Git{dir: dir}
+
+	detailsAbout := func(item string) string {
+		switch item {
+		case "init":
+			return `init: Initialize a new git repository in the root directory. No additional parameters required.`
+		case "status":
+			return `status: Show the working tree status. No additional parameters required.`
+		case "add":
+			return `add: Stage files for commit.
+- Optional: path (string) — file or directory path relative to root; omit to stage all changes`
+		case "commit":
+			return `commit: Commit staged changes.
+- Required: message (string) — commit message`
+		case "push":
+			return `push: Push commits to a remote.
+- Optional: remote (string, default "origin") — remote name
+- Optional: branch (string) — branch name`
+		case "pull":
+			return `pull: Pull changes from a remote.
+- Optional: remote (string, default "origin") — remote name
+- Optional: branch (string) — branch name`
+		case "branch":
+			return `branch: List all branches or create a new branch.
+- Optional: branch (string) — if provided, creates a new branch with this name`
+		case "checkout":
+			return `checkout: Switch to a branch.
+- Required: branch (string) — branch name to switch to`
+		case "log":
+			return `log: View commit history.
+- Optional: limit (number, default 10) — number of commits to show`
+		case "diff":
+			return `diff: View changes in the working tree.
+- Optional: path (string) — file or directory path relative to root to diff`
+		default:
+			return fmt.Sprintf("Nothing to add about %s", item)
+		}
+	}
 
 	return &core.Tool{
 		Name:        "git",
 		Description: "Perform git operations (init, status, add, commit, push, pull, branch, checkout, log, diff) within a restricted directory.",
 		AdvanceDesc: `Advanced Details:
-- Parameters:
-  * operation (string, required): The operation to perform - "init", "status", "add", "commit", "push", "pull", "branch", "checkout", "log", or "diff"
-  * path (string, optional): File or directory path relative to the root directory (for add, diff operations)
-  * message (string, optional): Commit message - required for "commit" operation
-  * branch (string, optional): Branch name - required for "checkout" operation, optional for "branch", "push", "pull" operations
-  * remote (string, optional): Remote name - optional for "push" and "pull" operations (defaults to "origin")
-  * limit (number, optional): Number of commits to show - optional for "log" operation (defaults to 10)
+- Available operations: init, status, add, commit, push, pull, branch, checkout, log, diff
+  Use expand tool with details_about="<operation>" for full parameter details on any operation.
+- Common parameters:
+  * operation (string, required): the operation to perform
 - Behavior:
-  * All operations are executed within the root directory
-  * Git repository must exist in the root directory (except for "init" operation which creates it)
-  * Path traversal attempts (e.g., "../") are blocked for security
-  * Commands are executed using git CLI
-- Usage:
-  * Use "init" to initialize a new git repository in the root directory
-  * Use "status" to check working tree status
-  * Use "add" to stage files (provide path parameter, or omit to stage all changes)
-  * Use "commit" to commit staged changes (provide message parameter)
-  * Use "push" to push commits to remote (optionally provide remote and branch)
-  * Use "pull" to pull changes from remote (optionally provide remote and branch)
-  * Use "branch" to list branches or create a new branch (optionally provide branch name to create)
-  * Use "checkout" to switch branches (provide branch parameter)
-  * Use "log" to view commit history (optionally provide limit parameter)
-  * Use "diff" to view changes (optionally provide path parameter)
-- Security: All operations are sandboxed to the root directory to prevent unauthorized access`,
+  * All operations run within the root directory; path traversal ("../") is blocked
+  * A git repository must already exist for all operations except "init"
+  * Commands delegate to the git CLI`,
+		DetailsAboutFunc: detailsAbout,
 		TroubleshootingInfo: `Troubleshooting:
 - "not a git repository": The root directory is not a git repository - use "init" operation to initialize it first
 - "path traversal detected": The provided path attempts to escape the root directory - use relative paths only

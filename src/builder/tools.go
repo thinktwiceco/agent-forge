@@ -2,6 +2,8 @@ package builder
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
@@ -17,14 +19,13 @@ import (
 // Tool represents a tool configuration with its initialization parameters
 type Tool struct {
 	Name string `yaml:"name"`
-	// Common configs
-	Root string `yaml:"root,omitempty"`
 	// Postgres-specific configs
 	PostgresURL    string   `yaml:"postgresURL,omitempty"`
 	Mode           string   `yaml:"mode,omitempty"`
 	AllowedTables  []string `yaml:"allowedTables,omitempty"`
 	AllowedSchemas []string `yaml:"allowedSchemas,omitempty"`
 	// API-specific configs
+	Headers   []string `yaml:"headers,omitempty"` // List of "Key: Value" header strings; values support ${ENV_VAR} expansion
 	Endpoints []struct {
 		Name          string `yaml:"name"`
 		URL           string `yaml:"url"`
@@ -35,7 +36,6 @@ type Tool struct {
 		URLParameters string `yaml:"urlParameters,omitempty"`
 		Validator     string `yaml:"validator,omitempty"` // Name of registered validator function
 	} `yaml:"endpoints,omitempty"`
-	OnApiCallHook string `yaml:"onApiCallHook,omitempty"` // Name of registered hook
 }
 
 // UnmarshalYAML implements custom unmarshaling to support both string and object formats
@@ -73,37 +73,25 @@ func (t *Tool) getTool(
 ) (llms.Tool, error) {
 	switch t.Name {
 	case FILE_SYSTEM_TOOL:
-		root := t.Root
-		if root == "" {
-			root = workingDir // fallback for backwards compatibility
+		if workingDir == "" {
+			return nil, fmt.Errorf("working_dir is required for fs tool")
 		}
-		if root == "" {
-			return nil, fmt.Errorf("root directory is required for fs tool")
-		}
-		return fs.NewFsTool(root), nil
+		return fs.NewFsTool(workingDir), nil
 	case WEB_BROWSER_TOOL:
-		root := t.Root
-		if root == "" {
-			root = workingDir // fallback for backwards compatibility
+		if workingDir == "" {
+			return nil, fmt.Errorf("working_dir is required for web tool")
 		}
-		if root == "" {
-			return nil, fmt.Errorf("root directory is required for web tool")
-		}
-		return web.NewWebTool(root), nil
+		return web.NewWebTool(filepath.Join(workingDir, "web")), nil
 	case VECTOR_DB_TOOL:
 		if vectorDB == nil || embeddingGenerator == nil {
 			return nil, fmt.Errorf("vectorDB and embeddingGenerator are required for vector DB tool")
 		}
 		return vector.NewVectorTool(vectorDB, embeddingGenerator), nil
 	case GIT_TOOL:
-		root := t.Root
-		if root == "" {
-			root = workingDir // fallback for backwards compatibility
+		if workingDir == "" {
+			return nil, fmt.Errorf("working_dir is required for git tool")
 		}
-		if root == "" {
-			return nil, fmt.Errorf("root directory is required for git tool")
-		}
-		return git.NewGitTool(root), nil
+		return git.NewGitTool(filepath.Join(workingDir, "repos")), nil
 	case POSTGRES_TOOL:
 		if t.PostgresURL == "" {
 			return nil, fmt.Errorf("postgresURL is required for postgres tool")
@@ -153,10 +141,16 @@ func (t *Tool) getTool(
 			endpoints[i] = endpoint
 		}
 
-		// Get hook from registry or use default
-		hook := api.GetHook(t.OnApiCallHook)
+		// Parse "Key: Value" header strings
+		headers := make(map[string]string)
+		for _, h := range t.Headers {
+			parts := strings.SplitN(h, ":", 2)
+			if len(parts) == 2 {
+				headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+			}
+		}
 
-		return api.NewApiTool(t.Name, endpoints, hook), nil
+		return api.NewApiTool(t.Name, endpoints, headers), nil
 	}
 	return nil, fmt.Errorf("invalid tool: %s", t.Name)
 }

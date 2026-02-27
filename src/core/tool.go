@@ -26,8 +26,9 @@ type Parameter struct {
 type Tool struct {
 	Name                string
 	Description         string
-	AdvanceDesc         string // Public field - use AdvanceDescription() method to access via interface
-	TroubleshootingInfo string // Public field - use Troubleshooting() method to access via interface
+	AdvanceDesc         string                   // Public field - use AdvanceDescription() method to access via interface
+	TroubleshootingInfo string                   // Public field - use Troubleshooting() method to access via interface
+	DetailsAboutFunc    func(item string) string // Optional; returns per-item details for DetailsAbout
 	Parameters          []Parameter
 	Handler             func(agentContext map[string]any, args map[string]any) llms.ToolReturn
 	Hooks               Hooks // Optional external validation hooks
@@ -51,6 +52,14 @@ func (t *Tool) AdvanceDescription() string {
 // Troubleshooting returns information about common issues and debugging tips (implements agentforge.Discoverable)
 func (t *Tool) Troubleshooting() string {
 	return t.TroubleshootingInfo
+}
+
+// DetailsAbout returns detailed information about a specific item (implements agentforge.Discoverable)
+func (t *Tool) DetailsAbout(item string) string {
+	if t.DetailsAboutFunc != nil {
+		return t.DetailsAboutFunc(item)
+	}
+	return fmt.Sprintf("Nothing to add about %s", item)
 }
 
 // GetHooks returns the hooks interface for external validation (can be nil)

@@ -1,15 +1,38 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/chromedp/chromedp"
 )
 
 const (
-	defaultTimeout = 60 * time.Second
+	defaultTimeout     = 60 * time.Second
+	defaultSettleDelay = 500 * time.Millisecond
 )
+
+// waitForPageReady waits for the page to be fully ready for content extraction.
+// Phase 1: polls document.readyState until it equals 'complete', ensuring all
+// scripts have executed (critical for JS-heavy SPAs).
+// Phase 2: holds a short settle delay to allow async data fetches and re-renders
+// triggered by those scripts to finish. Pass 0 to skip the settle delay.
+func waitForPageReady(ctx context.Context, settleDelay time.Duration) error {
+	if err := chromedp.Run(ctx,
+		chromedp.Poll(`document.readyState === 'complete'`, nil,
+			chromedp.WithPollingInterval(200*time.Millisecond),
+		),
+	); err != nil {
+		return err
+	}
+	if settleDelay > 0 {
+		_ = chromedp.Run(ctx, chromedp.Sleep(settleDelay))
+	}
+	return nil
+}
 
 // normalizeURL validates and normalizes a URL by adding scheme if missing.
 // Returns the normalized URL or an error if the URL is invalid.

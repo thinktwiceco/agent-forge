@@ -1,0 +1,17 @@
+# Copy to config.yaml and fill in your values.
+# Use dollar-brace syntax for env var interpolation, e.g. REPO_ROOT, DATABASE_URL.
+agent:
+  name: "My Agent"
+  system_prompt: |
+    You are a helpful assistant. Customize this prompt for your use case.
+  model: "togetherai::moonshotai/Kimi-K2.5"
+  working_dir: "${AGENT_WORKING_DIR}"
+  persistence: "json"
+  tools:
+    - name: fs
+    - name: web
+  subagents:
+    reasoning: "deepseek::deepseek-reasoner"
+  plugins:
+    - "todo"
+    - "vault"

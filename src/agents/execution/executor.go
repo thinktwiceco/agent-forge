@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
@@ -330,7 +331,12 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 					content = "Error: " + toolResult.Error
 				}
 			}
-			hm.AddToolMessage(toolCall.ID, content, toolResult.Ephemeral)
+			if toolResult.Success && strings.HasPrefix(content, "data:") {
+				hm.AddToolMessage(toolCall.ID, "[image loaded]", toolResult.Ephemeral)
+				hm.AddUserMessageWithImages("", content)
+			} else {
+				hm.AddToolMessage(toolCall.ID, content, toolResult.Ephemeral)
+			}
 		}
 
 		agentforge.Debug("Completed iteration %d, continuing to next iteration with tool results in history", iteration)

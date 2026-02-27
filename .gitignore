@@ -24,9 +24,18 @@
 !*.example
 
 # Local config (contains secrets/user paths)
-cmd/app/config.yaml
-cmd/app/config-test.yaml
+cmd/localforge/config.yaml
+cmd/localforge/config-test.yaml
+cmd/localforge/.env
 agent_config.yaml
+
+# localforge runtime dirs
+cmd/localforge/bin/*
+!cmd/localforge/bin/.gitkeep
+cmd/localforge/sandbox/*
+!cmd/localforge/sandbox/.gitkeep
+cmd/localforge/procedures/
+cmd/localforge/data/
 
 # Node.js
 node_modules/
@@ -72,3 +81,7 @@ agentforge-server
 *.db-trace-lock-journal
 *.db-trace-lock-wal
 *.db-trace-lock-journal
+
+
+UglyCatToysHeadOfMarketing/
+ShelfCycle/

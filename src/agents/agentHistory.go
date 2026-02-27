@@ -19,7 +19,7 @@ func (a *Agent) createHistoryFactory() func(chatId string) history.Manager {
 	return func(chatId string) history.Manager {
 		opts := []history.Option{}
 		if a.config.Persistence != "" {
-			p := persistence.NewPersistence(a.Name(), a.config.Persistence)
+			p := persistence.NewPersistence(a.Name(), a.config.Persistence, a.config.WorkingDir)
 			if p != nil {
 				opts = append(opts, history.WithPersistence(p))
 				agentforge.Debug("Initialized %s persistence for agent '%s'", a.config.Persistence, a.Name())

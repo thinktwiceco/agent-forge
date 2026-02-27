@@ -17,8 +17,10 @@ Plugins extend agent functionality by hooking into lifecycle events, providing t
    - `HookProvider` for event hooks
    - `ToolProvider` for tools
    - `PromptProvider` for system prompt additions
-3. During initialization, the agent checks which interfaces each plugin implements
-4. Hooks, tools, and prompts are registered automatically based on implemented interfaces
+3. Plugin self-registers via `registry.Register(name, factory)` in its `init()` function. The factory receives `workingDir` and returns a `core.Plugin`.
+4. [allplugins.go](../builder/allplugins.go) imports each plugin with a blank import to trigger `init()` when the builder loads.
+5. Config lists plugin names (e.g. `plugins: ["todo", "vault"]`). The builder fetches plugins from the registry and instantiates them with the agent's working directory.
+6. During `EventAgentInitialization`, the agent registers hooks, tools, and prompts from each plugin.
 
 ### Lifecycle Events
 
@@ -120,7 +122,14 @@ func (p *TodoPlugin) SystemPrompt() string {
 - **Clear Intent**: Interface implementation clearly shows plugin capabilities
 - **Flexible**: Mix and match interfaces as needed
 
+### Best Practices
+
+- **Folder-based plugins**: If a plugin operates inside a folder (e.g. `vault/`, `procedures/`), it should auto-create that folder at initialization time (e.g. in `EventAgentInitialized` or when the plugin is constructed). This avoids errors when the agent first uses the plugin.
+- **Paths are relative to working_dir**: All plugin folder paths are relative to the agent's `working_dir`. The factory receives `workingDir` and should use it as the base (e.g. `filepath.Join(workingDir, "vault")`).
+
 ## Available Plugins
 
 - [Logger](./logger/README.md) - Configurable output formatting for agent responses
 - [Todo](./todo/README.md) - Task management and todo list functionality for agents
+- [Procedures](./procedures/plugin.go) - Structured multi-phase procedures from `working_dir/procedures/`
+- [Vault](./vault/plugin.go) - Encrypted secret storage in `working_dir/vault/` with `saveSecret`, `listSecrets`, and `resolveSecret` for tools

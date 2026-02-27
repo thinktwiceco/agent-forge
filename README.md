@@ -13,8 +13,12 @@ A powerful Go framework for building intelligent agents with LLM integration, to
 - [Core Concepts](#core-concepts)
   - [Creating Agents](#creating-agents)
   - [Creating Tools](#creating-tools)
+  - [How to Add Tools](#how-to-add-tools)
   - [Multi-Agent Teams](#multi-agent-teams)
+  - [Paths & Working Directory](#paths--working-directory)
 - [System Agents](#system-agents)
+  - [Pre-built Subagents](#pre-built-subagents)
+  - [How to Add Subagents](#how-to-add-subagents)
   - [Reasoning Agent](#reasoning-agent)
   - [OS Agent](#os-agent)
   - [Git Agent](#git-agent)
@@ -32,7 +36,7 @@ A powerful Go framework for building intelligent agents with LLM integration, to
   - [Streaming Responses](#streaming-responses)
   - [Conversation Persistence](#conversation-persistence)
   - [Hook System](#hook-system)
-- [Plugins](#plugins)
+- [Plugins](#plugins) — [Plugins README](src/plugins/README.md)
   - [Logger Plugin](src/plugins/logger/README.md)
   - [Todo Plugin](src/plugins/todo/README.md)
 - [Complete Example](#complete-example)
@@ -150,9 +154,21 @@ func main() {
 
 ### Creating Agents
 
-Agents can be created using the **Builder pattern** (recommended) or `AgentConfig` for advanced use cases. See the [Agent Builder Guide](docs/AGENT_BUILDER.md) for comprehensive documentation.
+There are three ways to instantiate an agent:
 
-**Using Builder Pattern (Recommended):**
+| Method | Package | Returns |
+|--------|---------|---------|
+| `agents.NewAgent(config)` | agents | `*Agent` (panics on invalid config) |
+| `agents.NewBuilder(llm, name).Build()` | agents | `(*Agent, error)` |
+| `builder.NewAgentBuilder(name, persistence)` + `.Build()` | builder | `(*Agent, error)` |
+| `builder.NewAgentBuilderFromConfig(path)` + `.Build()` | builder | `(*Agent, error)` |
+| `builder.NewAgentBuilderFromConfigStruct(cfg)` + `.Build()` | builder | `(*Agent, error)` |
+
+**Required fields for direct instantiation:** `LLMEngine`, `AgentName`.
+
+See the [Agent Builder Guide](docs/AGENT_BUILDER.md) for comprehensive documentation.
+
+**Using agents.Builder (fluent API):**
 
 ```go
 agent, err := agents.NewBuilder(llm, "my-agent").
@@ -173,7 +189,31 @@ reasoningAgent := agents.ReasoningAgent(llm)
 agent.AddSystemAgent(reasoningAgent)
 ```
 
-**Using AgentConfig (Advanced):**
+**Using builder from YAML config:**
+```go
+import "github.com/thinktwiceco/agent-forge/src/builder"
+
+agentBuilder, err := builder.NewAgentBuilderFromConfig("config.yaml")
+if err != nil {
+    log.Fatal(err)
+}
+agent, err := agentBuilder.Build()
+```
+
+**Using builder from code (programmatic):**
+```go
+b := builder.NewAgentBuilder("My Agent", "json")
+b.SetSystemPrompt("You are a helpful assistant.")
+b.SetModel("deepseek::deepseek-chat")
+b.SetWorkingDir("/path/to/working/dir")
+b.AddTools(builder.Tool{Name: builder.FILE_SYSTEM_TOOL}, builder.Tool{Name: builder.GIT_TOOL})
+b.AddSubagent(builder.REASONING_AGENT, "deepseek::deepseek-reasoner")
+b.AddPlugin("logger")
+agent, err := b.Build()
+```
+See [Plugins](src/plugins/README.md) for available plugins.
+
+**Using AgentConfig (direct, advanced):**
 
 ```go
 agent := agents.NewAgent(&agents.AgentConfig{
@@ -226,6 +266,58 @@ agent := agents.NewAgent(&agents.AgentConfig{
 })
 ```
 
+### How to Add Tools
+
+**AgentConfig (direct):**
+```go
+agent := agents.NewAgent(&agents.AgentConfig{
+    LLMEngine: llm,
+    AgentName: "my-agent",
+    Tools:     []llms.Tool{fsTool, gitTool, customTool},
+})
+```
+
+**agents.Builder (fluent API):**
+```go
+agent, _ := agents.NewBuilder(llm, "my-agent").
+    WithTools(tool1, tool2, tool3).
+    Build()
+```
+
+**builder.AgentBuilder (code):**
+```go
+b := builder.NewAgentBuilder("My Agent", "json")
+b.SetWorkingDir("/path/to/working/dir")
+b.AddTools(
+    builder.Tool{Name: builder.FILE_SYSTEM_TOOL},
+    builder.Tool{Name: builder.GIT_TOOL},
+    builder.Tool{Name: builder.WEB_BROWSER_TOOL},
+    builder.Tool{Name: builder.POSTGRES_TOOL, PostgresURL: "...", Mode: "read", AllowedTables: []string{"users"}},
+)
+agent, _ := b.Build()
+```
+
+**YAML config:**
+```yaml
+agent:
+  working_dir: "/path"
+  tools:
+    - name: fs
+    - name: web
+    - name: git
+    - name: postgres
+      postgresURL: "postgresql://..."
+      mode: "read"
+      allowedTables: ["users"]
+```
+
+**After creation:**
+```go
+agent.AddTools([]llms.Tool{customTool})
+```
+
+Built-in tool names: `fs`, `web`, `vector`, `git`, `postgres`, `api`.
+
 ### Multi-Agent Teams
 
 Create specialized agents and coordinate them:
@@ -257,9 +349,81 @@ mainAgent.AddSystemAgent(reasoningAgent)
 // The delegate tool is automatically added when sub-agents are present
 ```
 
+### Paths & Working Directory
+
+Every tool and plugin path is relative to the agent's `working_dir`. Set `working_dir` in agent config (YAML or builder) or via `b.SetWorkingDir()`.
+
+```
+working_dir/
+├── data/
+│   └── conversations/   ← Persistence (json): conversation history
+├── repos/               ← Git tool (cloned repos)
+├── web/                 ← Web tool (saved content, browser data)
+├── vault/               ← Vault plugin (encrypted secrets)
+└── procedures/          ← Procedures plugin (procedure manifests)
+```
+
+| Component | Path | Notes |
+|-----------|------|-------|
+| fs tool | `working_dir` | Root for file operations |
+| git tool | `working_dir/repos` | Repos are cloned here |
+| web tool | `working_dir/web` | Saved content, browser data |
+| vault plugin | `working_dir/vault` | Encrypted secrets |
+| procedures plugin | `working_dir/procedures` | Procedure manifests |
+| persistence (json) | `working_dir/data/conversations/{agentName}` | Conversation history |
+
+When `working_dir` is not set, persistence uses `data/conversations/{agentName}` relative to the process CWD.
+
 ## System Agents
 
 System agents are pre-defined specialized agents that can be added to your main agent. They provide common functionality like reasoning analysis, OS operations, Git operations, coding assistance, web automation, and vector database operations.
+
+### Pre-built Subagents
+
+| Subagent | Constructor | Args | Purpose |
+|----------|-------------|------|---------|
+| **reasoning** | `agents.ReasoningAgent(llm)` | `llm` | Analyzes questions, finds ambiguities, guides responses |
+| **os** | `agents.OsAgent(llm, root)` | `llm`, `root string` | File system and OS tasks within restricted root |
+| **git** | `agents.GitAgent(llm, workingDir)` | `llm`, `workingDir string` | Git operations (status, diff, add, commit, etc.) |
+| **coding** | `agents.CodingAgent(llm, root)` | `llm`, `root string` | Code generation, analysis, refactoring |
+| **web** | `agents.WebAgent(llm, workingDir)` | `llm`, `workingDir string` | Web navigation, automation, content extraction |
+| **vector** | `agents.VectorAgent(llm, vectorDB, embeddingGenerator)` | `llm`, `vectorDB`, `embeddingGenerator` | Semantic search and document indexing |
+
+### How to Add Subagents
+
+**Programmatic (agents package):**
+```go
+agent := agents.NewAgent(&agents.AgentConfig{...})
+// or: agent, _ := agents.NewBuilder(llm, "main").Build()
+
+agent.AddSystemAgent(agents.ReasoningAgent(llm))
+agent.AddSystemAgent(agents.OsAgent(llm, "/path/to/root"))
+agent.AddSystemAgent(agents.GitAgent(llm, "/path/to/repos"))
+agent.AddSystemAgent(agents.WebAgent(llm, "/path/to/working/dir"))
+agent.AddSystemAgent(agents.VectorAgent(llm, vectorDB, embeddingGenerator))
+```
+
+**Via builder (code):**
+```go
+b := builder.NewAgentBuilder("My Agent", "json")
+b.SetWorkingDir("/path/to/working/dir")
+b.AddSubagent(builder.REASONING_AGENT, "deepseek::deepseek-reasoner")
+b.AddSubagent(builder.OS_AGENT, "deepseek::deepseek-chat")
+b.AddSubagent(builder.GIT_AGENT, "deepseek::deepseek-chat")
+b.AddSubagent(builder.WEB_AGENT, "deepseek::deepseek-chat")
+b.AddSubagent(builder.VECTOR_DB_AGENT, "togetherai::model")  // requires vectorDB + embeddingGenerator
+agent, _ := b.Build()
+```
+
+**Via YAML config:**
+```yaml
+agent:
+  working_dir: "/path/to/working/dir"
+  subagents:
+    reasoning: "deepseek::deepseek-reasoner"
+    web: "deepseek::deepseek-chat"
+    git: "deepseek::deepseek-chat"
+```
 
 ### Reasoning Agent
 
@@ -652,7 +816,7 @@ See [Telemetry Documentation](src/telemetry/README.md) for integration details.
 
 ## Plugins
 
-Plugins extend agent functionality by providing tools, hooks, and system prompt enhancements. The plugin system uses **interface segregation** - plugins only implement the interfaces they need:
+See [Plugins README](src/plugins/README.md) for details. Plugins extend agent functionality by providing tools, hooks, and system prompt enhancements. The plugin system uses **interface segregation** - plugins only implement the interfaces they need:
 
 ```go
 // Minimal plugin (just a name)
@@ -677,9 +841,32 @@ type PromptProvider interface {
 }
 ```
 
-**Available Plugins:**
-- **[Logger Plugin](src/plugins/logger/README.md)** - Configurable output formatting for agent responses
-- **[Todo Plugin](src/plugins/todo/README.md)** - Task management and todo list functionality
+### How Plugins Are Registered
+
+1. **Self-registration**: Each plugin calls `registry.Register(name, factory)` in its `init()` function. The factory receives the agent's `workingDir` and returns a `core.Plugin` instance.
+2. **Blank import**: [src/builder/allplugins.go](src/builder/allplugins.go) imports each plugin package with `_ "github.com/.../plugins/logger"`. This triggers `init()` so plugins register when the builder is loaded.
+3. **Config-driven**: Agent config (YAML or builder) lists plugin names, e.g. `plugins: ["todo", "vault"]`. At build time, the builder fetches each plugin from the registry and instantiates it with the agent's working directory.
+4. **Agent initialization**: During `EventAgentInitialization`, the agent iterates over plugins and registers their hooks, tools, and system prompts.
+
+### How to Add a New Plugin
+
+1. **Implement the plugin** in `src/plugins/<name>/`:
+   - Implement `core.Plugin` (required) and optionally `HookProvider`, `ToolProvider`, `PromptProvider`.
+   - Add an `init()` that calls `registry.Register("<name>", func(workingDir string) core.Plugin { return NewXxxPlugin(workingDir) })`.
+2. **Register the import** in [src/builder/allplugins.go](src/builder/allplugins.go):
+   - Add `_ "github.com/thinktwiceco/agent-forge/src/plugins/<name>"`.
+3. **Enable in config**: Add the plugin name to `agent.plugins` in your YAML, e.g. `plugins: ["myplugin"]`.
+
+**Best practice**: If the plugin operates inside a folder (e.g. `vault/`, `procedures/`), auto-create that folder at initialization time. All plugin paths are relative to the agent's `working_dir`.
+
+### Available Plugins
+
+| Plugin | Identifier | Description |
+|--------|------------|-------------|
+| [Logger](src/plugins/logger/README.md) | `"logger"` | Configurable output formatting for agent responses (colors, labels, trace formatting). Hooks into `EventNewChunk`. |
+| [Todo](src/plugins/todo/README.md) | `"todo"` | Task management via `todo_handler` tool. Add, update, list, and clear todos. Hooks into `EventToolExecution` for update callbacks. |
+| [Procedures](src/plugins/procedures/plugin.go) | `"procedures"` | Structured multi-phase procedures. Scans `working_dir/procedures/` for procedure manifests, provides a `procedure` tool to walk through phases. Uses `EventAgentInitialized` to load procedures and inject system prompt. |
+| [Vault](src/plugins/vault/plugin.go) | `"vault"` | Encrypted secret storage in `working_dir/vault/`. Tools: `saveSecret`, `listSecrets`. Injects `resolveSecret` into SessionStorage. Auto-decrypts tool args prefixed with `resolveSecret` before execution. Requires `VAULT_MASTER_KEY` env var (base64-encoded 32 bytes). |
 
 See the [Plugins README](src/plugins/README.md) for more information on creating custom plugins.
 
@@ -754,6 +941,7 @@ func main() {
 - `AF_DEEPSEEK_API_KEY` - API key for DeepSeek
 - `AF_OPENAI_API_KEY` - API key for OpenAI
 - `AF_LOG_LEVEL` - Logging level (DEBUG, INFO, WARN, ERROR). Default: INFO
+- `VAULT_MASTER_KEY` - Base64-encoded 32-byte key for the Vault plugin (required when using `vault` plugin). Generate with `openssl rand -base64 32`.
 
 Set via `.env` file or system environment variables. Environment variables take precedence over `.env` file values.
 
@@ -777,7 +965,10 @@ src/
 ├── integrations/    # External integrations (Milvus, embeddings)
 └── plugins/         # Plugin system
     ├── logger/      # Logger plugin
-    └── todo/        # Todo plugin
+    ├── todo/        # Todo plugin
+    ├── procedures/  # Procedures plugin
+    ├── vault/       # Vault plugin (encrypted secrets)
+    └── registry/    # Plugin registry (self-registration)
 ```
 
 **Key Improvements:**
@@ -787,14 +978,6 @@ src/
 - **Testable**: Mock implementations available for all interfaces
 
 See [File Structure Documentation](docs/FILE_STRUCTURE.md) for details.
-
-## Python SDK Usage
-
-The project includes a Python SDK for interacting with the AgentForge server.
-
-- **Documentation**: [Python SDK README](python-sdk/README.md)
-- **Build Script**: Use `scripts/build-python-sdk.sh` to compile the required Go server binaries for the SDK.
-
 
 ## Contributing
 

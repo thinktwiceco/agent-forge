@@ -8,6 +8,7 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/agents"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/plugins/registry"
 )
 
 const (
@@ -81,13 +82,17 @@ func (p *TodoPlugin) Tools() []llms.Tool {
 // SystemPrompt implements the core.PromptProvider interface
 func (p *TodoPlugin) SystemPrompt() string {
 	return `
-	Use the todo_handler tool in combination with the reasoning agent.
-	Create a todo list based on the user request. You can then complete each task
-	one by one and check them as completed!
+[TODO]
+- Tool: todo_handler
+- Use with reasoning agent when present
+- Create todo list from user request
+- Complete tasks one by one, check as completed
+- Use bulk action to add multiple items
 
-	Use the bulk action to add multiple todo items at once.
-	Use it after consulting with the reasoning agent, if present.
-	`
+[CLEANUP]
+- Before new todo list: call clearTodos if any todos present
+- After all completed: call clearTodos
+`
 }
 
 func NewTodoPlugin(onTodoUpdate func(todos []*TodoItem)) *TodoPlugin {
@@ -168,4 +173,14 @@ func (p *TodoPlugin) addBulkTodos(todos []map[string]string) error {
 
 func (p *TodoPlugin) clearTodos() {
 	p.items = make([]*TodoItem, 0)
+}
+
+// Callback is the optional update handler called whenever todos change.
+// Set this before building the agent (e.g. via builder.SetTodoCallback).
+var Callback func(todos []*TodoItem)
+
+func init() {
+	registry.Register(PLUGIN_NAME, func(_ string) core.Plugin {
+		return NewTodoPlugin(Callback)
+	})
 }

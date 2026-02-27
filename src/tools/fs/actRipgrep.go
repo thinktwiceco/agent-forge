@@ -10,7 +10,8 @@ import (
 // ripgrep performs a search using ripgrep in the specified path.
 // The path is validated to ensure it stays within the root directory.
 // Pattern is required, and additional ripgrep flags can be provided.
-func (fs *Fs) ripgrep(path, pattern string, flags []string) (string, error) {
+// offset skips that many match lines; headLimit caps the number returned (0 = no cap).
+func (fs *Fs) ripgrep(path, pattern string, flags []string, offset, headLimit int) (string, error) {
 	validatedPath, err := fs.validatePath(path)
 	if err != nil {
 		return "", err
@@ -54,7 +55,10 @@ func (fs *Fs) ripgrep(path, pattern string, flags []string) (string, error) {
 					RelativePath: path,
 					AbsolutePath: validatedPath,
 					Flags:        flags,
+					TotalMatches: 0,
 					MatchCount:   0,
+					Offset:       offset,
+					HeadLimit:    headLimit,
 					Output:       "",
 					Status:       "No matches found",
 				}
@@ -66,28 +70,38 @@ func (fs *Fs) ripgrep(path, pattern string, flags []string) (string, error) {
 		return "", fmt.Errorf("failed to execute ripgrep: %w", err)
 	}
 
-	// Parse output to count matches
-	output := stdout.String()
-	matchCount := 0
-	if output != "" {
-		// Count lines that contain matches (not headers or context)
-		lines := strings.Split(strings.TrimSpace(output), "\n")
-		for _, line := range lines {
-			if line != "" {
-				matchCount++
-			}
+	// Collect non-empty match lines
+	var lines []string
+	for _, line := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+		if line != "" {
+			lines = append(lines, line)
 		}
 	}
+	totalMatches := len(lines)
 
-	// Build detailed response
+	// Apply offset
+	if offset > totalMatches {
+		offset = totalMatches
+	}
+	lines = lines[offset:]
+
+	// Apply head_limit
+	if headLimit > 0 && len(lines) > headLimit {
+		lines = lines[:headLimit]
+	}
+
+	matchCount := len(lines)
 	response := &ripgrepResponse{
 		Pattern:      pattern,
 		RelativePath: path,
 		AbsolutePath: validatedPath,
 		Flags:        flags,
+		TotalMatches: totalMatches,
 		MatchCount:   matchCount,
-		Output:       output,
-		Status:       fmt.Sprintf("Found %d matches", matchCount),
+		Offset:       offset,
+		HeadLimit:    headLimit,
+		Output:       strings.Join(lines, "\n"),
+		Status:       fmt.Sprintf("Showing %d of %d matches", matchCount, totalMatches),
 	}
 
 	return response.String(), nil

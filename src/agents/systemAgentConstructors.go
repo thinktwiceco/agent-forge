@@ -1,12 +1,15 @@
 package agents
 
 import (
+	"path/filepath"
+
 	"github.com/thinktwiceco/agent-forge/src/agents/system"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 	"github.com/thinktwiceco/agent-forge/src/tools/expand"
 	"github.com/thinktwiceco/agent-forge/src/tools/fs"
 	"github.com/thinktwiceco/agent-forge/src/tools/git"
+	imagetool "github.com/thinktwiceco/agent-forge/src/tools/image"
 	"github.com/thinktwiceco/agent-forge/src/tools/vector"
 	"github.com/thinktwiceco/agent-forge/src/tools/web"
 )
@@ -42,7 +45,7 @@ func CodingAgent(llmEngine llms.LLMEngine, root string) core.SubAgent {
 }
 
 // GitAgent creates a git operations agent with git tools.
-func GitAgent(llmEngine llms.LLMEngine, root string) core.SubAgent {
+func GitAgent(llmEngine llms.LLMEngine, workingDir string) core.SubAgent {
 	template, err := system.CreateGitAgentTemplate()
 	if err != nil {
 		panic(err)
@@ -50,7 +53,7 @@ func GitAgent(llmEngine llms.LLMEngine, root string) core.SubAgent {
 	config := systemConfigToAgentConfig(template.ToConfig(llmEngine))
 
 	// Add git tool
-	gitTool := git.NewGitTool(root)
+	gitTool := git.NewGitTool(filepath.Join(workingDir, "repos"))
 	config.Tools = []llms.Tool{gitTool}
 
 	agent := NewAgent(&config)
@@ -92,13 +95,26 @@ func VectorAgent(llmEngine llms.LLMEngine, vectorDB core.VectorDB, embeddingGene
 	return agent.AgentAsSubAgent()
 }
 
+// VisionAgent creates a vision agent that loads images and answers visual questions.
+// The llmEngine must be backed by a vision-capable model (e.g. gpt-4o).
+func VisionAgent(llmEngine llms.LLMEngine, workingDir string) core.SubAgent {
+	template := system.CreateVisionAgentTemplate()
+	config := systemConfigToAgentConfig(template.ToConfig(llmEngine))
+
+	imgTool := imagetool.NewImageTool(workingDir)
+	config.Tools = []llms.Tool{imgTool}
+
+	agent := NewAgent(&config)
+	return agent.AgentAsSubAgent()
+}
+
 // WebAgent creates a web operations agent.
 func WebAgent(llmEngine llms.LLMEngine, workingDir string) core.SubAgent {
 	template := system.CreateWebAgentTemplate()
 	config := systemConfigToAgentConfig(template.ToConfig(llmEngine))
 
 	// Add web tool
-	webTool := web.NewWebTool(workingDir)
+	webTool := web.NewWebTool(filepath.Join(workingDir, "web"))
 	config.Tools = []llms.Tool{webTool}
 
 	agent := NewAgent(&config)

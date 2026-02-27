@@ -71,6 +71,11 @@ type AgentConfig struct {
 	// If empty or not set, no persistence is used.
 	Persistence string
 
+	// WorkingDir is the agent's working directory. Tool and plugin paths are relative to it.
+	// When set, conversation persistence (json) stores history in WorkingDir/data/conversations/{agentName}.
+	// When empty, persistence uses data/conversations/{agentName} relative to process CWD.
+	WorkingDir string
+
 	// SubAgents is the list of sub-agents available for delegation
 	SubAgents []core.SubAgent
 

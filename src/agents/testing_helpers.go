@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/thinktwiceco/agent-forge/src/core"
 )
@@ -63,6 +64,11 @@ func (m *mockSubAgent) Troubleshooting() string {
 		return m.troubleshootingFunc()
 	}
 	return "No troubleshooting information available for mock subagent"
+}
+
+// DetailsAbout returns per-item details for the mock subagent.
+func (m *mockSubAgent) DetailsAbout(item string) string {
+	return fmt.Sprintf("Nothing to add about %s", item)
 }
 
 // ChatStream initiates a streaming chat interaction with the mock subagent.

@@ -10,9 +10,7 @@ import (
 )
 
 // expand retrieves detailed information about a tool or sub-agent.
-func (e *Expand) expand(agentContext map[string]any, subjectType string, subjectName string, troubleshoot bool) llms.ToolReturn {
-	// Validate subject_type
-
+func (e *Expand) expand(agentContext map[string]any, subjectType string, subjectName string, troubleshoot bool, detailsAbout string) llms.ToolReturn {
 	ctx, err := core.RehydrateContext(agentContext)
 	if err != nil {
 		return core.NewErrorResponse(fmt.Sprintf("Error rehydrating context: %v", err))
@@ -63,7 +61,16 @@ func (e *Expand) expand(agentContext map[string]any, subjectType string, subject
 		}
 	}
 
-	// Build the response
+	// If details_about is set, return per-item details only
+	if detailsAbout != "" {
+		var response strings.Builder
+		fmt.Fprintf(&response, "=== %s: %s — details about: %s ===\n\n", strings.ToUpper(subjectType), subjectName, detailsAbout)
+		response.WriteString(discoverable.DetailsAbout(detailsAbout))
+		response.WriteString("\n")
+		return core.NewSuccessResponse(response.String())
+	}
+
+	// Build the full response
 	var response strings.Builder
 	fmt.Fprintf(&response, "=== %s: %s ===\n\n", strings.ToUpper(subjectType), subjectName)
 

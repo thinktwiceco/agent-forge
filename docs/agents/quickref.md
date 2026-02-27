@@ -12,7 +12,7 @@ go build ./...
 ./scripts/start-dev.sh
 
 # Run with custom config
-AF_LOG_LEVEL=DEBUG go run ./cmd/app -config custom.yaml -port 8080
+AF_LOG_LEVEL=DEBUG go run ./cmd/localforge -config custom.yaml -port 8080
 ```
 
 ## Testing

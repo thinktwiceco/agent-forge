@@ -2,68 +2,107 @@ package fs
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
-// Fs represents a file system tool with a restricted root directory.
+// toInt converts an interface{} value (number) to int, returning 0 on failure.
+func toInt(v any) int {
+	switch n := v.(type) {
+	case int:
+		return n
+	case int64:
+		return int(n)
+	case float64:
+		return int(n)
+	}
+	return 0
+}
+
+// Fs represents a file system tool operating within a specific directory.
 type Fs struct {
-	root string
+	// dir is the directory this tool is sandboxed to (agent working_dir).
+	dir string
 }
 
 // NewFsTool creates a file system tool that provides read, write, and delete operations.
-// All file operations are restricted to the specified root directory for security.
+// All file operations are restricted to dir.
 //
 // Parameters:
-//   - root: The root directory path that restricts all file operations
-func NewFsTool(root string) llms.Tool {
-	fs := &Fs{root: root}
+//   - dir: The directory this tool operates in (agent working_dir).
+func NewFsTool(dir string) llms.Tool {
+	_ = os.MkdirAll(dir, 0755)
+	fs := &Fs{dir: dir}
+
+	detailsAbout := func(item string) string {
+		switch item {
+		case "read":
+			return `read: Read the contents of a file.
+- Required: path (string) — file path relative to the root directory
+- Returns: file content as a string`
+		case "write":
+			return `write: Create or overwrite a file (parent directories are created automatically).
+- Required: path (string) — file path relative to the root directory
+- Required: content (string) — content to write to the file`
+		case "delete":
+			return `delete: Remove a file.
+- Required: path (string) — file path relative to the root directory`
+		case "list":
+			return `list: List all files and directories inside a directory.
+- Required: path (string) — directory path relative to the root directory`
+		case "get_file_info":
+			return `get_file_info: Return detailed file information (permissions, ownership, size, timestamps).
+- Required: path (string) — file path relative to the root directory`
+		case "get_root":
+			return `get_root: Return the sandbox root directory path. No additional parameters required.`
+		case "ripgrep":
+			return `ripgrep: Search for a pattern in files using ripgrep (rg must be installed).
+- Required: path (string) — file or directory path relative to root
+- Required: pattern (string) — search pattern (regex supported)
+- Optional: flags (array of strings) — additional rg flags, e.g. ["-i", "-n", "--color=never"]
+- Optional: head_limit (integer, default 0) — max match lines to return; 0 = no limit
+- Optional: offset (integer, default 0) — match lines to skip; use with head_limit for pagination`
+		case "grep_logs":
+			return `grep_logs: Search the application log file for a pattern (requires AF_LOG_FILE env var).
+- Required: pattern (string) — search pattern
+- Optional: flags (array of strings) — additional rg flags
+- Optional: head_limit (integer, default 0) — max match lines to return
+- Optional: offset (integer, default 0) — match lines to skip`
+		default:
+			return fmt.Sprintf("Nothing to add about %s", item)
+		}
+	}
 
 	return &core.Tool{
 		Name:        "fs",
 		Description: "Perform file system operations (read, write, delete, list, ripgrep) on files within a restricted directory.",
 		AdvanceDesc: `Advanced Details:
-- Parameters:
-  * operation (string, required): The operation to perform - "read", "write", "delete", "list", "get_file_info", "get_root", "ripgrep", or "grep_logs"
-  * path (string, required for read/write/delete/list/get_file_info/ripgrep): File or directory path relative to the root directory
-  * content (string, optional): File content - required for "write" operation
-  * pattern (string, required for ripgrep): Search pattern for ripgrep operation
-  * flags (array of strings, optional): Additional ripgrep flags (e.g., ["-i", "-n", "--color=never"])
+- Available operations: read, write, delete, list, get_file_info, get_root, ripgrep, grep_logs
+  Use expand tool with details_about="<operation>" for full parameter details on any operation.
+- Common parameters:
+  * operation (string, required): the operation to perform
+  * path (string): file or directory path relative to the root — required for most operations
 - Behavior:
-  * All file paths are validated to ensure they stay within the root directory
-  * Path traversal attempts (e.g., "../") are blocked for security
-  * Read operation returns file content as a string
-  * Write operation creates the file if it doesn't exist, and creates parent directories if needed
-  * Delete operation removes the specified file
-  * List operation lists all files and directories in the specified directory
-  * GetFileInfo operation returns detailed file information (permissions, ownership, size, timestamps)
-  * GetRoot operation returns the sandbox root directory path
-  * Ripgrep operation searches for patterns in files using ripgrep (rg must be installed)
-  * GrepLogs operation searches the application log file for a pattern - only available when AF_LOG_FILE is set
-- Usage:
-  * Use "read" to read file contents
-  * Use "write" to create or update files (provide content parameter)
-  * Use "delete" to remove files
-  * Use "list" to list files and directories in a directory
-  * Use "get_file_info" to retrieve detailed file information (permissions, ownership, size, timestamps)
-  * Use "get_root" to retrieve the sandbox root directory path (no path parameter needed)
-  * Use "ripgrep" to search for patterns in files (provide pattern parameter, optional flags array)
-  * Use "grep_logs" to search the application log file (provide pattern parameter, optional flags array; requires AF_LOG_FILE)
-- Security: All operations are sandboxed to the root directory to prevent unauthorized access`,
+  * All paths are validated and sandboxed to the root directory; path traversal ("../") is blocked
+  * write creates parent directories automatically
+  * ripgrep/grep_logs results support pagination via head_limit and offset`,
+		DetailsAboutFunc: detailsAbout,
 		TroubleshootingInfo: `Troubleshooting:
 - "path traversal detected": The provided path attempts to escape the root directory - use relative paths only
 - "file not found": The file doesn't exist (for read/delete/get_file_info operations) - verify the path is correct
 - "directory not found": The directory doesn't exist (for list operation) - verify the path is correct
 - "path is not a directory": The path exists but is not a directory (for list operation)
 - "missing required parameter: content": Content parameter is required for write operations
-- "missing required parameter: pattern": Pattern parameter is required for ripgrep operations
+- "missing required parameter: pattern": Pattern parameter is required for ripgrep/grep_logs operations
 - "ripgrep (rg) is not installed": ripgrep must be installed and in PATH for ripgrep operations
 - "invalid operation": Operation must be exactly "read", "write", "delete", "list", "get_file_info", "get_root", "ripgrep", or "grep_logs"
 - "grep_logs is not available": Set AF_LOG_FILE to enable file logging and grep_logs
 - Permission errors: Ensure the process has read/write/delete permissions for the root directory
 - "failed to create directory": Parent directory creation failed - check permissions
-- "missing required parameter: path": Path parameter is required for read/write/delete/list/get_file_info/ripgrep operations (not needed for get_root, grep_logs)`,
+- "missing required parameter: path": Path parameter is required for read/write/delete/list/get_file_info/ripgrep operations (not needed for get_root, grep_logs)
+- Large output: Use head_limit (e.g., 100) to cap results and offset to page through them`,
 		Parameters: []core.Parameter{
 			{
 				Name:        "operation",
@@ -93,6 +132,18 @@ func NewFsTool(root string) llms.Tool {
 				Name:        "flags",
 				Type:        "array",
 				Description: "Additional ripgrep flags - optional for 'ripgrep' and 'grep_logs' operations (e.g., [\"-i\", \"-n\", \"--color=never\"])",
+				Required:    false,
+			},
+			{
+				Name:        "head_limit",
+				Type:        "integer",
+				Description: "Maximum number of match lines to return for 'ripgrep' and 'grep_logs' operations; 0 = no limit (default 0). Use with 'offset' for pagination.",
+				Required:    false,
+			},
+			{
+				Name:        "offset",
+				Type:        "integer",
+				Description: "Number of match lines to skip before returning results for 'ripgrep' and 'grep_logs' operations (default 0). Use with 'head_limit' for pagination.",
 				Required:    false,
 			},
 		},
@@ -138,7 +189,16 @@ func NewFsTool(root string) llms.Tool {
 					}
 				}
 
-				info, err := fs.grepLogs(patternStr, flags)
+				offset := 0
+				if v, ok := args["offset"]; ok {
+					offset = toInt(v)
+				}
+				headLimit := 0
+				if v, ok := args["head_limit"]; ok {
+					headLimit = toInt(v)
+				}
+
+				info, err := fs.grepLogs(patternStr, flags, offset, headLimit)
 				if err != nil {
 					return core.NewErrorResponse(err.Error())
 				}
@@ -231,7 +291,16 @@ func NewFsTool(root string) llms.Tool {
 					}
 				}
 
-				info, err := fs.ripgrep(pathStr, patternStr, flags)
+				offset := 0
+				if v, ok := args["offset"]; ok {
+					offset = toInt(v)
+				}
+				headLimit := 0
+				if v, ok := args["head_limit"]; ok {
+					headLimit = toInt(v)
+				}
+
+				info, err := fs.ripgrep(pathStr, patternStr, flags, offset, headLimit)
 				if err != nil {
 					return core.NewErrorResponse(err.Error())
 				}

@@ -8,7 +8,7 @@ import (
 
 // init executes git init and returns initialization result.
 func (git *Git) init() (string, error) {
-	absRoot, err := filepath.Abs(git.root)
+	absRoot, err := filepath.Abs(git.dir)
 	if err != nil {
 		return "", fmt.Errorf("invalid root directory: %w", err)
 	}

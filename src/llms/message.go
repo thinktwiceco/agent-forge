@@ -4,6 +4,23 @@ import "encoding/json"
 
 /// Common message interface
 
+// ContentPartType identifies the kind of content within a multimodal message.
+type ContentPartType string
+
+const (
+	ContentPartTypeText     ContentPartType = "text"
+	ContentPartTypeImageURL ContentPartType = "image_url"
+)
+
+// ContentPart is a single element in a multimodal user message.
+// Use Type to discriminate: Text is populated for text parts,
+// ImageURL is populated for image parts (data URI or https URL).
+type ContentPart struct {
+	Type     ContentPartType
+	Text     string
+	ImageURL string
+}
+
 type MessageRole string
 
 func (r MessageRole) String() string {
@@ -20,13 +37,14 @@ const (
 type UnifiedMessage struct {
 	role             MessageRole
 	content          string
-	reasoningContent string     // For assistant messages - reasoning content from thinking models (e.g. DeepSeek Reasoner)
-	toolCallID       string     // For tool messages - the ID of the tool call this responds to
-	toolCalls        []ToolCall // For assistant messages - tool calls made by the assistant
-	promptTokens     int        // Input tokens consumed
-	completionTokens int        // Output tokens generated
-	totalTokens      int        // Total tokens used
-	ephemeral        bool       // Whether the message is ephemeral. If ephemeral is not useful for the chat history, it should be set to true.
+	contentParts     []ContentPart // Non-nil when message carries multimodal content
+	reasoningContent string        // For assistant messages - reasoning content from thinking models (e.g. DeepSeek Reasoner)
+	toolCallID       string        // For tool messages - the ID of the tool call this responds to
+	toolCalls        []ToolCall    // For assistant messages - tool calls made by the assistant
+	promptTokens     int           // Input tokens consumed
+	completionTokens int           // Output tokens generated
+	totalTokens      int           // Total tokens used
+	ephemeral        bool          // Whether the message is ephemeral. If ephemeral is not useful for the chat history, it should be set to true.
 }
 
 func (m *UnifiedMessage) Role() MessageRole {
@@ -35,6 +53,12 @@ func (m *UnifiedMessage) Role() MessageRole {
 
 func (m *UnifiedMessage) Content() string {
 	return m.content
+}
+
+// ContentParts returns the multimodal content parts when present.
+// Returns nil for plain text messages.
+func (m *UnifiedMessage) ContentParts() []ContentPart {
+	return m.contentParts
 }
 
 func (m *UnifiedMessage) ToolCallID() string {
@@ -73,6 +97,24 @@ func UserMessage(content string) *UnifiedMessage {
 	return &UnifiedMessage{
 		role:    MessageRoleUser,
 		content: content,
+	}
+}
+
+// UserMessageWithImages creates a multimodal user message containing text and one or more
+// images. Each imageURL may be a data URI (e.g. "data:image/png;base64,...") or an
+// https URL pointing to a publicly accessible image.
+func UserMessageWithImages(text string, imageURLs ...string) *UnifiedMessage {
+	parts := make([]ContentPart, 0, 1+len(imageURLs))
+	if text != "" {
+		parts = append(parts, ContentPart{Type: ContentPartTypeText, Text: text})
+	}
+	for _, url := range imageURLs {
+		parts = append(parts, ContentPart{Type: ContentPartTypeImageURL, ImageURL: url})
+	}
+	return &UnifiedMessage{
+		role:         MessageRoleUser,
+		content:      text,
+		contentParts: parts,
 	}
 }
 

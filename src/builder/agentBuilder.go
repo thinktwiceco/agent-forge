@@ -19,7 +19,7 @@ type Config struct {
 		Persistence  string              `yaml:"persistence"`
 		Tools        []Tool              `yaml:"tools"`
 		Subagents    map[Subagent]string `yaml:"subagents"`
-		Plugins      []Plugin            `yaml:"plugins"`
+		Plugins      []string            `yaml:"plugins"`
 	} `yaml:"agent"`
 	VectorStorage *VectorStorageConfig `yaml:"vector-storage,omitempty"`
 }
@@ -29,7 +29,7 @@ type AgentBuilder struct {
 	systemPrompt       string
 	tools              []Tool
 	Subagents          map[LLM]Subagent
-	plugins            []Plugin
+	plugins            []string
 	llmEngine          llms.LLMEngine
 	workingDir         string
 	persistence        string
@@ -129,7 +129,7 @@ func (b *AgentBuilder) AddSubagent(subagent Subagent, model string) *AgentBuilde
 	return b
 }
 
-func (b *AgentBuilder) AddPlugin(plugin Plugin) *AgentBuilder {
+func (b *AgentBuilder) AddPlugin(plugin string) *AgentBuilder {
 	b.plugins = append(b.plugins, plugin)
 	return b
 }
@@ -180,6 +180,7 @@ func (b *AgentBuilder) Build() (*agents.Agent, error) {
 		CanExpand:    true,
 		MainAgent:    true,
 		Persistence:  b.persistence,
+		WorkingDir:   b.workingDir,
 		SubAgents:    subagents,
 		Tools:        tools,
 		Plugins:      plugins,
@@ -248,7 +249,7 @@ func (b *AgentBuilder) buildTools() ([]llms.Tool, error) {
 func (b *AgentBuilder) buildPlugins() ([]core.Plugin, error) {
 	plugins := []core.Plugin{}
 	for _, plugin := range b.plugins {
-		plugin, err := plugin.getPlugin()
+		plugin, err := getPlugin(plugin, b.workingDir)
 		if err != nil {
 			return nil, err
 		}
