@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [0.4.9] - 2026-02-27
+
+
+## [Unreleased]
 ## [0.4.8] - 2026-02-27
 - [cd3615f](http://github.com/thinktwiceco/agent-forge/commit/cd3615fb0c196bb44aeb2edf88c324dc0d16e0de) - chore(release): prepare release v0.4.8 (#30)
 - [7249fc6](http://github.com/thinktwiceco/agent-forge/commit/7249fc6800bdd52c3158abe9275b7e42e4296027) - fix: replace WriteString+Sprintf with Fprintf for staticcheck QF1012
