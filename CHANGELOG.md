@@ -4,8 +4,14 @@
 - [cd3615f](http://github.com/thinktwiceco/agent-forge/commit/cd3615fb0c196bb44aeb2edf88c324dc0d16e0de) - chore(release): prepare release v0.4.8 (#30)
 - [7249fc6](http://github.com/thinktwiceco/agent-forge/commit/7249fc6800bdd52c3158abe9275b7e42e4296027) - fix: replace WriteString+Sprintf with Fprintf for staticcheck QF1012
 
+## [0.4.7] - 2026-02-20
+- [a069354](http://github.com/thinktwiceco/agent-forge/commit/a0693548002141728da8fad30e131ca966c6511a) - chore: bump version to 0.4.7
+- [a100130](http://github.com/thinktwiceco/agent-forge/commit/a10013015e914d866736be77a3351d1c247154e0) - feat(web): add push SSE endpoint and chat UI subscription
+- [f0f41e4](http://github.com/thinktwiceco/agent-forge/commit/f0f41e4f0cc7d7cd62b68185a706432b77254d0d) - feat: add queue package and async inbox for agent
+- [3313f94](http://github.com/thinktwiceco/agent-forge/commit/3313f946a99a5f0effb49e9f24bebf1bed1a06e5) - chore(release): prepare release v0.4.6 (#28)
+- [2eb341a](http://github.com/thinktwiceco/agent-forge/commit/2eb341a8b00dbd7c7d1a4cd9985a4f3bc0facf49) - feat(history): add src/history package, fix gitignore to track it
+- [67df18f](http://github.com/thinktwiceco/agent-forge/commit/67df18f2263d20e85d1762195bf7fce350204162) - chore: add commit history to v0.4.6 changelog
 
-## [Unreleased]
 ## [0.4.6] - 2026-02-18
 ### Fixed
 - fix: stop gitignoring go.work (module workspace)
@@ -17,10 +23,6 @@
 ## [0.4.4] - 2026-02-16
 - [eec4bdf](http://github.com/thinktwiceco/agent-forge/commit/eec4bdf43b89b21df3777829ab748438f1f04e36) - chore(release): prepare release v0.4.4 (#22)
 
-
-## [Unreleased]
-## [0.4.4] - 2026-02-16
-
 ### Changed
 - chore(release): prepare release v0.4.4 (patch version bump)
 
@@ -31,10 +33,6 @@
 - [d65f4d4](http://github.com/thinktwiceco/agent-forge/commit/d65f4d427d858d69317c05c6c325f5deaf460bbd) - Merge pull request #18 from thinktwiceco/changelog-v0.4.2
 - [0824516](http://github.com/thinktwiceco/agent-forge/commit/08245161d3474a8c6ab381639938f23fd592c1b6) - chore(release): prepare release v0.4.2
 - [b334c57](http://github.com/thinktwiceco/agent-forge/commit/b334c57b39f82392998b2974bbd6c201384af9b3) - chore: update changelog for v0.4.2 [skip ci]
-
-
-## [Unreleased]
-## [0.4.3] - 2026-02-10
 
 ### Added
 - Add Kimi-K2.5 (moonshotai/Kimi-K2.5) to TogetherAI available models
@@ -57,8 +55,6 @@
 - [b58e8ac](http://github.com/thinktwiceco/agent-forge/commit/b58e8ac3413ca31a6b44273e37f6b7faea097c0f) - Merge pull request #13 from thinktwiceco/changelog-v0.4.0
 - [6a4fa89](http://github.com/thinktwiceco/agent-forge/commit/6a4fa8947231d5e5e70f6348c3d6e805aa23b692) - chore: update changelog for v0.4.0 [skip ci]
 
-
-## [Unreleased]
 ## [0.4.0] - 2026-02-07
 - [fe4d8f4](http://github.com/thinktwiceco/agent-forge/commit/fe4d8f4ca5fcc9d314277ed97ecfbd98d201ecc7) - Merge pull request #12 from thinktwiceco/release/v0.4.0
 - [d3c8daa](http://github.com/thinktwiceco/agent-forge/commit/d3c8daaf751ab1e6fa8b1e4f072db013bf5b6d85) - ci: remove duplicate test workflow
