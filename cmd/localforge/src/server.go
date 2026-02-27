@@ -9,36 +9,52 @@ import (
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	"github.com/thinktwiceco/agent-forge/cmd/localforge/src/providers"
 )
 
 //go:embed static
 var embeddedStatic embed.FS
 
 type Server struct {
-	engine       *gin.Engine
-	agentMgr     *AgentManager
-	configMgr    *ConfigManager
-	todoMgr      *TodoManager
-	httpSrv      *http.Server
-	convRegistry *ConversationRegistry
-	pushRegistry *PushRegistry
-	devMode      bool
-	appDir       string
+	engine           *gin.Engine
+	agentMgr         *AgentManager
+	configMgr        *ConfigManager
+	todoMgr          *TodoManager
+	httpSrv          *http.Server
+	convRegistry     *ConversationRegistry
+	pushRegistry     *PushRegistry
+	providerRegistry *ProviderRegistry
+	devMode          bool
+	appDir           string
 }
 
 func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoManager, devMode bool, appDir string) *Server {
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery(), corsMiddleware())
 
+	// Initialize provider registry
+	providerRegistry := NewProviderRegistry()
+
+	// Register Instagram provider if token exists
+	if token := os.Getenv("INSTAGRAM_ACCESS_TOKEN"); token != "" {
+		providerRegistry.Register(providers.NewInstagramProvider(token))
+	}
+
+	// Register Telegram provider if token exists
+	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
+		providerRegistry.Register(providers.NewTelegramProvider(token))
+	}
+
 	server := &Server{
-		engine:       engine,
-		agentMgr:     agentMgr,
-		configMgr:    configMgr,
-		todoMgr:      todoMgr,
-		convRegistry: NewConversationRegistry(),
-		pushRegistry: NewPushRegistry(),
-		devMode:      devMode,
-		appDir:       appDir,
+		engine:           engine,
+		agentMgr:         agentMgr,
+		configMgr:        configMgr,
+		todoMgr:          todoMgr,
+		convRegistry:     NewConversationRegistry(),
+		pushRegistry:     NewPushRegistry(),
+		providerRegistry: providerRegistry,
+		devMode:          devMode,
+		appDir:           appDir,
 	}
 	server.setupRoutes()
 	return server
@@ -95,6 +111,10 @@ func (s *Server) setupRoutes() {
 	api.PUT("/config/tools/:toolName", s.handleUpdateToolConfig)
 	api.POST("/agent/reload", s.handleReload)
 	api.GET("/todos", s.handleGetTodos)
+	
+	// Webhook endpoints
+	api.POST("/webhooks/:provider", s.handleWebhook)
+	api.POST("/webhooks/:provider/sync", s.handleWebhookSync)
 }
 
 func (s *Server) Run(port string) error {
