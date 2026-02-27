@@ -118,9 +118,18 @@ if [ "${1:-}" != "" ]; then
   INSTALL_DIR="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
   AGENT_NAME="$(basename "$INSTALL_DIR")"
 else
-  echo ""
-  read -r -p "Agent name (will create ./<name>/ directory): " AGENT_NAME
-  [ -z "$AGENT_NAME" ] && die "Agent name cannot be empty."
+  # If stdin is not a terminal (e.g., piped), re-open from /dev/tty if available
+  # Otherwise use a default agent name
+  if [ -t 0 ] || [ -c /dev/tty ]; then
+    echo ""
+    read -r -p "Agent name (will create ./<name>/ directory): " AGENT_NAME < /dev/tty 2>/dev/null || AGENT_NAME=""
+  fi
+  
+  if [ -z "$AGENT_NAME" ]; then
+    # Use environment variable or default
+    AGENT_NAME="${AGENT_FORGE_NAME:-my-agent}"
+  fi
+  
   INSTALL_DIR="$(pwd)/$AGENT_NAME"
 fi
 

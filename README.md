@@ -60,29 +60,50 @@ A powerful Go framework for building intelligent agents with LLM integration, to
 
 ### Run localforge (pre-built binary)
 
-Download the latest release, set up the folder structure, and get a ready-to-run agent in one command:
+Download the latest release, set up the folder structure, and get a ready-to-run agent in one command.
+
+#### Quick start (with custom directory)
+
+Recommended: pass a directory argument to avoid any input prompts:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/install-release.sh | bash
+curl -fsSL https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/install-release.sh | bash -s -- ./my-agent
 ```
 
-This will:
-1. Detect your OS and architecture
-2. Download the latest `localforge` binary from GitHub Releases
-3. Create a working directory with `config.yaml`, `.env`, `procedures/`, `data/`, and a `start.sh` launcher
+Then configure and start:
 
-Then configure your agent and start it:
 ```bash
-cd <agent-name>
+cd my-agent
 # Edit config.yaml (model, system_prompt, tools)
 # Add your API keys to .env
 ./start.sh
 ```
 
-To install into a specific directory, pass the path as an argument:
+#### Alternative: Interactive or default directory
+
+Without an argument, the script will use the default directory name (`my-agent`):
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/install-release.sh | bash -s -- ./my-agent
+curl -fsSL https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/install-release.sh | bash
 ```
+
+Or with interactive prompt (requires terminal):
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/install-release.sh)
+```
+
+#### What it does
+
+1. Detects your OS and architecture (darwin/linux/windows, amd64/arm64)
+2. Fetches the latest `localforge` binary from GitHub Releases
+3. Creates the working directory structure:
+   - `bin/localforge` — the executable
+   - `config.yaml` — agent configuration
+   - `.env` — API keys and secrets
+   - `procedures/` — multi-phase workflow definitions
+   - `data/` — conversation history storage
+   - `start.sh` or `start.bat` — convenience launcher
 
 ### Use as a Go library
 
