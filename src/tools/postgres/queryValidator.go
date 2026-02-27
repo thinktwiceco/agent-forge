@@ -195,6 +195,15 @@ func extractTableRefs(query, stmtType string) ([]TableRef, error) {
 
 // validateTableRefs checks that all extracted tables are allowed and schemas (if specified) are allowed
 func validateTableRefs(refs []TableRef, allowedTables []string, allowedSchemas []string) error {
+	// Check if wildcard "*" is present in allowedTables - grants access to all tables
+	grantAllTables := false
+	for _, t := range allowedTables {
+		if t == "*" {
+			grantAllTables = true
+			break
+		}
+	}
+
 	allowedTableMap := make(map[string]bool)
 	for _, t := range allowedTables {
 		allowedTableMap[strings.ToLower(t)] = true
@@ -207,7 +216,9 @@ func validateTableRefs(refs []TableRef, allowedTables []string, allowedSchemas [
 	unauthorized := make([]string, 0)
 	for _, ref := range refs {
 		tableKey := strings.ToLower(ref.Table)
-		if !allowedTableMap[tableKey] {
+
+		// If wildcard is present, skip table name validation
+		if !grantAllTables && !allowedTableMap[tableKey] {
 			if ref.Schema != "" {
 				unauthorized = append(unauthorized, ref.Schema+"."+ref.Table)
 			} else {
@@ -215,6 +226,8 @@ func validateTableRefs(refs []TableRef, allowedTables []string, allowedSchemas [
 			}
 			continue
 		}
+
+		// Still validate schemas if allowedSchemas is configured
 		if ref.Schema != "" && len(allowedSchemas) > 0 && !allowedSchemaMap[strings.ToLower(ref.Schema)] {
 			unauthorized = append(unauthorized, ref.Schema+"."+ref.Table+" (schema not in allowed list)")
 		}

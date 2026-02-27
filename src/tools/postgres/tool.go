@@ -21,7 +21,7 @@ type Postgres struct {
 // Parameters:
 //   - postgresURL: PostgreSQL connection URL (format: postgresql://user:pass@host:port/db)
 //   - mode: Access mode - "read" (SELECT only) or "write" (SELECT, INSERT, UPDATE, DELETE)
-//   - allowedTables: Whitelist of table names the agent can access
+//   - allowedTables: Whitelist of table names the agent can access. Use "*" to grant access to all tables.
 //   - allowedSchemas: Whitelist of schema names; when set, tables must be in these schemas and search_path is set for convenience
 func NewPostgresTool(postgresURL, mode string, allowedTables, allowedSchemas []string) llms.Tool {
 	pg := &Postgres{
@@ -51,7 +51,7 @@ func NewPostgresTool(postgresURL, mode string, allowedTables, allowedSchemas []s
 		AdvanceDesc: fmt.Sprintf(`Advanced Details:
 - Configuration:
   * Mode: %s (READ allows SELECT only; WRITE allows SELECT, INSERT, UPDATE, DELETE)
-  * Allowed Tables: %v (queries can only access these tables)
+  * Allowed Tables: %v (queries can only access these tables; use "*" to allow all tables)
 %s- Parameters:
   * query (string, required): Complete SQL query to execute
 
@@ -66,7 +66,7 @@ func NewPostgresTool(postgresURL, mode string, allowedTables, allowedSchemas []s
 
 - Security:
   * Query validation prevents dangerous operations
-  * Table whitelist restricts access to authorized tables only
+  * Table whitelist restricts access to authorized tables only (use "*" to allow all tables)
   * Mode-based restrictions (READ = SELECT only, WRITE = all data operations)
   * Dangerous operations (DROP, TRUNCATE, ALTER, etc.) are blocked
 

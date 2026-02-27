@@ -55,6 +55,10 @@ func NewGitTool(dir string) llms.Tool {
 		case "diff":
 			return `diff: View changes in the working tree.
 - Optional: path (string) — file or directory path relative to root to diff`
+		case "clone":
+			return `clone: Clone a repository into a new directory.
+- Required: url (string) — repository URL to clone
+- Optional: directory (string) — target directory name; if omitted, uses repository name from URL`
 		default:
 			return fmt.Sprintf("Nothing to add about %s", item)
 		}
@@ -62,15 +66,15 @@ func NewGitTool(dir string) llms.Tool {
 
 	return &core.Tool{
 		Name:        "git",
-		Description: "Perform git operations (init, status, add, commit, push, pull, branch, checkout, log, diff) within a restricted directory.",
+		Description: "Perform git operations (init, status, add, commit, push, pull, branch, checkout, log, diff, clone) within a restricted directory.",
 		AdvanceDesc: `Advanced Details:
-- Available operations: init, status, add, commit, push, pull, branch, checkout, log, diff
+- Available operations: init, status, add, commit, push, pull, branch, checkout, log, diff, clone
   Use expand tool with details_about="<operation>" for full parameter details on any operation.
 - Common parameters:
   * operation (string, required): the operation to perform
 - Behavior:
   * All operations run within the root directory; path traversal ("../") is blocked
-  * A git repository must already exist for all operations except "init"
+  * A git repository must already exist for all operations except "init" and "clone"
   * Commands delegate to the git CLI`,
 		DetailsAboutFunc: detailsAbout,
 		TroubleshootingInfo: `Troubleshooting:
@@ -78,7 +82,8 @@ func NewGitTool(dir string) llms.Tool {
 - "path traversal detected": The provided path attempts to escape the root directory - use relative paths only
 - "missing required parameter: message": Message parameter is required for commit operations
 - "missing required parameter: branch": Branch parameter is required for checkout operations
-- "invalid operation": Operation must be exactly "init", "status", "add", "commit", "push", "pull", "branch", "checkout", "log", or "diff"
+- "missing required parameter: url": URL parameter is required for clone operations
+- "invalid operation": Operation must be exactly "init", "status", "add", "commit", "push", "pull", "branch", "checkout", "log", "diff", or "clone"
 - Git command errors: Check that git is installed and accessible, and that the repository is in a valid state
 - Permission errors: Ensure the process has read/write permissions for the root directory
 - Init on existing repository: Running "init" on an existing repository is safe and will not overwrite existing data`,
@@ -86,7 +91,7 @@ func NewGitTool(dir string) llms.Tool {
 			{
 				Name:        "operation",
 				Type:        "string",
-				Description: "The operation to perform: 'init', 'status', 'add', 'commit', 'push', 'pull', 'branch', 'checkout', 'log', or 'diff'",
+				Description: "The operation to perform: 'init', 'status', 'add', 'commit', 'push', 'pull', 'branch', 'checkout', 'log', 'diff', or 'clone'",
 				Required:    true,
 				Validator:   validateOperation,
 			},
@@ -120,6 +125,18 @@ func NewGitTool(dir string) llms.Tool {
 				Description: "Number of commits to show - optional for 'log' operation (defaults to 10)",
 				Required:    false,
 			},
+			{
+				Name:        "url",
+				Type:        "string",
+				Description: "Repository URL - required for 'clone' operation",
+				Required:    false,
+			},
+			{
+				Name:        "directory",
+				Type:        "string",
+				Description: "Target directory name - optional for 'clone' operation (defaults to repository name from URL)",
+				Required:    false,
+			},
 		},
 		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 			operation := args["operation"].(string)
@@ -127,6 +144,24 @@ func NewGitTool(dir string) llms.Tool {
 			// Handle init operation (bypasses repository validation since it creates the repo)
 			if operation == "init" {
 				result, err := git.init()
+				if err != nil {
+					return core.NewErrorResponse(err.Error())
+				}
+				return core.NewSuccessResponse(result)
+			}
+
+			// Handle clone operation (bypasses repository validation since it creates the repo)
+			if operation == "clone" {
+				url, ok := args["url"]
+				if !ok {
+					return core.NewErrorResponse("missing required parameter: url (required for clone operation)")
+				}
+				urlStr, ok := url.(string)
+				if !ok {
+					return core.NewErrorResponse("url parameter must be a string")
+				}
+				directory, _ := args["directory"].(string)
+				result, err := git.clone(urlStr, directory)
 				if err != nil {
 					return core.NewErrorResponse(err.Error())
 				}

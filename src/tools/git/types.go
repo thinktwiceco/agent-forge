@@ -330,3 +330,29 @@ Path: %s
 
 	return result
 }
+
+// gitCloneResponse represents a git clone operation result.
+type gitCloneResponse struct {
+	Operation string
+	URL       string
+	Directory string
+	FullPath  string
+	Output    string
+	Success   bool
+}
+
+// String formats the git clone response as a string.
+func (r *gitCloneResponse) String() string {
+	result := fmt.Sprintf(`Git Operation: Clone
+Repository URL: %s
+Cloned to: %s
+Full Path: %s
+Status: %s
+`, r.URL, r.Directory, r.FullPath, map[bool]string{true: "Success", false: "Failed"}[r.Success])
+
+	if r.Output != "" {
+		result += fmt.Sprintf("\nOutput:\n%s\n", r.Output)
+	}
+
+	return result
+}

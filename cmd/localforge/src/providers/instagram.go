@@ -94,11 +94,11 @@ func (p *InstagramProvider) SendMessage(ctx context.Context, recipient string, m
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		var errorBody bytes.Buffer
-		errorBody.ReadFrom(resp.Body)
+		_, _ = errorBody.ReadFrom(resp.Body)
 		return fmt.Errorf("instagram API error (status %d): %s", resp.StatusCode, errorBody.String())
 	}
 

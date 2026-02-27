@@ -111,7 +111,7 @@ func (s *Server) setupRoutes() {
 	api.PUT("/config/tools/:toolName", s.handleUpdateToolConfig)
 	api.POST("/agent/reload", s.handleReload)
 	api.GET("/todos", s.handleGetTodos)
-	
+
 	// Webhook endpoints
 	api.POST("/webhooks/:provider", s.handleWebhook)
 	api.POST("/webhooks/:provider/sync", s.handleWebhookSync)

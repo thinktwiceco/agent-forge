@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/thinktwiceco/agent-forge/cmd/localforge/src/providers"
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/queue"
@@ -63,7 +64,7 @@ func (s *Server) handleWebhook(c *gin.Context) {
 
 	// Format webhook payload as a message to the agent
 	message := s.formatWebhookMessage(provider, payload)
-	
+
 	// Use a dedicated conversation ID for webhooks (or create a new one per webhook)
 	// Option 1: Shared webhook conversation
 	conversationID := fmt.Sprintf("webhook-%s", provider)
@@ -71,10 +72,6 @@ func (s *Server) handleWebhook(c *gin.Context) {
 	// conversationID := ""
 
 	agentforge.Debug("Processing webhook from %s: %s", provider, message)
-
-	// Create a context for this webhook processing
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Enrich message with metadata
 	enriched := queue.FormatHeaders(message, map[string]string{
@@ -85,7 +82,9 @@ func (s *Server) handleWebhook(c *gin.Context) {
 	// Start agent processing in the background
 	// For webhooks, we typically don't stream back to the caller
 	// Instead, we acknowledge receipt and process asynchronously
+	// Use context.Background() inside the goroutine so handler return doesn't cancel processing
 	go func() {
+		ctx := context.Background()
 		providerInst := s.providerRegistry.Get(provider)
 		if providerInst == nil {
 			agentforge.Debug("No provider registered for %s", provider)
@@ -104,9 +103,23 @@ func (s *Server) handleWebhook(c *gin.Context) {
 			return
 		}
 
+		// For Telegram, send initial "processing" message to provide feedback
+		var telegramMessageID int
+		if provider == "telegram" {
+			if telegramProvider, ok := providerInst.(*providers.TelegramProvider); ok {
+				messageID, err := telegramProvider.SendMessageWithID(ctx, recipientID, "⏳ Processing your request...")
+				if err != nil {
+					agentforge.Debug("Failed to send initial Telegram message: %v", err)
+				} else {
+					telegramMessageID = messageID
+					agentforge.Debug("Sent initial Telegram message with ID %d", messageID)
+				}
+			}
+		}
+
 		responseCh := agent.ChatStream(ctx, enriched, conversationID)
 		stream := responseCh.Start()
-		
+
 		var fullResponse strings.Builder
 		for chunk := range stream {
 			if chunk.Status == "error" {
@@ -119,8 +132,27 @@ func (s *Server) handleWebhook(c *gin.Context) {
 			}
 		}
 
-		// Send accumulated response back via provider
+		// Send or edit accumulated response back via provider
 		if fullResponse.Len() > 0 {
+			// For Telegram, edit the initial message if we sent one
+			if provider == "telegram" && telegramMessageID > 0 {
+				if telegramProvider, ok := providerInst.(*providers.TelegramProvider); ok {
+					err := telegramProvider.EditMessage(ctx, recipientID, telegramMessageID, fullResponse.String())
+					if err != nil {
+						agentforge.Debug("Failed to edit Telegram message: %v", err)
+						// Fallback: send as new message
+						err = providerInst.SendMessage(ctx, recipientID, fullResponse.String())
+						if err != nil {
+							agentforge.Debug("Failed to send Telegram message: %v", err)
+						}
+					} else {
+						agentforge.Debug("Successfully edited Telegram message %d", telegramMessageID)
+					}
+					return
+				}
+			}
+
+			// For other providers or if edit failed, send as new message
 			err := providerInst.SendMessage(ctx, recipientID, fullResponse.String())
 			if err != nil {
 				agentforge.Debug("Failed to send message via %s: %v", provider, err)
@@ -132,8 +164,8 @@ func (s *Server) handleWebhook(c *gin.Context) {
 
 	// Return immediate acknowledgment
 	c.JSON(http.StatusOK, gin.H{
-		"status":  "accepted",
-		"message": "webhook received and processing",
+		"status":   "accepted",
+		"message":  "webhook received and processing",
 		"provider": provider,
 	})
 }
@@ -143,7 +175,7 @@ func (s *Server) verifyWebhookSignature(provider string, body []byte, headers ht
 	// Get webhook secret from environment
 	secretEnvVar := fmt.Sprintf("WEBHOOK_SECRET_%s", strings.ToUpper(provider))
 	secret := os.Getenv(secretEnvVar)
-	
+
 	// If no secret is configured, skip verification (insecure, but allows testing)
 	if secret == "" {
 		agentforge.Debug("No webhook secret configured for %s (set %s to enable verification)", provider, secretEnvVar)
@@ -177,7 +209,7 @@ func verifyGitHubSignature(body []byte, signature, secret string) error {
 
 	// Remove "sha256=" prefix
 	signature = strings.TrimPrefix(signature, "sha256=")
-	
+
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
@@ -212,7 +244,7 @@ func verifyStripeSignature(body []byte, signature, secret string) error {
 
 	// Create signed payload: timestamp.body
 	signedPayload := fmt.Sprintf("%s.%s", timestamp, string(body))
-	
+
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(signedPayload))
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
@@ -244,7 +276,7 @@ func verifyInstagramSignature(body []byte, signature, secret string) error {
 
 	// Remove "sha256=" prefix if present
 	signature = strings.TrimPrefix(signature, "sha256=")
-	
+
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
@@ -273,15 +305,15 @@ func (s *Server) formatWebhookMessage(provider string, payload map[string]interf
 	// Try to extract common fields
 	eventType, _ := payload["event"].(string)
 	action, _ := payload["action"].(string)
-	
+
 	var message strings.Builder
-	message.WriteString(fmt.Sprintf("[Webhook from %s]\n", provider))
-	
+	fmt.Fprintf(&message, "[Webhook from %s]\n", provider)
+
 	if eventType != "" {
-		message.WriteString(fmt.Sprintf("Event: %s\n", eventType))
+		fmt.Fprintf(&message, "Event: %s\n", eventType)
 	}
 	if action != "" {
-		message.WriteString(fmt.Sprintf("Action: %s\n", action))
+		fmt.Fprintf(&message, "Action: %s\n", action)
 	}
 
 	// Provider-specific formatting
@@ -298,7 +330,7 @@ func (s *Server) formatWebhookMessage(provider string, payload map[string]interf
 		// Generic formatting - pretty print the entire payload
 		jsonBytes, err := json.MarshalIndent(payload, "", "  ")
 		if err == nil {
-			message.WriteString(fmt.Sprintf("\nPayload:\n%s", string(jsonBytes)))
+			fmt.Fprintf(&message, "\nPayload:\n%s", string(jsonBytes))
 		}
 	}
 
@@ -308,27 +340,27 @@ func (s *Server) formatWebhookMessage(provider string, payload map[string]interf
 // formatGitHubWebhook formats GitHub-specific webhook events
 func (s *Server) formatGitHubWebhook(payload map[string]interface{}) string {
 	var msg strings.Builder
-	
+
 	// Extract common GitHub fields
 	if repo, ok := payload["repository"].(map[string]interface{}); ok {
 		if name, ok := repo["full_name"].(string); ok {
-			msg.WriteString(fmt.Sprintf("Repository: %s\n", name))
+			fmt.Fprintf(&msg, "Repository: %s\n", name)
 		}
 	}
-	
+
 	if sender, ok := payload["sender"].(map[string]interface{}); ok {
 		if login, ok := sender["login"].(string); ok {
-			msg.WriteString(fmt.Sprintf("Sender: %s\n", login))
+			fmt.Fprintf(&msg, "Sender: %s\n", login)
 		}
 	}
 
 	// Handle specific event types
 	if commits, ok := payload["commits"].([]interface{}); ok {
-		msg.WriteString(fmt.Sprintf("\nCommits (%d):\n", len(commits)))
+		fmt.Fprintf(&msg, "\nCommits (%d):\n", len(commits))
 		for i, c := range commits {
 			if commit, ok := c.(map[string]interface{}); ok {
 				if message, ok := commit["message"].(string); ok {
-					msg.WriteString(fmt.Sprintf("  %d. %s\n", i+1, message))
+					fmt.Fprintf(&msg, "  %d. %s\n", i+1, message)
 				}
 			}
 		}
@@ -336,13 +368,13 @@ func (s *Server) formatGitHubWebhook(payload map[string]interface{}) string {
 
 	if issue, ok := payload["issue"].(map[string]interface{}); ok {
 		if title, ok := issue["title"].(string); ok {
-			msg.WriteString(fmt.Sprintf("Issue: %s\n", title))
+			fmt.Fprintf(&msg, "Issue: %s\n", title)
 		}
 	}
 
 	if pr, ok := payload["pull_request"].(map[string]interface{}); ok {
 		if title, ok := pr["title"].(string); ok {
-			msg.WriteString(fmt.Sprintf("Pull Request: %s\n", title))
+			fmt.Fprintf(&msg, "Pull Request: %s\n", title)
 		}
 	}
 
@@ -352,21 +384,21 @@ func (s *Server) formatGitHubWebhook(payload map[string]interface{}) string {
 // formatStripeWebhook formats Stripe-specific webhook events
 func (s *Server) formatStripeWebhook(payload map[string]interface{}) string {
 	var msg strings.Builder
-	
+
 	if eventType, ok := payload["type"].(string); ok {
-		msg.WriteString(fmt.Sprintf("Event Type: %s\n", eventType))
+		fmt.Fprintf(&msg, "Event Type: %s\n", eventType)
 	}
 
 	if data, ok := payload["data"].(map[string]interface{}); ok {
 		if obj, ok := data["object"].(map[string]interface{}); ok {
 			if id, ok := obj["id"].(string); ok {
-				msg.WriteString(fmt.Sprintf("Object ID: %s\n", id))
+				fmt.Fprintf(&msg, "Object ID: %s\n", id)
 			}
 			if amount, ok := obj["amount"].(float64); ok {
-				msg.WriteString(fmt.Sprintf("Amount: $%.2f\n", amount/100))
+				fmt.Fprintf(&msg, "Amount: $%.2f\n", amount/100)
 			}
 			if status, ok := obj["status"].(string); ok {
-				msg.WriteString(fmt.Sprintf("Status: %s\n", status))
+				fmt.Fprintf(&msg, "Status: %s\n", status)
 			}
 		}
 	}
@@ -402,14 +434,14 @@ func (s *Server) formatInstagramWebhook(payload map[string]interface{}) string {
 	// Extract sender info
 	if sender, ok := firstMessage["sender"].(map[string]interface{}); ok {
 		if senderID, ok := sender["id"].(string); ok {
-			msg.WriteString(fmt.Sprintf("From: %s\n", senderID))
+			fmt.Fprintf(&msg, "From: %s\n", senderID)
 		}
 	}
 
 	// Extract message text
 	if message, ok := firstMessage["message"].(map[string]interface{}); ok {
 		if text, ok := message["text"].(string); ok {
-			msg.WriteString(fmt.Sprintf("Message: %s\n", text))
+			fmt.Fprintf(&msg, "Message: %s\n", text)
 		}
 	}
 
@@ -436,11 +468,11 @@ func (s *Server) formatTelegramWebhook(payload map[string]interface{}) string {
 	// Extract sender info
 	if from, ok := message["from"].(map[string]interface{}); ok {
 		if username, ok := from["username"].(string); ok {
-			msg.WriteString(fmt.Sprintf("From: @%s\n", username))
+			fmt.Fprintf(&msg, "From: @%s\n", username)
 		} else if firstName, ok := from["first_name"].(string); ok {
-			msg.WriteString(fmt.Sprintf("From: %s", firstName))
+			fmt.Fprintf(&msg, "From: %s", firstName)
 			if lastName, ok := from["last_name"].(string); ok {
-				msg.WriteString(fmt.Sprintf(" %s", lastName))
+				fmt.Fprintf(&msg, " %s", lastName)
 			}
 			msg.WriteString("\n")
 		}
@@ -448,7 +480,7 @@ func (s *Server) formatTelegramWebhook(payload map[string]interface{}) string {
 
 	// Extract message text
 	if text, ok := message["text"].(string); ok {
-		msg.WriteString(fmt.Sprintf("Message: %s\n", text))
+		fmt.Fprintf(&msg, "Message: %s\n", text)
 	}
 
 	return msg.String()
@@ -500,7 +532,7 @@ func (s *Server) handleWebhookSync(c *gin.Context) {
 		"sender":   "webhook",
 		"provider": provider,
 	})
-	
+
 	responseCh := agent.ChatStream(ctx, enriched, conversationID)
 	stream := responseCh.Start()
 

@@ -245,3 +245,92 @@ func TestValidateQuery_QuotedIdentifiersAndSchema(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateQuery_WildcardTableAccess(t *testing.T) {
+	tests := []struct {
+		name           string
+		query          string
+		mode           string
+		allowedTables  []string
+		allowedSchemas []string
+		wantError      bool
+		errorMsg       string
+	}{
+		{
+			name:          "wildcard allows any table",
+			query:         "SELECT * FROM any_table_name",
+			mode:          "read",
+			allowedTables: []string{"*"},
+			wantError:     false,
+		},
+		{
+			name:          "wildcard allows multiple tables in JOIN",
+			query:         "SELECT * FROM table1 t1 JOIN table2 t2 ON t1.id = t2.id JOIN table3 t3 ON t2.id = t3.id",
+			mode:          "read",
+			allowedTables: []string{"*"},
+			wantError:     false,
+		},
+		{
+			name:          "wildcard allows INSERT",
+			query:         "INSERT INTO any_table (col1, col2) VALUES ('val1', 'val2')",
+			mode:          "write",
+			allowedTables: []string{"*"},
+			wantError:     false,
+		},
+		{
+			name:          "wildcard allows UPDATE",
+			query:         "UPDATE any_table SET status = 'active'",
+			mode:          "write",
+			allowedTables: []string{"*"},
+			wantError:     false,
+		},
+		{
+			name:          "wildcard allows DELETE",
+			query:         "DELETE FROM any_table WHERE id = 123",
+			mode:          "write",
+			allowedTables: []string{"*"},
+			wantError:     false,
+		},
+		{
+			name:           "wildcard with schema restriction - allowed schema",
+			query:          "SELECT * FROM private.some_table",
+			mode:           "read",
+			allowedTables:  []string{"*"},
+			allowedSchemas: []string{"private"},
+			wantError:      false,
+		},
+		{
+			name:           "wildcard with schema restriction - disallowed schema",
+			query:          "SELECT * FROM public.some_table",
+			mode:           "read",
+			allowedTables:  []string{"*"},
+			allowedSchemas: []string{"private"},
+			wantError:      true,
+			errorMsg:       "not in allowed list",
+		},
+		{
+			name:          "wildcard mixed with specific tables",
+			query:         "SELECT * FROM random_table",
+			mode:          "read",
+			allowedTables: []string{"users", "*", "products"},
+			wantError:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ValidateQuery(tt.query, tt.mode, tt.allowedTables, tt.allowedSchemas)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
