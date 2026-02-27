@@ -33,6 +33,11 @@ type ToolConfigResponse struct {
 	AllowedSchemas []string `json:"allowedSchemas,omitempty"`
 }
 
+type ProviderContext struct {
+	Provider    string
+	RecipientID string
+}
+
 const (
 	SSEEventContent       = "content"
 	SSEEventToolCall      = "tool_call"
