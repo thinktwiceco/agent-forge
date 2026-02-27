@@ -230,6 +230,20 @@ STARTEOF
   fi
 fi
 
+# ─── copy update script ───────────────────────────────────────────────────────
+
+UPDATE_SCRIPT="$INSTALL_DIR/update-release.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_UPDATE_SCRIPT="$SCRIPT_DIR/update-release.sh"
+
+if [ -f "$SOURCE_UPDATE_SCRIPT" ]; then
+  cp "$SOURCE_UPDATE_SCRIPT" "$UPDATE_SCRIPT"
+  chmod +x "$UPDATE_SCRIPT"
+  echo "update-release.sh copied."
+else
+  echo "WARNING: update-release.sh not found at $SOURCE_UPDATE_SCRIPT (skipped)"
+fi
+
 # ─── done ────────────────────────────────────────────────────────────────────
 
 echo ""
@@ -237,9 +251,12 @@ echo "Install complete ($TAG):"
 echo "  $BINARY_PATH"
 echo "  $INSTALL_DIR/config.yaml  — edit model, system_prompt, tools"
 echo "  $INSTALL_DIR/.env         — add your API keys"
+echo "  $UPDATE_SCRIPT            — run to update to latest version"
 echo ""
 if [ "$OS" = "windows" ]; then
   echo "Start: cd \"$INSTALL_DIR\" && start.bat"
 else
   echo "Start: cd \"$INSTALL_DIR\" && ./start.sh"
 fi
+echo ""
+echo "Update: cd \"$INSTALL_DIR\" && ./update-release.sh"
