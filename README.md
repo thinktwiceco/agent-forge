@@ -58,6 +58,34 @@ A powerful Go framework for building intelligent agents with LLM integration, to
 
 ## Installation
 
+### Run localforge (pre-built binary)
+
+Download the latest release, set up the folder structure, and get a ready-to-run agent in one command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/install-release.sh | bash
+```
+
+This will:
+1. Detect your OS and architecture
+2. Download the latest `localforge` binary from GitHub Releases
+3. Create a working directory with `config.yaml`, `.env`, `procedures/`, `data/`, and a `start.sh` launcher
+
+Then configure your agent and start it:
+```bash
+cd <agent-name>
+# Edit config.yaml (model, system_prompt, tools)
+# Add your API keys to .env
+./start.sh
+```
+
+To install into a specific directory, pass the path as an argument:
+```bash
+curl -fsSL https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/install-release.sh | bash -s -- ./my-agent
+```
+
+### Use as a Go library
+
 ```bash
 go get github.com/thinktwiceco/agent-forge
 ```
