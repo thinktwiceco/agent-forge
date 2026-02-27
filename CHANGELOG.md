@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [0.4.7] - 2026-02-20
+- [a069354](http://github.com/thinktwiceco/agent-forge/commit/a0693548002141728da8fad30e131ca966c6511a) - chore: bump version to 0.4.7
+- [a100130](http://github.com/thinktwiceco/agent-forge/commit/a10013015e914d866736be77a3351d1c247154e0) - feat(web): add push SSE endpoint and chat UI subscription
+- [f0f41e4](http://github.com/thinktwiceco/agent-forge/commit/f0f41e4f0cc7d7cd62b68185a706432b77254d0d) - feat: add queue package and async inbox for agent
+- [3313f94](http://github.com/thinktwiceco/agent-forge/commit/3313f946a99a5f0effb49e9f24bebf1bed1a06e5) - chore(release): prepare release v0.4.6 (#28)
+- [2eb341a](http://github.com/thinktwiceco/agent-forge/commit/2eb341a8b00dbd7c7d1a4cd9985a4f3bc0facf49) - feat(history): add src/history package, fix gitignore to track it
+- [67df18f](http://github.com/thinktwiceco/agent-forge/commit/67df18f2263d20e85d1762195bf7fce350204162) - chore: add commit history to v0.4.6 changelog
+
+
+## [Unreleased]
 ## [0.4.6] - 2026-02-18
 ### Fixed
 - fix: stop gitignoring go.work (module workspace)
