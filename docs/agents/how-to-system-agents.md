@@ -48,4 +48,3 @@ mainAgent.AddSystemAgent(myAgent)
 - `OsAgent(llm, root)` - File system operations
 - `GitAgent(llm, root)` - Git operations
 - `WebAgent(llm, workingDir)` - Web automation
-- `VectorAgent(llm, db, embeddings)` - Semantic search

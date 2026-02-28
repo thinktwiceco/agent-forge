@@ -162,7 +162,7 @@ See [docs/AGENT_BUILDER.md](docs/AGENT_BUILDER.md) for comprehensive documentati
 | Git | `agents.GitAgent(llm, workingDir)` | Git repository operations |
 | Coding | `agents.CodingAgent(llm, root)` | Code generation and analysis |
 | Web | `agents.WebAgent(llm, workingDir)` | Web navigation and automation |
-| Vector | `agents.VectorAgent(llm, db, embeddings)` | Semantic search and document indexing |
+| Vision | `agents.VisionAgent(llm, workingDir)` | Loads images and answers visual questions (requires vision-capable model, e.g. gpt-4o) |
 
 Add subagents with:
 
@@ -478,13 +478,13 @@ working_dir/
 
 **Model Format:** `provider::model-name`
 
-**Supported Providers:**
+**Supported Providers and Models:**
 
-| Provider | Identifier | Environment Variable | Example Models |
-|----------|-----------|---------------------|----------------|
-| OpenAI | `openai` | `AF_OPENAI_API_KEY` | `gpt-4o`, `gpt-4o-mini` |
+| Provider | Identifier | Environment Variable | Models |
+|----------|-----------|---------------------|--------|
+| OpenAI | `openai` | `AF_OPENAI_API_KEY` | `gpt-5`, `gpt-5.1`, `gpt-5.2` |
 | DeepSeek | `deepseek` | `AF_DEEPSEEK_API_KEY` | `deepseek-chat`, `deepseek-reasoner` |
-| TogetherAI | `togetherai` | `AF_TOGETHERAI_API_KEY` | `moonshotai/Kimi-K2.5`, `meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo`, `Qwen/Qwen2.5-7B-Instruct-Turbo` |
+| TogetherAI | `togetherai` | `AF_TOGETHERAI_API_KEY` | `meta-llama/Llama-3.2-3B-Instruct-Turbo`, `meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo`, `Qwen/Qwen2.5-7B-Instruct-Turbo`, `Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8`, `openai/gpt-oss-120b`, `zai-org/GLM-4.7`, `moonshotai/Kimi-K2.5` |
 
 #### Tools Configuration
 
@@ -519,7 +519,7 @@ tools:
 | Git | `git` | Model spec, working_dir | Git repository operations |
 | Web | `web` | Model spec, working_dir | Web navigation and automation |
 | Coding | `coding` | Model spec, working_dir | Code generation and analysis |
-| Vector | `vector` | Model spec, vector-storage config | Semantic search and indexing |
+| Vision | `vision` | Model spec (vision-capable, e.g. gpt-4o), working_dir | Loads images and answers visual questions |
 
 **Example:**
 
@@ -551,7 +551,7 @@ plugins:
 
 #### Vector Storage Configuration
 
-Required when using `vector` tool or `vector` subagent.
+Required when using `vector` tool.
 
 | Field | Type | Required | Description | Default |
 |-------|------|----------|-------------|---------|
