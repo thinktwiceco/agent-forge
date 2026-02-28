@@ -99,6 +99,15 @@ func (s *Server) setupRoutes() {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 	})
 
+	s.engine.GET("/knowledge", func(c *gin.Context) {
+		data, err := fs.ReadFile(staticFS, "knowledge.html")
+		if err != nil {
+			c.String(http.StatusNotFound, "knowledge.html not found")
+			return
+		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+	})
+
 	api := s.engine.Group("/api")
 	api.POST("/chat", s.handleChat)
 	api.POST("/chat/stop", s.handleStopChat)
@@ -111,6 +120,11 @@ func (s *Server) setupRoutes() {
 	api.PUT("/config/tools/:toolName", s.handleUpdateToolConfig)
 	api.POST("/agent/reload", s.handleReload)
 	api.GET("/todos", s.handleGetTodos)
+
+	// Knowledge graph endpoints
+	api.GET("/knowledge/graph", s.handleGetKnowledgeGraph)
+	api.GET("/knowledge/stats", s.handleGetKnowledgeStats)
+	api.GET("/knowledge/node/:id", s.handleGetKnowledgeNode)
 
 	// Webhook endpoints
 	api.POST("/webhooks/:provider", s.handleWebhook)
