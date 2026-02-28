@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Knowledge Graph - ThinkTwice Agent</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="/static/css/knowledge.css" />
+  </head>
+  <body>
+    <div class="knowledge-container">
+      <aside class="knowledge-sidebar">
+        <div class="knowledge-header">
+          <div class="brand">
+            <span class="brand-icon">✦</span>
+            <span class="brand-name">Knowledge Graph</span>
+          </div>
+          <a href="/" class="btn btn-back">← Back to Chat</a>
+        </div>
+
+        <div class="search-section">
+          <input
+            type="text"
+            id="search-input"
+            class="search-input"
+            placeholder="Search nodes..."
+          />
+        </div>
+
+        <div class="filter-section">
+          <h3 class="section-title">Node Types</h3>
+          <div id="node-type-filters" class="filter-list">
+            <label class="filter-item">
+              <input type="checkbox" checked data-type="all" />
+              <span>All Types</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="filter-section">
+          <h3 class="section-title">Edge Types</h3>
+          <div id="edge-type-filters" class="filter-list">
+            <label class="filter-item">
+              <input type="checkbox" checked data-edge-type="all" />
+              <span>All Relations</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="stats-section">
+          <h3 class="section-title">Statistics</h3>
+          <div class="stat-grid">
+            <div class="stat-item">
+              <span class="stat-value" id="stat-nodes">0</span>
+              <span class="stat-label">Nodes</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-value" id="stat-edges">0</span>
+              <span class="stat-label">Edges</span>
+            </div>
+          </div>
+          <div id="stats-by-type" class="stats-by-type"></div>
+        </div>
+
+        <div class="controls-section">
+          <button id="reset-zoom" class="btn btn-small">Reset View</button>
+          <button id="fit-graph" class="btn btn-small">Fit to Screen</button>
+        </div>
+      </aside>
+
+      <main class="graph-container">
+        <div class="graph-toolbar">
+          <div class="toolbar-left">
+            <span class="toolbar-title">Graph Visualization</span>
+          </div>
+          <div class="toolbar-right">
+            <button id="refresh-graph" class="btn btn-small">
+              ↻ Refresh
+            </button>
+          </div>
+        </div>
+        <div id="graph-canvas" class="graph-canvas">
+          <div class="loading-overlay" id="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p>Loading knowledge graph...</p>
+          </div>
+          <div class="empty-state" id="empty-state" style="display: none">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="3"/>
+              <line x1="12" y1="2" x2="12" y2="9"/>
+              <line x1="12" y1="15" x2="12" y2="22"/>
+              <line x1="2" y1="12" x2="9" y2="12"/>
+              <line x1="15" y1="12" x2="22" y2="12"/>
+            </svg>
+            <h3>No Knowledge Graph Data</h3>
+            <p>Start a conversation to create knowledge nodes.</p>
+            <a href="/" class="btn">Go to Chat</a>
+          </div>
+        </div>
+        <svg id="graph-svg" class="graph-svg"></svg>
+      </main>
+
+      <aside class="node-detail-panel" id="node-detail-panel">
+        <div class="detail-header">
+          <h3 class="detail-title">Node Details</h3>
+          <button class="btn-close" id="close-detail">×</button>
+        </div>
+        <div class="detail-content" id="detail-content">
+          <p class="detail-placeholder">Click a node to view details</p>
+        </div>
+      </aside>
+    </div>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script type="module" src="/static/js/knowledge.js"></script>
+  </body>
+</html>

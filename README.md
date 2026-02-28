@@ -2,204 +2,114 @@
   <img src="assets/agent_forge_logo.png" alt="Agent Forge Logo" width="400"/>
 </div>
 
-A powerful Go framework for building intelligent agents with LLM integration, tool execution, and multi-agent collaboration.
+A Go framework and application for building AI agents with LLM integration, tool execution, and multi-agent orchestration.
+
+**Two ways to use agent-forge:**
+
+1. **Go Library** - Import `github.com/thinktwiceco/agent-forge` into your Go projects to build custom AI agents
+2. **localforge Application** - Pre-built server with web UI for local agent orchestration
 
 ## Table of Contents
 
 - [Features](#features)
-- [Installation](#installation)
 - [Development](#development)
-- [Quick Start](#quick-start)
-- [Core Concepts](#core-concepts)
-  - [Creating Agents](#creating-agents)
-  - [Creating Tools](#creating-tools)
-  - [How to Add Tools](#how-to-add-tools)
-  - [Multi-Agent Teams](#multi-agent-teams)
-  - [Paths & Working Directory](#paths--working-directory)
-- [System Agents](#system-agents)
-  - [Pre-built Subagents](#pre-built-subagents)
-  - [How to Add Subagents](#how-to-add-subagents)
-  - [Reasoning Agent](#reasoning-agent)
-  - [OS Agent](#os-agent)
-  - [Git Agent](#git-agent)
-  - [Coding Agent](#coding-agent)
-  - [Web Agent](#web-agent)
-  - [Vector Agent](#vector-agent)
-- [Built-in Tools](#built-in-tools)
-  - [File System Tool](#file-system-tool)
-  - [Git Tool](#git-tool)
-  - [Postgres Tool](#postgres-tool)
-  - [API Tool](#api-tool)
-  - [Web Browser Tool](#web-browser-tool)
-  - [Vector Database Tool](#vector-database-tool)
-- [Advanced Features](#advanced-features)
-  - [Streaming Responses](#streaming-responses)
-  - [Conversation Persistence](#conversation-persistence)
-  - [Hook System](#hook-system)
-- [Plugins](#plugins) — [Plugins README](src/plugins/README.md)
-  - [Logger Plugin](src/plugins/logger/README.md)
-  - [Todo Plugin](src/plugins/todo/README.md)
-- [Complete Example](#complete-example)
-- [Environment Variables](#environment-variables)
-- [Project Structure](#project-structure)
+- [localforge Library](#localforge-library)
+  - [Installation](#installation)
+  - [Library Structure](#library-structure)
+  - [Agents, Subagents and Tools](#agents-subagents-and-tools)
+  - [Adding Tools and Plugins](#adding-tools-and-plugins)
+  - [Streamed Responses](#streamed-responses)
+  - [The Builders](#the-builders)
+  - [Examples](#examples)
+- [localforge Application](#localforge-application)
+  - [What is localforge?](#what-is-localforge)
+  - [Installation](#installation-1)
+  - [Configuration](#configuration)
+  - [Using the Application](#using-the-application)
+  - [YAML Configuration Reference](#yaml-configuration-reference)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Features
 
-- 🚀 **Simple Agent Creation** - Create AI agents with just a few lines of code
-- 🔧 **Extensible Tool System** - Build custom tools with automatic validation
-- 👥 **Multi-Agent Teams** - Orchestrate teams of specialized agents
-- 🔄 **Streaming Responses** - Real-time streaming of agent responses
-- 💾 **Conversation Persistence** - Built-in conversation history storage
-- 🔌 **Multiple LLM Providers** - Support for OpenAI, DeepSeek, TogetherAI, and OpenAI-compatible APIs
-- 🌐 **Web Automation** - Navigate, interact with, and extract content from web pages using headless browser
-- 📊 **Session Management** - Automatic browser session cleanup and resource management
+**Library:**
+- Simple agent creation with fluent API
+- Extensible tool system with custom tool support
+- Multi-agent teams with delegation pattern
+- Real-time streaming responses
+- Multiple LLM providers (OpenAI, DeepSeek, TogetherAI)
+- Built-in tools (filesystem, git, web, postgres, vector DB)
+- Plugin system for extending functionality
+- Conversation persistence and history management
 
-## Installation
-
-### Run localforge (pre-built binary)
-
-Download the latest release, set up the folder structure, and get a ready-to-run agent in one command.
-
-#### Quick start (with custom directory)
-
-Recommended: pass a directory argument to avoid any input prompts:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/install-release.sh | bash -s -- ./my-agent
-```
-
-Then configure and start:
-
-```bash
-cd my-agent
-# Edit config.yaml (model, system_prompt, tools)
-# Add your API keys to .env
-./start.sh
-```
-
-#### Alternative: Interactive or default directory
-
-Without an argument, the script will use the default directory name (`my-agent`):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/install-release.sh | bash
-```
-
-Or with interactive prompt (requires terminal):
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/install-release.sh)
-```
-
-#### What it does
-
-1. Detects your OS and architecture (darwin/linux/windows, amd64/arm64)
-2. Fetches the latest `localforge` binary from GitHub Releases
-3. Creates the working directory structure:
-   - `bin/localforge` — the executable
-   - `config.yaml` — agent configuration
-   - `.env` — API keys and secrets
-   - `procedures/` — multi-phase workflow definitions
-   - `data/` — conversation history storage
-   - `start.sh` or `start.bat` — convenience launcher
-
-### Use as a Go library
-
-```bash
-go get github.com/thinktwiceco/agent-forge
-```
+**Application:**
+- HTTP/SSE API server
+- Web-based chat interface
+- Pre-configured agent workflows
+- Multi-agent orchestration
+- Conversation management
+- File uploads and knowledge integration
 
 ## Development
 
-### Running Tests
+### Prerequisites
 
-Run unit tests using the test script:
+- Go 1.21 or later
+- `golangci-lint` for linting (install: `brew install golangci-lint` or see [docs](https://golangci-lint.run/welcome/install/))
+
+### Setup
+
+```bash
+git clone https://github.com/thinktwiceco/agent-forge
+cd agent-forge
+go mod download
+```
+
+### Testing
 
 ```bash
 ./scripts/test.sh --unit
 ```
 
-This runs all unit tests with race detection and coverage reporting.
-
 ### Linting
-
-Run the linter using the lint script:
 
 ```bash
 ./scripts/lint.sh
 ```
 
-**Note:** You'll need to install `golangci-lint` first. See installation instructions below.
+### CI/CD
 
-#### Installing golangci-lint
+CI runs on all PRs and pushes to `main`. See [.github/workflows/ci.yml](.github/workflows/ci.yml) for details.
 
-**Using the official installation script (recommended):**
+### Releases
+
+Releases follow semantic versioning. See [docs/RELEASE_PIPELINE.md](docs/RELEASE_PIPELINE.md) for the complete release process.
+
+## localforge Library
+
+### Installation
+
 ```bash
-curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin latest
+go get github.com/thinktwiceco/agent-forge
 ```
 
-Make sure `$(go env GOPATH)/bin` is in your PATH:
-```bash
-export PATH=$PATH:$(go env GOPATH)/bin
+### Library Structure
+
+```
+src/
+├── agents/       # Agent creation and execution
+├── builder/      # Config-driven agent builder
+├── core/         # Core interfaces (Tool, Plugin, SubAgent)
+├── llms/         # LLM provider integrations
+├── tools/        # Built-in tools (fs, git, web, postgres, api, vector)
+├── plugins/      # Plugin system and built-in plugins
+├── history/      # Conversation history management
+└── telemetry/    # Observability (tool exec, tokens, truncation)
 ```
 
-**Using Go install:**
-```bash
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-```
+See [docs/FILE_STRUCTURE.md](docs/FILE_STRUCTURE.md) for details.
 
-**Using package managers:**
-- macOS: `brew install golangci-lint`
-- Linux (snap): `sudo snap install golangci-lint`
-
-## Quick Start
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "github.com/thinktwiceco/agent-forge/src/agents"
-    "github.com/thinktwiceco/agent-forge/src/llms"
-)
-
-func main() {
-    ctx := context.Background()
-    
-    // Create an LLM engine
-    multiModelLLM, err := llms.NewOpenAILLMBuilder("togetherai").
-        SetModel(llms.TOGETHERAI_Llama3170BInstructTurbo).
-        SetCtx(ctx).
-        Build()
-    if err != nil {
-        panic(err)
-    }
-    llm := multiModelLLM.MainModel()
-    
-    // Create an agent
-    agent := agents.NewAgent(&agents.AgentConfig{
-        LLMEngine:    llm,
-        AgentName:    "Assistant",
-        SystemPrompt: "You are a helpful AI assistant.",
-        MainAgent:    true,
-    })
-    
-    // Chat with the agent
-    responseCh := agent.ChatStream("Hello! How can you help me?", "")
-    
-    // Process streaming response
-    for chunk := range responseCh.Start() {
-        if chunk.Content != "" {
-            fmt.Print(chunk.Content)
-        }
-    }
-}
-```
-
-## Core Concepts
+### Agents, Subagents and Tools
 
 ### Creating Agents
 

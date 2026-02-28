@@ -36,6 +36,7 @@ cmd/localforge/sandbox/*
 !cmd/localforge/sandbox/.gitkeep
 cmd/localforge/procedures/
 cmd/localforge/data/
+cmd/localforge/vault/
 
 # Node.js
 node_modules/
@@ -85,4 +86,5 @@ agentforge-server
 
 UglyCatToysHeadOfMarketing/
 ShelfCycle/
-TEST/
+TEST/cmd/localforge/delegation-test.txt
+cmd/localforge/web/
