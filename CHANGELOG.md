@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+## [0.4.10] - 2026-02-28
+- [f8c6661](http://github.com/thinktwiceco/agent-forge/commit/f8c6661acafa852628358efe39d16c5fbb2ce811) - feat(plugins): add knowledge plugin with graph and semantic search (#34)
+
+
+## [Unreleased]
 ## [0.4.8] - 2026-02-27
 - [cd3615f](http://github.com/thinktwiceco/agent-forge/commit/cd3615fb0c196bb44aeb2edf88c324dc0d16e0de) - chore(release): prepare release v0.4.8 (#30)
 - [7249fc6](http://github.com/thinktwiceco/agent-forge/commit/7249fc6800bdd52c3158abe9275b7e42e4296027) - fix: replace WriteString+Sprintf with Fprintf for staticcheck QF1012
