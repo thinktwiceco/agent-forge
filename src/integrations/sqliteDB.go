@@ -237,7 +237,7 @@ func (s *SQLiteDB) Search(queryEmbedding []float32, topK int, filters map[string
 		for k, v := range filters {
 			// Check if filter key exists in metadata JSON
 			// SQLite JSON functions: json_extract(metadata, '$.key')
-			conditions = append(conditions, fmt.Sprintf("json_extract(metadata, '$.%s') = ?", k))
+			conditions = append(conditions, fmt.Sprintf("(json_valid(metadata) AND json_extract(metadata, '$.%s') = ?)", k))
 			args = append(args, v)
 		}
 		if len(conditions) > 0 {
@@ -344,7 +344,7 @@ func (s *SQLiteDB) ListDocuments(opts core.ListOptions) ([]core.DocumentSummary,
 	if len(opts.Filters) > 0 {
 		conditions := []string{}
 		for k, v := range opts.Filters {
-			conditions = append(conditions, fmt.Sprintf("json_extract(metadata, '$.%s') = ?", k))
+			conditions = append(conditions, fmt.Sprintf("(json_valid(metadata) AND json_extract(metadata, '$.%s') = ?)", k))
 			args = append(args, v)
 		}
 		if len(conditions) > 0 {

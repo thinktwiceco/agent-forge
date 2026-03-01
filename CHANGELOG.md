@@ -1,3 +1,7 @@
+## [0.4.14] - 2026-03-01
+- fix(integrations): robust metadata filtering in SQLite vector DB
+- chore(release): prepare release v0.4.14
+
 ## [0.4.13] - 2026-03-01
 - fix(knowledge): fix "malformed JSON" error in traversal tools by adding json_valid check
 - refactor(knowledge): store NULL instead of empty strings for node metadata
