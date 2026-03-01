@@ -272,7 +272,7 @@ func (q *GraphQuerier) findNodesByTypeAndContent(nodeType, identifier string, li
 	query := `
 		SELECT id, type, content, embedding_id, metadata, created_at, updated_at
 		FROM knowledge_nodes
-		WHERE type = ? AND (id = ? OR content LIKE ? OR json_extract(metadata, '$.title') LIKE ?)
+		WHERE type = ? AND (id = ? OR content LIKE ? OR (metadata IS NOT NULL AND metadata != '' AND json_valid(metadata) AND json_extract(metadata, '$.title') LIKE ?))
 		ORDER BY created_at DESC
 	`
 
