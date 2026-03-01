@@ -1,3 +1,7 @@
+## [0.4.13] - 2026-03-01
+- fix(knowledge): fix "malformed JSON" error in traversal tools by adding json_valid check
+- refactor(knowledge): store NULL instead of empty strings for node metadata
+
 ## [0.4.12] - 2026-03-01
 - fix(knowledge): fix explore_fact returning empty results for titles/IDs
 
