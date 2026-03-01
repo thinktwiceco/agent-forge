@@ -1,3 +1,6 @@
+## [0.4.12] - 2026-03-01
+- fix(knowledge): fix explore_fact returning empty results for titles/IDs
+
 ## [0.4.11] - 2026-03-01
 - chore(release): prepare release v0.4.11
 
