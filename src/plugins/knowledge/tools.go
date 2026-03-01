@@ -12,10 +12,14 @@ import (
 func (p *KnowledgePlugin) Tools() []llms.Tool {
 	return []llms.Tool{
 		p.newExploreCategoryTool(),
+		p.newExploreSubcategoryTool(),
 		p.newExploreFactTool(),
 		p.newFindTool(),
 		p.newRememberTool(),
+		p.newAttachDocumentTool(),
+		p.newLinkRelevantTool(),
 		p.newAddCategoryTool(),
+		p.newAddSubcategoryTool(),
 		p.newGetCategoriesTool(),
 		p.newGetCategoryFactsTool(),
 		p.newForgetTool(),
@@ -26,7 +30,7 @@ func (p *KnowledgePlugin) Tools() []llms.Tool {
 func (p *KnowledgePlugin) newExploreCategoryTool() llms.Tool {
 	return &core.Tool{
 		Name:        "explore_category",
-		Description: "Explore a category and get its full hierarchy including all child nodes",
+		Description: "<ACTION>Retrieve topology of Category.</ACTION> <RETURNS>Children (Subcategories, Facts [title-only], Documents), and relevant Nodes.</RETURNS> <INSTRUCTION>You MUST use explore_fact afterward to expand text content of Facts.</INSTRUCTION>",
 		Parameters: []core.Parameter{
 			{
 				Name:        "category",
@@ -40,12 +44,38 @@ func (p *KnowledgePlugin) newExploreCategoryTool() llms.Tool {
 			if !ok || category == "" {
 				return core.NewErrorResponse("category parameter is required")
 			}
-
 			result, err := p.ExploreCategory(category)
 			if err != nil {
 				return core.NewErrorResponse(fmt.Sprintf("failed to explore category: %v", err))
 			}
+			resultJSON, _ := json.Marshal(result)
+			return core.NewSuccessResponse(string(resultJSON))
+		},
+	}
+}
 
+// newExploreSubcategoryTool creates the explore_subcategory tool
+func (p *KnowledgePlugin) newExploreSubcategoryTool() llms.Tool {
+	return &core.Tool{
+		Name:        "explore_subcategory",
+		Description: "<ACTION>Retrieve topology of Subcategory.</ACTION> <RETURNS>Children (Subcategories, Facts [title-only], Documents), and relevant Nodes.</RETURNS> <INSTRUCTION>You MUST use explore_fact afterward to expand text content of Facts.</INSTRUCTION>",
+		Parameters: []core.Parameter{
+			{
+				Name:        "subcategory",
+				Type:        "string",
+				Description: "The subcategory name to explore",
+				Required:    true,
+			},
+		},
+		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+			subcategory, ok := args["subcategory"].(string)
+			if !ok || subcategory == "" {
+				return core.NewErrorResponse("subcategory parameter is required")
+			}
+			result, err := p.ExploreSubcategory(subcategory)
+			if err != nil {
+				return core.NewErrorResponse(fmt.Sprintf("failed to explore subcategory: %v", err))
+			}
 			resultJSON, _ := json.Marshal(result)
 			return core.NewSuccessResponse(string(resultJSON))
 		},
@@ -56,12 +86,12 @@ func (p *KnowledgePlugin) newExploreCategoryTool() llms.Tool {
 func (p *KnowledgePlugin) newExploreFactTool() llms.Tool {
 	return &core.Tool{
 		Name:        "explore_fact",
-		Description: "Explore a fact and get its full context including related facts and parent categories",
+		Description: "<ACTION>Expand Fact content.</ACTION> <RETURNS>Full content body + parent Categories, attached Documents, and relevant Nodes.</RETURNS>",
 		Parameters: []core.Parameter{
 			{
 				Name:        "fact",
 				Type:        "string",
-				Description: "The fact content to explore",
+				Description: "The fact title or content snippet to explore (use the id or title from explore_category)",
 				Required:    true,
 			},
 		},
@@ -70,12 +100,10 @@ func (p *KnowledgePlugin) newExploreFactTool() llms.Tool {
 			if !ok || fact == "" {
 				return core.NewErrorResponse("fact parameter is required")
 			}
-
 			result, err := p.ExploreFact(fact)
 			if err != nil {
 				return core.NewErrorResponse(fmt.Sprintf("failed to explore fact: %v", err))
 			}
-
 			resultJSON, _ := json.Marshal(result)
 			return core.NewSuccessResponse(string(resultJSON))
 		},
@@ -127,7 +155,7 @@ func (p *KnowledgePlugin) newFindTool() llms.Tool {
 func (p *KnowledgePlugin) newRememberTool() llms.Tool {
 	return &core.Tool{
 		Name:        "remember",
-		Description: "Save a fact under a specific category",
+		Description: "<ACTION>Ingest knowledge Fact.</ACTION> <INSTRUCTION>Evaluate existing Categories/Subcategories before insertion. You MUST construct a short 'title' (3-8 words) for optimal traversal.</INSTRUCTION>",
 		Parameters: []core.Parameter{
 			{
 				Name:        "category",
@@ -136,9 +164,15 @@ func (p *KnowledgePlugin) newRememberTool() llms.Tool {
 				Required:    true,
 			},
 			{
+				Name:        "title",
+				Type:        "string",
+				Description: "Short label for the fact (3-8 words), e.g. \"Prefers dark mode\"",
+				Required:    false,
+			},
+			{
 				Name:        "fact",
 				Type:        "string",
-				Description: "The fact content to remember",
+				Description: "The full fact content to remember",
 				Required:    true,
 			},
 		},
@@ -147,23 +181,115 @@ func (p *KnowledgePlugin) newRememberTool() llms.Tool {
 			if !ok || category == "" {
 				return core.NewErrorResponse("category parameter is required")
 			}
-
 			fact, ok := args["fact"].(string)
 			if !ok || fact == "" {
 				return core.NewErrorResponse("fact parameter is required")
 			}
+			title, _ := args["title"].(string)
 
-			factID, err := p.Remember(category, fact)
+			var factID string
+			var err error
+			if title != "" {
+				factID, err = p.RememberWithTitle(category, title, fact)
+			} else {
+				factID, err = p.Remember(category, fact)
+			}
 			if err != nil {
 				return core.NewErrorResponse(fmt.Sprintf("failed to remember fact: %v", err))
 			}
-
 			result := map[string]any{
 				"fact_id":  factID,
 				"category": category,
+				"title":    title,
 				"fact":     fact,
 			}
+			resultJSON, _ := json.Marshal(result)
+			return core.NewSuccessResponse(string(resultJSON))
+		},
+	}
+}
 
+// newAttachDocumentTool creates the attach_document tool
+func (p *KnowledgePlugin) newAttachDocumentTool() llms.Tool {
+	return &core.Tool{
+		Name:        "attach_document",
+		Description: "Attach a filesystem document path to a Category or Fact node via a has_document edge",
+		Parameters: []core.Parameter{
+			{
+				Name:        "parent",
+				Type:        "string",
+				Description: "Node name (or ID) to attach the document to (Category or Fact)",
+				Required:    true,
+			},
+			{
+				Name:        "file_path",
+				Type:        "string",
+				Description: "Absolute or relative filesystem path to the document",
+				Required:    true,
+			},
+		},
+		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+			parent, ok := args["parent"].(string)
+			if !ok || parent == "" {
+				return core.NewErrorResponse("parent parameter is required")
+			}
+			filePath, ok := args["file_path"].(string)
+			if !ok || filePath == "" {
+				return core.NewErrorResponse("file_path parameter is required")
+			}
+			docID, err := p.AttachDocument(parent, filePath)
+			if err != nil {
+				return core.NewErrorResponse(fmt.Sprintf("failed to attach document: %v", err))
+			}
+			result := map[string]any{
+				"document_id": docID,
+				"parent":      parent,
+				"file_path":   filePath,
+			}
+			resultJSON, _ := json.Marshal(result)
+			return core.NewSuccessResponse(string(resultJSON))
+		},
+	}
+}
+
+// newLinkRelevantTool creates the link_relevant tool
+func (p *KnowledgePlugin) newLinkRelevantTool() llms.Tool {
+	return &core.Tool{
+		Name:        "link_relevant",
+		Description: "<ACTION>Construct horizontal relationship (is_relevant_to edge) between any two nodes.</ACTION> <INSTRUCTION>Consider categories and subcategories relationships when organizing multidimensional data.</INSTRUCTION>",
+		Parameters: []core.Parameter{
+			{
+				Name:        "node_a",
+				Type:        "string",
+				Description: "First node name or ID",
+				Required:    true,
+			},
+			{
+				Name:        "node_b",
+				Type:        "string",
+				Description: "Second node name or ID to link to node_a",
+				Required:    true,
+			},
+		},
+		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+			nodeA, ok := args["node_a"].(string)
+			if !ok || nodeA == "" {
+				return core.NewErrorResponse("node_a parameter is required")
+			}
+			nodeB, ok := args["node_b"].(string)
+			if !ok || nodeB == "" {
+				return core.NewErrorResponse("node_b parameter is required")
+			}
+			edgeAB, edgeBA, err := p.LinkRelevant(nodeA, nodeB)
+			if err != nil {
+				return core.NewErrorResponse(fmt.Sprintf("failed to link nodes: %v", err))
+			}
+			result := map[string]any{
+				"edge_ab": edgeAB,
+				"edge_ba": edgeBA,
+				"node_a":  nodeA,
+				"node_b":  nodeB,
+			}
 			resultJSON, _ := json.Marshal(result)
 			return core.NewSuccessResponse(string(resultJSON))
 		},
@@ -174,7 +300,7 @@ func (p *KnowledgePlugin) newRememberTool() llms.Tool {
 func (p *KnowledgePlugin) newAddCategoryTool() llms.Tool {
 	return &core.Tool{
 		Name:        "add_category",
-		Description: "Create a new category node",
+		Description: "Create a new top-level category node",
 		Parameters: []core.Parameter{
 			{
 				Name:        "category",
@@ -197,6 +323,52 @@ func (p *KnowledgePlugin) newAddCategoryTool() llms.Tool {
 			result := map[string]any{
 				"category_id": categoryID,
 				"category":    category,
+			}
+
+			resultJSON, _ := json.Marshal(result)
+			return core.NewSuccessResponse(string(resultJSON))
+		},
+	}
+}
+
+// newAddSubcategoryTool creates the add_subcategory tool
+func (p *KnowledgePlugin) newAddSubcategoryTool() llms.Tool {
+	return &core.Tool{
+		Name:        "add_subcategory",
+		Description: "Create a new subcategory node under an existing category or subcategory",
+		Parameters: []core.Parameter{
+			{
+				Name:        "parent",
+				Type:        "string",
+				Description: "The name or ID of the parent category or subcategory",
+				Required:    true,
+			},
+			{
+				Name:        "subcategory",
+				Type:        "string",
+				Description: "The subcategory name to create",
+				Required:    true,
+			},
+		},
+		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+			parent, ok := args["parent"].(string)
+			if !ok || parent == "" {
+				return core.NewErrorResponse("parent parameter is required")
+			}
+			subcategory, ok := args["subcategory"].(string)
+			if !ok || subcategory == "" {
+				return core.NewErrorResponse("subcategory parameter is required")
+			}
+
+			subCatID, err := p.AddSubcategory(parent, subcategory)
+			if err != nil {
+				return core.NewErrorResponse(fmt.Sprintf("failed to add subcategory: %v", err))
+			}
+
+			result := map[string]any{
+				"subcategory_id": subCatID,
+				"subcategory":    subcategory,
+				"parent":         parent,
 			}
 
 			resultJSON, _ := json.Marshal(result)

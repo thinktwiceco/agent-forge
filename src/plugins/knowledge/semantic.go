@@ -119,7 +119,7 @@ func (p *KnowledgePlugin) findWithSemanticAndGraph(query string, topK int, trave
 	}
 
 	// Perform graph traversal from matched nodes
-	graphResult, err := p.findRelated(nodeIDs, traverseDepth)
+	graphResult, err := p.querier.findRelated(nodeIDs, traverseDepth)
 	if err != nil {
 		return nil, fmt.Errorf("failed to traverse graph: %w", err)
 	}
@@ -150,15 +150,15 @@ func (p *KnowledgePlugin) findWithTextSearch(query string, traverseDepth int, fi
 			nodes, err = p.findNodesByType(nodeType, limit, offset)
 		} else {
 			// Search within specific type
-			nodes, err = p.findNodesByTypeAndContent(nodeType, query, limit, offset)
+			nodes, err = p.querier.findNodesByTypeAndContent(nodeType, query, limit, offset)
 		}
 	} else {
 		if query == "" {
 			// No query and no type filter - get recent nodes
-			nodes, err = p.getAllNodes(limit)
+			nodes, err = p.querier.getAllNodes(limit)
 		} else {
 			// General text search
-			nodes, err = p.findNodesByContentPaginated(query, false, limit, offset)
+			nodes, err = p.querier.findNodesByContentPaginated(query, false, limit, offset)
 		}
 	}
 
@@ -181,7 +181,7 @@ func (p *KnowledgePlugin) findWithTextSearch(query string, traverseDepth int, fi
 	}
 
 	// Perform graph traversal
-	graphResult, err := p.findRelated(nodeIDs, traverseDepth)
+	graphResult, err := p.querier.findRelated(nodeIDs, traverseDepth)
 	if err != nil {
 		return nil, fmt.Errorf("failed to traverse graph: %w", err)
 	}
@@ -292,7 +292,7 @@ func (p *KnowledgePlugin) findScored(query string, limit int) ([]ScoredNode, err
 	}
 
 	// Fallback to text search
-	nodes, err := p.findNodesByContentPaginated(query, false, limit, 0)
+	nodes, err := p.querier.findNodesByContentPaginated(query, false, limit, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search nodes: %w", err)
 	}

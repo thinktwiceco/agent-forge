@@ -27,6 +27,9 @@ func setupTestPlugin(t *testing.T) (*KnowledgePlugin, func()) {
 		t.Fatalf("Failed to ensure schema: %v", err)
 	}
 
+	plugin.querier = NewGraphQuerier(plugin.db)
+	plugin.explorer = NewKnowledgeExplorer(plugin.querier)
+
 	// Return cleanup function
 	cleanup := func() {
 		_ = plugin.Close()
@@ -224,7 +227,7 @@ func TestGraphTraversal(t *testing.T) {
 	_, _ = plugin.saveEdge(node3, node4, "related_to", 1.0, nil)
 
 	// Traverse from node 1 with depth 2
-	result, err := plugin.findRelated([]string{node1}, 2)
+	result, err := plugin.querier.findRelated([]string{node1}, 2)
 	if err != nil {
 		t.Fatalf("Failed to traverse graph: %v", err)
 	}
@@ -254,7 +257,7 @@ func TestCyclePrevention(t *testing.T) {
 	_, _ = plugin.saveEdge(node3, node1, "related_to", 1.0, nil)
 
 	// Traverse - should not loop infinitely
-	result, err := plugin.findRelated([]string{node1}, 5)
+	result, err := plugin.querier.findRelated([]string{node1}, 5)
 	if err != nil {
 		t.Fatalf("Failed to traverse graph: %v", err)
 	}
@@ -374,7 +377,7 @@ func TestGetNodeCountByType(t *testing.T) {
 	_, _ = plugin.saveNode("fact", "Fact 1", "", nil)
 
 	// Get counts
-	counts, err := plugin.getNodeCountByType()
+	counts, err := plugin.querier.getNodeCountByType()
 	if err != nil {
 		t.Fatalf("Failed to get counts: %v", err)
 	}
@@ -424,13 +427,15 @@ func TestAddAndListNodeTypes(t *testing.T) {
 		t.Fatalf("Failed to list node types: %v", err)
 	}
 
-	if len(types) != 2 {
-		t.Errorf("Expected exactly 2 default node types, got %d", len(types))
+	if len(types) != 4 {
+		t.Errorf("Expected exactly 4 default node types, got %d", len(types))
 	}
 
-	// Verify Category and Fact types exist
+	// Verify Category, Fact, Subcategory, and Document types exist
 	foundCategory := false
 	foundFact := false
+	foundDocument := false
+	foundSubcategory := false
 	for _, typ := range types {
 		if typ.Name == "Category" {
 			foundCategory = true
@@ -444,6 +449,12 @@ func TestAddAndListNodeTypes(t *testing.T) {
 				t.Errorf("Expected Fact description, got %s", typ.Description)
 			}
 		}
+		if typ.Name == "Document" {
+			foundDocument = true
+		}
+		if typ.Name == "Subcategory" {
+			foundSubcategory = true
+		}
 	}
 
 	if !foundCategory {
@@ -451,6 +462,12 @@ func TestAddAndListNodeTypes(t *testing.T) {
 	}
 	if !foundFact {
 		t.Error("Expected to find Fact node type")
+	}
+	if !foundDocument {
+		t.Error("Expected to find Document node type")
+	}
+	if !foundSubcategory {
+		t.Error("Expected to find Subcategory node type")
 	}
 }
 
@@ -464,25 +481,34 @@ func TestAddAndListEdgeTypes(t *testing.T) {
 		t.Fatalf("Failed to list edge types: %v", err)
 	}
 
-	if len(types) != 2 {
-		t.Errorf("Expected exactly 2 default edge types, got %d", len(types))
+	if len(types) != 5 {
+		t.Errorf("Expected exactly 5 default edge types, got %d", len(types))
 	}
 
-	// Verify has_category and has_fact types exist
+	// Verify all 5 default edge types exist
 	foundHasCategory := false
 	foundHasFact := false
+	foundHasDocument := false
+	foundIsRelevantTo := false
+	foundHasSubcategory := false
 	for _, typ := range types {
-		if typ.Name == "has_category" {
+		switch typ.Name {
+		case "has_category":
 			foundHasCategory = true
 			if typ.Description != "Links Category to Category" {
 				t.Errorf("Expected has_category description, got %s", typ.Description)
 			}
-		}
-		if typ.Name == "has_fact" {
+		case "has_fact":
 			foundHasFact = true
 			if typ.Description != "Links Category to Fact, or Fact to Fact" {
 				t.Errorf("Expected has_fact description, got %s", typ.Description)
 			}
+		case "has_document":
+			foundHasDocument = true
+		case "is_relevant_to":
+			foundIsRelevantTo = true
+		case "has_subcategory":
+			foundHasSubcategory = true
 		}
 	}
 
@@ -491,6 +517,15 @@ func TestAddAndListEdgeTypes(t *testing.T) {
 	}
 	if !foundHasFact {
 		t.Error("Expected to find has_fact edge type")
+	}
+	if !foundHasDocument {
+		t.Error("Expected to find has_document edge type")
+	}
+	if !foundIsRelevantTo {
+		t.Error("Expected to find is_relevant_to edge type")
+	}
+	if !foundHasSubcategory {
+		t.Error("Expected to find has_subcategory edge type")
 	}
 }
 
@@ -742,12 +777,12 @@ func TestSystemPromptWithCategories(t *testing.T) {
 	}
 
 	// Should contain key guidance sections
-	if !contains(prompt, "START OF EVERY CONVERSATION") {
-		t.Error("Expected system prompt to contain conversation start guidance")
+	if !contains(prompt, "SILENT_EXECUTION") {
+		t.Error("Expected system prompt to contain silent execution guidance")
 	}
 
-	if !contains(prompt, "ALWAYS STORE") {
-		t.Error("Expected system prompt to contain storage triggers")
+	if !contains(prompt, "PROACTIVE_RETENTION") {
+		t.Error("Expected system prompt to contain proactive retention guidance")
 	}
 
 	// Test 2: buildCategoriesSection should return empty before categories exist
@@ -781,8 +816,8 @@ func TestSystemPromptWithCategories(t *testing.T) {
 	categoriesSection = plugin.buildCategoriesSection()
 
 	// Should contain "CURRENT CATEGORIES"
-	if !contains(categoriesSection, "CURRENT CATEGORIES") {
-		t.Error("Expected categories section to contain 'CURRENT CATEGORIES'")
+	if !contains(categoriesSection, "CURRENT_CATEGORIES") {
+		t.Error("Expected categories section to contain 'CURRENT_CATEGORIES'")
 	}
 
 	// Should contain the category names
@@ -795,7 +830,7 @@ func TestSystemPromptWithCategories(t *testing.T) {
 	}
 
 	// Should contain the helpful text
-	if !contains(categoriesSection, "Top-level knowledge organization") {
+	if !contains(categoriesSection, "Top-level knowledge organization nodes") {
 		t.Error("Expected categories section to contain organizational context text")
 	}
 }
@@ -1034,24 +1069,17 @@ func TestExploreCategory(t *testing.T) {
 		t.Fatalf("Failed to explore category: %v", err)
 	}
 
-	if len(result.Nodes) == 0 {
-		t.Error("Expected nodes in exploration result")
+	if result.Category.ID == "" {
+		t.Error("Expected category in exploration result")
 	}
 
-	// Should contain both the category and its facts
-	hasCategory := false
-	hasFact := false
-	for _, node := range result.Nodes {
-		if node.Type == "Category" && node.Content == "Technology" {
-			hasCategory = true
-		}
-		if node.Type == "Fact" {
-			hasFact = true
-		}
-	}
+	// Should contain the category node
+	hasCategory := result.Category.Type == "Category" && result.Category.Content == "Technology"
+	// Should have the fact as a light node
+	hasFact := len(result.Facts) > 0
 
 	if !hasCategory {
-		t.Error("Expected to find Technology category in exploration")
+		t.Errorf("Expected to find Technology category, got type=%s content=%s", result.Category.Type, result.Category.Content)
 	}
 
 	if !hasFact {
@@ -1080,24 +1108,22 @@ func TestExploreFact(t *testing.T) {
 		t.Fatalf("Failed to explore fact: %v", err)
 	}
 
-	if len(result.Nodes) == 0 {
-		t.Error("Expected nodes in exploration result")
+	if result.Fact.ID == "" {
+		t.Error("Expected fact in exploration result")
 	}
 
-	// Should contain the fact and its parent category
-	hasFact := false
+	// The fact itself should be the full node
+	hasFact := result.Fact.Type == "Fact" && result.Fact.Content == "Exercise daily"
+	// Parent categories are returned as light nodes
 	hasCategory := false
-	for _, node := range result.Nodes {
-		if node.Type == "Fact" && node.Content == "Exercise daily" {
-			hasFact = true
-		}
-		if node.Type == "Category" && node.Content == "Health" {
+	for _, light := range result.ParentCategories {
+		if light.Title == "Health" || light.Type == "Category" {
 			hasCategory = true
 		}
 	}
 
 	if !hasFact {
-		t.Error("Expected to find the fact in exploration")
+		t.Errorf("Expected to find fact, got type=%s content=%s", result.Fact.Type, result.Fact.Content)
 	}
 
 	if !hasCategory {

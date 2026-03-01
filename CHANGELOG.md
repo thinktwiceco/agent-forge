@@ -1,4 +1,5 @@
-## [Unreleased]
+## [0.4.11] - 2026-03-01
+- chore(release): prepare release v0.4.11
 
 ## [0.4.10] - 2026-02-28
 - [f8c6661](http://github.com/thinktwiceco/agent-forge/commit/f8c6661acafa852628358efe39d16c5fbb2ce811) - feat(plugins): add knowledge plugin with graph and semantic search (#34)
