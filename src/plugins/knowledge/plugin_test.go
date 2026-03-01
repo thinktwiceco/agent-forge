@@ -777,12 +777,12 @@ func TestSystemPromptWithCategories(t *testing.T) {
 	}
 
 	// Should contain key guidance sections
-	if !contains(prompt, "START OF EVERY CONVERSATION") {
-		t.Error("Expected system prompt to contain conversation start guidance")
+	if !contains(prompt, "SILENT_EXECUTION") {
+		t.Error("Expected system prompt to contain silent execution guidance")
 	}
 
-	if !contains(prompt, "ALWAYS STORE") {
-		t.Error("Expected system prompt to contain storage triggers")
+	if !contains(prompt, "PROACTIVE_RETENTION") {
+		t.Error("Expected system prompt to contain proactive retention guidance")
 	}
 
 	// Test 2: buildCategoriesSection should return empty before categories exist
@@ -816,8 +816,8 @@ func TestSystemPromptWithCategories(t *testing.T) {
 	categoriesSection = plugin.buildCategoriesSection()
 
 	// Should contain "CURRENT CATEGORIES"
-	if !contains(categoriesSection, "CURRENT CATEGORIES") {
-		t.Error("Expected categories section to contain 'CURRENT CATEGORIES'")
+	if !contains(categoriesSection, "CURRENT_CATEGORIES") {
+		t.Error("Expected categories section to contain 'CURRENT_CATEGORIES'")
 	}
 
 	// Should contain the category names
@@ -830,7 +830,7 @@ func TestSystemPromptWithCategories(t *testing.T) {
 	}
 
 	// Should contain the helpful text
-	if !contains(categoriesSection, "Top-level knowledge organization") {
+	if !contains(categoriesSection, "Top-level knowledge organization nodes") {
 		t.Error("Expected categories section to contain organizational context text")
 	}
 }

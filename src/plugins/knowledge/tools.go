@@ -30,7 +30,7 @@ func (p *KnowledgePlugin) Tools() []llms.Tool {
 func (p *KnowledgePlugin) newExploreCategoryTool() llms.Tool {
 	return &core.Tool{
 		Name:        "explore_category",
-		Description: "Explore a category. Returns sub-categories, facts (title only), documents, and relevant nodes as light nodes. Call explore_fact to get the full content of a specific fact.",
+		Description: "<ACTION>Retrieve topology of Category.</ACTION> <RETURNS>Children (Subcategories, Facts [title-only], Documents), and relevant Nodes.</RETURNS> <INSTRUCTION>You MUST use explore_fact afterward to expand text content of Facts.</INSTRUCTION>",
 		Parameters: []core.Parameter{
 			{
 				Name:        "category",
@@ -58,7 +58,7 @@ func (p *KnowledgePlugin) newExploreCategoryTool() llms.Tool {
 func (p *KnowledgePlugin) newExploreSubcategoryTool() llms.Tool {
 	return &core.Tool{
 		Name:        "explore_subcategory",
-		Description: "Explore a subcategory. Returns child sub-categories, facts (title only), documents, and relevant nodes as light nodes.",
+		Description: "<ACTION>Retrieve topology of Subcategory.</ACTION> <RETURNS>Children (Subcategories, Facts [title-only], Documents), and relevant Nodes.</RETURNS> <INSTRUCTION>You MUST use explore_fact afterward to expand text content of Facts.</INSTRUCTION>",
 		Parameters: []core.Parameter{
 			{
 				Name:        "subcategory",
@@ -86,7 +86,7 @@ func (p *KnowledgePlugin) newExploreSubcategoryTool() llms.Tool {
 func (p *KnowledgePlugin) newExploreFactTool() llms.Tool {
 	return &core.Tool{
 		Name:        "explore_fact",
-		Description: "Get the full content of a fact, plus its parent categories, attached documents, and relevant nodes (as light nodes).",
+		Description: "<ACTION>Expand Fact content.</ACTION> <RETURNS>Full content body + parent Categories, attached Documents, and relevant Nodes.</RETURNS>",
 		Parameters: []core.Parameter{
 			{
 				Name:        "fact",
@@ -155,7 +155,7 @@ func (p *KnowledgePlugin) newFindTool() llms.Tool {
 func (p *KnowledgePlugin) newRememberTool() llms.Tool {
 	return &core.Tool{
 		Name:        "remember",
-		Description: "Save a fact under a specific category. Provide a short title (3-8 words) so the fact can be identified during navigation without reading the full content.",
+		Description: "<ACTION>Ingest knowledge Fact.</ACTION> <INSTRUCTION>Evaluate existing Categories/Subcategories before insertion. You MUST construct a short 'title' (3-8 words) for optimal traversal.</INSTRUCTION>",
 		Parameters: []core.Parameter{
 			{
 				Name:        "category",
@@ -256,7 +256,7 @@ func (p *KnowledgePlugin) newAttachDocumentTool() llms.Tool {
 func (p *KnowledgePlugin) newLinkRelevantTool() llms.Tool {
 	return &core.Tool{
 		Name:        "link_relevant",
-		Description: "Create a bidirectional is_relevant_to edge between any two nodes (Category, Fact, or Document)",
+		Description: "<ACTION>Construct horizontal relationship (is_relevant_to edge) between any two nodes.</ACTION> <INSTRUCTION>Consider categories and subcategories relationships when organizing multidimensional data.</INSTRUCTION>",
 		Parameters: []core.Parameter{
 			{
 				Name:        "node_a",

@@ -88,57 +88,48 @@ func (p *KnowledgePlugin) SystemPrompt() string {
 		semanticInfo = " with semantic search"
 	}
 
-	return fmt.Sprintf(`[KNOWLEDGE STORAGE%s]
-Hierarchical graph with Categories, Subcategories, Facts, and Documents. Use proactively to remember everything.
+	return fmt.Sprintf(`<KNOWLEDGE_GRAPH_SYSTEM>
+<METADATA>
+Type: Hierarchical Graph%s
+Purpose: Proactive persistent memory.
+</METADATA>
 
-NODE TYPES:
-- Category: Top-level organizational grouping. Has a name (content) and an optional title.
-- Subcategory: A specific grouping within a Category or another Subcategory (recursive).
-- Fact: A piece of knowledge stored under a category or subcategory. Has full content + an optional short title.
-- Document: A file system reference (content = absolute path). Title = filename.
+<SCHEMA>
+Nodes:
+  CATEGORY: Top-level. field:name=content field:title=optional
+  SUBCATEGORY: Recursive child. field:name=content field:title=optional
+  FACT: Knowledge unit. field:body=content field:title=short_id
+  DOCUMENT: File ref. field:path=content field:name=title
 
-EDGE TYPES:
-- has_category: Category → Category
-- has_subcategory: Category or Subcategory → Subcategory
-- has_fact: Category or Subcategory → Fact, or Fact → Fact
-- has_document: Category or Fact → Document (file reference)
-- is_relevant_to: Bidirectional relevance between any two nodes of any type
+Edges:
+  has_subcategory: [Category|Subcategory] -> Subcategory
+  has_fact: [Category|Subcategory] -> Fact
+  has_document: [Category|Fact] -> Document
+  is_relevant_to: [Any] <-> [Any]
+</SCHEMA>
 
-TOOLS:
-- explore_category: Returns sub-categories, facts (titles only), documents, and relevant nodes
-- explore_subcategory: Returns child sub-categories, facts (titles only), documents, and relevant nodes
-- explore_fact: Returns full fact content + parent categories, documents, relevant nodes (titles only)
-- find: Semantic/text search across all nodes
-- remember: Save a fact under a category or subcategory (optional title for navigation)
-- attach_document: Attach a file path to a parent node
-- link_relevant: Create a bidirectional is_relevant_to edge between any two nodes
-- add_category: Create a new category
-- add_subcategory: Create a new subcategory under an existing category or subcategory
-- get_categories: List all top-level categories
-- get_category_facts: Get facts under a category
-- forget: Delete a node and all dependents
+<TOOL_USAGE_EXPANSION>
+<RETRIEVAL>
+1. DISCOVERY: Use 'get_categories' to identify top-level nodes.
+2. TRAVERSAL: Use 'explore_category' or 'explore_subcategory'. Yields LIGHT NODES (titles only for brevity).
+3. EXPANSION: Use 'explore_fact' to retrieve full content of facts discovered in step 2. You MUST expand facts to read their content.
+4. RECURSION: Use 'find' for semantic querying when graph descent is insufficient.
+</RETRIEVAL>
 
-NAVIGATION MODEL:
-  explore_category and explore_subcategory return child titles only — use explore_fact to get full content.
-  explore_fact returns neighbour titles only — use explore_fact/explore_category/explore_subcategory to dig deeper.
-  This two-phase design keeps responses compact: browse titles first, then read what matters.
+<STORAGE_AND_RELATIONSHIPS>
+1. CLASSIFICATION: When acquiring new knowledge, critically evaluate the correct Category and Subcategory. 
+2. STRUCTURE_CREATION: Use 'add_category' or 'add_subcategory' if the required classification hierarchy does not exist.
+3. INGESTION: Use 'remember' to store the Fact. You MUST provide a short 'title' for optimal light-node retrieval during traversal.
+4. CROSS_REFERENCING: Use 'link_relevant' to connect the new node to other Categories, Subcategories, or Facts to build horizontal relationships.
+5. FILE_ATTACHMENT: Use 'attach_document' to bind file paths to related nodes.
+</STORAGE_AND_RELATIONSHIPS>
+</TOOL_USAGE_EXPANSION>
 
-CRITICAL BEHAVIORS:
-
-1. START OF EVERY CONVERSATION (SILENTLY):
-   - get_categories → explore relevant categories for context about user, history, and prior work.
-   - Present retrieved info as natural recall: "I remember...", "Last time..."
-   - Never announce "checking", "retrieving", or "exploring".
-
-2. PROACTIVE STORAGE (After ANY response):
-   - Store key facts immediately with remember (include a short title).
-   - Create categories and subcategories as needed. Store silently — never announce it.
-
-3. ALWAYS STORE:
-   - User preferences, goals, context
-   - Research findings & task outcomes
-   - Feedback and corrections
-   - Tool capabilities and known issues
+<CONSTRAINTS>
+- SILENT_EXECUTION: Execute tools without conversational narration (e.g., do not say "I am checking..."). Formulate responses as innate knowledge.
+- PROACTIVE_RETENTION: Automatically store user preferences, goals, context, findings, and corrections post-response.
+</CONSTRAINTS>
+</KNOWLEDGE_GRAPH_SYSTEM>
 `, semanticInfo)
 }
 
@@ -166,16 +157,16 @@ func (p *KnowledgePlugin) buildCategoriesSection() string {
 
 	// Build the categories list
 	var categoryList string
-	categoryList = "\nCURRENT CATEGORIES:\nTop-level knowledge organization (closest to Omnia Nunc Node):\n"
+	categoryList = "\n<CURRENT_CATEGORIES>\n<INFO>Top-level knowledge organization nodes</INFO>\n"
 	for _, cat := range categories {
 		categoryList += fmt.Sprintf("  - %s\n", cat.Content)
 	}
 
 	if len(categories) >= maxCategories {
-		categoryList += fmt.Sprintf("  ... and %d more categories\n", len(categories)-maxCategories)
+		categoryList += fmt.Sprintf("  ... [%d additional categories muted]\n", len(categories)-maxCategories)
 	}
 
-	categoryList += "\nWhen storing new information, consider organizing it under these existing categories or create new ones as needed.\n"
+	categoryList += "\n<INSTRUCTION>Evaluate these categories when classifying new knowledge for STORAGE_AND_RELATIONSHIPS operations.</INSTRUCTION>\n</CURRENT_CATEGORIES>\n"
 
 	return categoryList
 }
