@@ -20,6 +20,7 @@ type Config struct {
 	TruncationStrategy TruncationStrategy // Optional: for history truncation
 	MaxContextTokens   int                // Maximum tokens allowed in context
 	ReservedTokens     int                // Reserved tokens for output
+	WorkingDir         string             // Agent's working directory
 }
 
 // Manager manages agent context lifecycle and operations.
@@ -157,6 +158,7 @@ func (m *Manager) initAgentContext() {
 		Trace:          m.config.Trace,
 		Model:          m.config.Model,
 		Tools:          m.config.Tools,
+		WorkingDir:     m.config.WorkingDir,
 		SubAgents:      m.config.SubAgents,
 		SessionStorage: existingSessionStorage,
 		PluginFields:   existingPluginFields,

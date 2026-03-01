@@ -28,7 +28,7 @@ type AgentBuilder struct {
 	name               string
 	systemPrompt       string
 	tools              []Tool
-	Subagents          map[LLM]Subagent
+	Subagents          map[Subagent]LLM
 	plugins            []string
 	llmEngine          llms.LLMEngine
 	workingDir         string
@@ -123,9 +123,9 @@ func (b *AgentBuilder) AddSubagent(subagent Subagent, model string) *AgentBuilde
 	llm.model()
 	llm.provider()
 	if b.Subagents == nil {
-		b.Subagents = make(map[LLM]Subagent)
+		b.Subagents = make(map[Subagent]LLM)
 	}
-	b.Subagents[llm] = subagent
+	b.Subagents[subagent] = llm
 	return b
 }
 
@@ -218,18 +218,18 @@ func (b *AgentBuilder) createLLMEngine(l LLM) (llms.LLMEngine, error) {
 
 func (b *AgentBuilder) buildSubagents() ([]core.SubAgent, error) {
 	subagents := []core.SubAgent{}
-	for llm, subagent := range b.Subagents {
+	for subagent, llm := range b.Subagents {
 		llmEngine, err := b.createLLMEngine(llm)
 		if err != nil {
 			return nil, err
 		}
 
-		subagent, err := subagent.getSubagent(llmEngine, b.vectorDB, b.embeddingGenerator, b.workingDir)
+		subagentInstance, err := subagent.getSubagent(llmEngine, b.vectorDB, b.embeddingGenerator, b.workingDir)
 
 		if err != nil {
 			return nil, err
 		}
-		subagents = append(subagents, subagent)
+		subagents = append(subagents, subagentInstance)
 	}
 	return subagents, nil
 }

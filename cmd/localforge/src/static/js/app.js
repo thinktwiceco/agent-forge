@@ -2,6 +2,7 @@ import { ChatManager } from "./chat.js";
 import { ConversationManager } from "./conversations.js";
 import { ConfigPanel } from "./config.js";
 import { TodoManager } from "./todos.js";
+import { FileSystemManager } from "./fs.js";
 
 // Load conversation ID from localStorage
 function loadConversationId() {
@@ -27,13 +28,14 @@ const chatManager = new ChatManager(appState);
 const conversationManager = new ConversationManager(appState, chatManager);
 const configPanel = new ConfigPanel(appState);
 const todoManager = new TodoManager();
+const fsManager = new FileSystemManager();
 
 async function bootstrap() {
   await configPanel.load();
   await conversationManager.refreshList();
   conversationManager.bindNewChat();
   todoManager.start();
-  
+
   // Auto-load last conversation if exists
   if (appState.conversationId) {
     await chatManager.loadConversation(appState.conversationId);

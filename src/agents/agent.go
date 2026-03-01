@@ -112,6 +112,15 @@ func NewAgent(config *AgentConfig) *Agent {
 	a.loadDelegateTool()
 	a.setResponseCh()
 
+	// Inject working directory to all initially registered tools
+	if a.config.WorkingDir != "" {
+		for _, tool := range a.tools {
+			if wda, ok := tool.(core.WorkingDirAware); ok {
+				wda.SetWorkingDir(a.config.WorkingDir)
+			}
+		}
+	}
+
 	// Create context manager and set agentContext
 	// Pass truncation strategy and token counter to the manager
 	a.contextMgr = agentctx.NewManager(agentctx.Config{
@@ -124,6 +133,7 @@ func NewAgent(config *AgentConfig) *Agent {
 		TruncationStrategy: a.config.TruncationStrategy,
 		MaxContextTokens:   a.maxContextTokens,
 		ReservedTokens:     a.reservedOutputTokens,
+		WorkingDir:         a.config.WorkingDir,
 	})
 	a.agentContext = a.contextMgr.Context()
 
@@ -267,6 +277,15 @@ func (a *Agent) GetTools() []llms.Tool {
 func (a *Agent) AddTools(tools []llms.Tool) {
 	if len(tools) == 0 {
 		return
+	}
+
+	// Inject working directory to newly added tools
+	if a.config.WorkingDir != "" {
+		for _, tool := range tools {
+			if wda, ok := tool.(core.WorkingDirAware); ok {
+				wda.SetWorkingDir(a.config.WorkingDir)
+			}
+		}
 	}
 
 	// Ensure tools slice exists

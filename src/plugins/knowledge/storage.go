@@ -53,6 +53,32 @@ type ScoredNode struct {
 	Score float32 `json:"score"`
 }
 
+// LightNode is a minimal node representation used during graph traversal.
+// It lets the agent browse available nodes by title before deciding which to explore fully.
+type LightNode struct {
+	ID    string `json:"id"`
+	Type  string `json:"type"`
+	Title string `json:"title"`
+}
+
+// GetTitle returns the node's title from metadata, falling back to a truncated content snippet.
+func (n *Node) GetTitle() string {
+	if n.Metadata != nil {
+		if title, ok := n.Metadata["title"].(string); ok && title != "" {
+			return title
+		}
+	}
+	if len(n.Content) > 80 {
+		return n.Content[:80] + "..."
+	}
+	return n.Content
+}
+
+// toLightNode converts a Node to a LightNode.
+func toLightNode(n Node) LightNode {
+	return LightNode{ID: n.ID, Type: n.Type, Title: n.GetTitle()}
+}
+
 // openDB opens the SQLite database connection
 func (p *KnowledgePlugin) openDB() error {
 	dbPath := filepath.Join(p.dir, dbFileName)
@@ -164,6 +190,8 @@ func (p *KnowledgePlugin) seedDefaultTypes() error {
 	}{
 		{"Category", "Organizational nodes for grouping knowledge"},
 		{"Fact", "Actual knowledge/information nodes"},
+		{"Document", "Reference to a file system document"},
+		{"Subcategory", "A specific grouping within a Category or another Subcategory (recursive)"},
 	}
 
 	defaultEdgeTypes := []struct {
@@ -172,6 +200,9 @@ func (p *KnowledgePlugin) seedDefaultTypes() error {
 	}{
 		{"has_category", "Links Category to Category"},
 		{"has_fact", "Links Category to Fact, or Fact to Fact"},
+		{"has_document", "Links Category or Fact to a Document (file reference)"},
+		{"is_relevant_to", "Bidirectional relevance link between any two nodes of any type"},
+		{"has_subcategory", "Links Category or Subcategory to a Subcategory (recursive)"},
 	}
 
 	for _, nt := range defaultNodeTypes {
@@ -890,10 +921,11 @@ func (p *KnowledgePlugin) getTopLevelCategories() ([]Node, error) {
 	return nodes, nil
 }
 
-// remember saves a fact under a specific category
-func (p *KnowledgePlugin) remember(category string, fact string) (string, error) {
+// remember saves a fact under a specific category.
+// If title is non-empty it is stored in metadata so navigation can show a short label.
+func (p *KnowledgePlugin) remember(category string, fact string, title string) (string, error) {
 	// Find the category node
-	categoryNodes, err := p.findNodesByTypeAndContent("Category", category, 10, 0)
+	categoryNodes, err := p.querier.findNodesByTypeAndContent("Category", category, 10, 0)
 	if err != nil {
 		return "", fmt.Errorf("failed to search for category: %w", err)
 	}
@@ -904,8 +936,14 @@ func (p *KnowledgePlugin) remember(category string, fact string) (string, error)
 
 	categoryNode := categoryNodes[0]
 
+	// Build metadata with optional title
+	var metadata map[string]any
+	if title != "" {
+		metadata = map[string]any{"title": title}
+	}
+
 	// Create the fact node with embedding
-	factID, err := p.saveWithEmbedding("Fact", fact, nil)
+	factID, err := p.saveWithEmbedding("Fact", fact, metadata)
 	if err != nil {
 		return "", fmt.Errorf("failed to save fact: %w", err)
 	}
@@ -921,10 +959,13 @@ func (p *KnowledgePlugin) remember(category string, fact string) (string, error)
 	return factID, nil
 }
 
-// addCategory creates a new category node
+// addCategory creates a new category node, storing the category name as its title in metadata.
 func (p *KnowledgePlugin) addCategory(category string) (string, error) {
+	// Store category name as title so light-node browsing shows it
+	metadata := map[string]any{"title": category}
+
 	// Create the category node with embedding
-	categoryID, err := p.saveWithEmbedding("Category", category, nil)
+	categoryID, err := p.saveWithEmbedding("Category", category, metadata)
 	if err != nil {
 		return "", fmt.Errorf("failed to save category: %w", err)
 	}
@@ -955,6 +996,32 @@ func (p *KnowledgePlugin) addCategory(category string) (string, error) {
 	return categoryID, nil
 }
 
+// addSubcategory creates a new subcategory node under a parent category or subcategory
+func (p *KnowledgePlugin) addSubcategory(parentIdentifier string, subcategory string) (string, error) {
+	node, err := p.getNode(parentIdentifier)
+	if err != nil {
+		nodes, err2 := p.findNodesByContent(parentIdentifier, false)
+		if err2 != nil || len(nodes) == 0 {
+			return "", fmt.Errorf("parent node not found: %s", parentIdentifier)
+		}
+		node = &nodes[0]
+	}
+
+	metadata := map[string]any{"title": subcategory}
+	subID, err := p.saveWithEmbedding("Subcategory", subcategory, metadata)
+	if err != nil {
+		return "", fmt.Errorf("failed to save subcategory: %w", err)
+	}
+
+	_, err = p.saveEdge(node.ID, subID, "has_subcategory", 1.0, nil)
+	if err != nil {
+		_ = p.deleteNode(subID)
+		return "", fmt.Errorf("failed to link subcategory to parent: %w", err)
+	}
+
+	return subID, nil
+}
+
 // getCategories returns all Category nodes
 func (p *KnowledgePlugin) getCategories() ([]Node, error) {
 	nodes, err := p.findNodesByType("Category", 0, 0)
@@ -967,7 +1034,7 @@ func (p *KnowledgePlugin) getCategories() ([]Node, error) {
 // getCategoryFacts returns all Fact nodes directly connected to a category
 func (p *KnowledgePlugin) getCategoryFacts(category string) ([]Node, error) {
 	// Find the category node
-	categoryNodes, err := p.findNodesByTypeAndContent("Category", category, 10, 0)
+	categoryNodes, err := p.querier.findNodesByTypeAndContent("Category", category, 10, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search for category: %w", err)
 	}

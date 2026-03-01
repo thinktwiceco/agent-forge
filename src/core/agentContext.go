@@ -21,6 +21,8 @@ type AgentContext struct {
 	Model string
 	// Tools is the list of tools available to the agent (immutable)
 	Tools []llms.Tool
+	// WorkingDir is the agent's working directory, accessible to tools (immutable)
+	WorkingDir string
 	// SubAgents is the list of sub-agents available for delegation (immutable)
 	SubAgents []SubAgent
 	// ResponseCh is the response channel for the current chat session (immutable per session)
@@ -48,6 +50,7 @@ func (ac *AgentContext) BuildContext(responseCh *ResponseCh) map[string]any {
 	context["model"] = ac.Model
 	context["responseCh"] = responseCh
 	context["tools"] = ac.Tools
+	context["workingDir"] = ac.WorkingDir
 	context["subAgents"] = ac.SubAgents
 	context["lastSubagentMessage"] = ac.LastSubagentMessage
 
@@ -88,6 +91,9 @@ func RehydrateContext(contextMap map[string]any) (*AgentContext, error) {
 		return nil, err
 	}
 	if err := ac.validateModel(contextMap); err != nil {
+		return nil, err
+	}
+	if err := ac.validateWorkingDir(contextMap); err != nil {
 		return nil, err
 	}
 	if err := ac.validateTools(contextMap); err != nil {
@@ -141,6 +147,16 @@ func (ac *AgentContext) validateModel(contextMap map[string]any) error {
 		ac.Model = model
 	} else if model, exists := contextMap["model"]; exists {
 		return fmt.Errorf("model must be a string, got %T", model)
+	}
+	return nil
+}
+
+// validateWorkingDir extracts and validates the workingDir field from the context map.
+func (ac *AgentContext) validateWorkingDir(contextMap map[string]any) error {
+	if workingDir, ok := contextMap["workingDir"].(string); ok {
+		ac.WorkingDir = workingDir
+	} else if workingDir, exists := contextMap["workingDir"]; exists {
+		return fmt.Errorf("workingDir must be a string, got %T", workingDir)
 	}
 	return nil
 }

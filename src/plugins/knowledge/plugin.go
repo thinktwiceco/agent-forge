@@ -21,6 +21,8 @@ type KnowledgePlugin struct {
 	dir          string
 	vectorDB     core.VectorDB
 	embeddingGen core.EmbeddingGenerator
+	querier      *GraphQuerier
+	explorer     *KnowledgeExplorer
 }
 
 // NewKnowledgePlugin creates a new knowledge graph plugin
@@ -65,6 +67,10 @@ func (p *KnowledgePlugin) onInit(a *agents.Agent) error {
 		agentforge.Debug("🧠 [Knowledge Plugin] Semantic search enabled")
 	}
 
+	// Initialize querier and explorer
+	p.querier = NewGraphQuerier(p.db)
+	p.explorer = NewKnowledgeExplorer(p.querier)
+
 	// Now that DB is initialized, append the categories section to system prompt
 	categoriesSection := p.buildCategoriesSection()
 	if categoriesSection != "" {
@@ -83,80 +89,56 @@ func (p *KnowledgePlugin) SystemPrompt() string {
 	}
 
 	return fmt.Sprintf(`[KNOWLEDGE STORAGE%s]
-Hierarchical storage with Categories and Facts. Use this to remember everything important.
+Hierarchical graph with Categories, Subcategories, Facts, and Documents. Use proactively to remember everything.
+
+NODE TYPES:
+- Category: Top-level organizational grouping. Has a name (content) and an optional title.
+- Subcategory: A specific grouping within a Category or another Subcategory (recursive).
+- Fact: A piece of knowledge stored under a category or subcategory. Has full content + an optional short title.
+- Document: A file system reference (content = absolute path). Title = filename.
+
+EDGE TYPES:
+- has_category: Category → Category
+- has_subcategory: Category or Subcategory → Subcategory
+- has_fact: Category or Subcategory → Fact, or Fact → Fact
+- has_document: Category or Fact → Document (file reference)
+- is_relevant_to: Bidirectional relevance between any two nodes of any type
 
 TOOLS:
-- explore_category: Explore a category and its full hierarchy
-- explore_fact: Explore a fact with context
-- find: Search across all knowledge
-- remember: Save a fact under a category
+- explore_category: Returns sub-categories, facts (titles only), documents, and relevant nodes
+- explore_subcategory: Returns child sub-categories, facts (titles only), documents, and relevant nodes
+- explore_fact: Returns full fact content + parent categories, documents, relevant nodes (titles only)
+- find: Semantic/text search across all nodes
+- remember: Save a fact under a category or subcategory (optional title for navigation)
+- attach_document: Attach a file path to a parent node
+- link_relevant: Create a bidirectional is_relevant_to edge between any two nodes
 - add_category: Create a new category
-- get_categories: List all categories
+- add_subcategory: Create a new subcategory under an existing category or subcategory
+- get_categories: List all top-level categories
 - get_category_facts: Get facts under a category
-- forget: Delete information and dependents
+- forget: Delete a node and all dependents
+
+NAVIGATION MODEL:
+  explore_category and explore_subcategory return child titles only — use explore_fact to get full content.
+  explore_fact returns neighbour titles only — use explore_fact/explore_category/explore_subcategory to dig deeper.
+  This two-phase design keeps responses compact: browse titles first, then read what matters.
 
 CRITICAL BEHAVIORS:
 
-1. START OF EVERY CONVERSATION:
-   - ALWAYS use get_categories to see existing knowledge structure
-   - ALWAYS use explore_category to retrieve context about:
-     * The user (preferences, goals, history, context)
-     * Previous tasks and their outcomes
-     * Your own performance and learnings
-     * Tool usage patterns and best practices
-   - Treat each conversation as potentially connected to previous ones
-   - Look for patterns in user interests across conversations
-   
-   IMPORTANT: Use these tools SILENTLY - never mention "checking", "retrieving", or "exploring"
+1. START OF EVERY CONVERSATION (SILENTLY):
+   - get_categories → explore relevant categories for context about user, history, and prior work.
+   - Present retrieved info as natural recall: "I remember...", "Last time..."
+   - Never announce "checking", "retrieving", or "exploring".
 
-2. NATURAL PRESENTATION:
-   - Present retrieved information as if you naturally remember it
-   - DON'T say: "Let me check...", "I found...", "Let me explore...", "I can see from..."
-   - DO say: "I remember...", "Last time we discussed...", "You were interested in..."
-   - Act like a human who naturally recalls previous conversations
-   - Be conversational and seamless - don't announce your retrieval process
+2. PROACTIVE STORAGE (After ANY response):
+   - Store key facts immediately with remember (include a short title).
+   - Create categories and subcategories as needed. Store silently — never announce it.
 
-3. CONTEXTUAL AWARENESS (Before responding):
-   - When user asks about ANY topic, SILENTLY use find or explore_category
-   - If topic relates to previous research/discussions, naturally reference it
-   - Example: "Oh, you were looking at [topic] before! Are you still interested in that?"
-   - Always connect new information to existing knowledge when relevant
-   - Look for topic threads and maintain continuity
-
-4. PROACTIVE STORAGE (After ANY response):
-   - After answering research questions, IMMEDIATELY store key facts with remember
-   - After completing tasks, IMMEDIATELY store outcomes and insights
-   - Store under existing relevant categories when connections exist
-   - If no relevant category exists, create one with add_category or ask user
-   - Don't wait until end of conversation - store as you go
-   - Store SILENTLY - don't announce "I'm storing this..."
-
-5. ALWAYS STORE when you:
-   - Learn about the user (preferences, goals, context, personal info)
-   - Answer research or informational questions (store key facts)
-   - Complete multi-step tasks (outcomes, what worked, what didn't)
-   - Receive feedback (user satisfaction, suggestions, corrections)
-   - Discover tool capabilities or limitations
-   - Identify patterns or optimization opportunities
-   - Test features or workflows (successes and failures)
-
-6. RECOMMENDED CATEGORIES:
-   - "User Context" - User information, preferences, goals, history
-   - "Agent Performance" - Your successes, failures, learnings, feedback
-   - "Tool Usage" - Tool capabilities, best practices, known issues
-   - "Research & Content" - Information gathered during tasks (organize by topic)
-   - "Process Optimization" - Patterns, improvements, recurring issues
-   
-   Create topic-specific categories as needed (e.g., "Python Research", "Project X Notes").
-
-7. TYPICAL WORKFLOW:
-   - Start: SILENTLY use get_categories → explore relevant categories for context
-   - Before answering: SILENTLY use find to check if topic has prior context
-   - After answering: SILENTLY remember key facts immediately
-   - During: SILENTLY remember new learnings as you discover them
-   - End: SILENTLY remember overall outcomes, insights, and feedback
-
-Remember: Be natural and conversational. Check context silently, present as natural recall, store immediately.
+3. ALWAYS STORE:
+   - User preferences, goals, context
+   - Research findings & task outcomes
+   - Feedback and corrections
+   - Tool capabilities and known issues
 `, semanticInfo)
 }
 
@@ -200,14 +182,28 @@ func (p *KnowledgePlugin) buildCategoriesSection() string {
 
 // Public API Methods for Knowledge Graph Abstraction
 
-// ExploreCategory finds a category and returns its full hierarchy
-func (p *KnowledgePlugin) ExploreCategory(category string) (*GraphResult, error) {
-	return p.exploreCategory(category)
+// ExploreCategory finds a category and returns its structured exploration result with light nodes.
+func (p *KnowledgePlugin) ExploreCategory(category string) (*CategoryExploreResult, error) {
+	if p.explorer == nil {
+		return nil, fmt.Errorf("knowledge plugin not fully initialized")
+	}
+	return p.explorer.ExploreCategory(category)
 }
 
-// ExploreFact finds a fact and returns its full context
-func (p *KnowledgePlugin) ExploreFact(fact string) (*GraphResult, error) {
-	return p.exploreFact(fact)
+// ExploreSubcategory finds a subcategory and returns its structured exploration result with light nodes.
+func (p *KnowledgePlugin) ExploreSubcategory(subcategory string) (*SubcategoryExploreResult, error) {
+	if p.explorer == nil {
+		return nil, fmt.Errorf("knowledge plugin not fully initialized")
+	}
+	return p.explorer.ExploreSubcategory(subcategory)
+}
+
+// ExploreFact finds a fact and returns its full content plus light-node neighbours.
+func (p *KnowledgePlugin) ExploreFact(fact string) (*FactExploreResult, error) {
+	if p.explorer == nil {
+		return nil, fmt.Errorf("knowledge plugin not fully initialized")
+	}
+	return p.explorer.ExploreFact(fact)
 }
 
 // Find searches for nodes matching query and returns scored results
@@ -217,12 +213,20 @@ func (p *KnowledgePlugin) Find(query string, limit int) ([]ScoredNode, error) {
 
 // Remember saves a fact under a specific category
 func (p *KnowledgePlugin) Remember(category string, fact string) (string, error) {
-	return p.remember(category, fact)
+	return p.remember(category, fact, "")
 }
 
-// AddCategory creates a new category node
+// RememberWithTitle saves a fact under a category with an explicit short title.
+func (p *KnowledgePlugin) RememberWithTitle(category, title, fact string) (string, error) {
+	return p.remember(category, fact, title)
+}
 func (p *KnowledgePlugin) AddCategory(category string) (string, error) {
 	return p.addCategory(category)
+}
+
+// AddSubcategory creates a new subcategory node under a parent category or subcategory
+func (p *KnowledgePlugin) AddSubcategory(parentIdentifier string, subcategory string) (string, error) {
+	return p.addSubcategory(parentIdentifier, subcategory)
 }
 
 // GetCategories returns all Category nodes
@@ -238,6 +242,71 @@ func (p *KnowledgePlugin) GetCategoryFacts(category string) ([]Node, error) {
 // Forget deletes a node and all its dependents (cascade delete)
 func (p *KnowledgePlugin) Forget(identifier string) (int, error) {
 	return p.forgetCascade(identifier)
+}
+
+// saveDocument creates a Document node at filePath and links it to parentID via has_document.
+func (p *KnowledgePlugin) saveDocument(parentID, filePath string, extra map[string]any) (string, error) {
+	if extra == nil {
+		extra = make(map[string]any)
+	}
+	extra["file_path"] = filePath
+	extra["title"] = filepath.Base(filePath)
+	docID, err := p.saveNode("Document", filePath, "", extra)
+	if err != nil {
+		return "", fmt.Errorf("failed to save document node: %w", err)
+	}
+	_, err = p.saveEdge(parentID, docID, "has_document", 1.0, nil)
+	if err != nil {
+		_ = p.deleteNode(docID)
+		return "", fmt.Errorf("failed to link document: %w", err)
+	}
+	return docID, nil
+}
+
+// AttachDocument resolves a parent node by ID or content and attaches a document to it.
+func (p *KnowledgePlugin) AttachDocument(parentIdentifier, filePath string) (string, error) {
+	node, err := p.getNode(parentIdentifier)
+	if err != nil {
+		nodes, err2 := p.findNodesByContent(parentIdentifier, false)
+		if err2 != nil || len(nodes) == 0 {
+			return "", fmt.Errorf("parent node not found: %s", parentIdentifier)
+		}
+		node = &nodes[0]
+	}
+	return p.saveDocument(node.ID, filePath, nil)
+}
+
+// LinkRelevant creates bidirectional is_relevant_to edges between two nodes (resolved by ID or content).
+func (p *KnowledgePlugin) LinkRelevant(identifierA, identifierB string) (string, string, error) {
+	resolve := func(id string) (*Node, error) {
+		node, err := p.getNode(id)
+		if err == nil {
+			return node, nil
+		}
+		nodes, err := p.findNodesByContent(id, false)
+		if err != nil || len(nodes) == 0 {
+			return nil, fmt.Errorf("node not found: %s", id)
+		}
+		return &nodes[0], nil
+	}
+	nodeA, err := resolve(identifierA)
+	if err != nil {
+		return "", "", err
+	}
+	nodeB, err := resolve(identifierB)
+	if err != nil {
+		return "", "", err
+	}
+	edgeAB, err := p.saveEdge(nodeA.ID, nodeB.ID, "is_relevant_to", 1.0, nil)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create A→B edge: %w", err)
+	}
+	edgeBA, err := p.saveEdge(nodeB.ID, nodeA.ID, "is_relevant_to", 1.0, nil)
+	if err != nil {
+		_ = p.deleteEdge(edgeAB)
+		return "", "", fmt.Errorf("failed to create B→A edge: %w", err)
+	}
+	return edgeAB, edgeBA, nil
 }
 
 // init registers the plugin factory

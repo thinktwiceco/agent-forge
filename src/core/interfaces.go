@@ -73,6 +73,12 @@ type PromptProvider interface {
 	SystemPrompt() string
 }
 
+// WorkingDirAware is an optional interface for plugins and tools
+// that need to know the agent's working directory.
+type WorkingDirAware interface {
+	SetWorkingDir(dir string)
+}
+
 // LegacyPlugin wraps old-style plugins for backward compatibility.
 // This adapter converts the old On(event) pattern to the new Hooks() map pattern.
 type LegacyPlugin struct {

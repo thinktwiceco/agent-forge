@@ -3,11 +3,10 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"path/filepath"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 type KnowledgeNode struct {
@@ -57,34 +56,20 @@ type NodeDetailResponse struct {
 	Neighbors GraphResponse `json:"neighbors"`
 }
 
-func (s *Server) getKnowledgeDB() (*sql.DB, error) {
-	cfg := s.configMgr.GetConfig()
-	workingDir := cfg.Agent.WorkingDir
-	if workingDir == "" {
-		workingDir = "."
+// knowledgeDB returns the shared DB connection or an error if it was never opened.
+func (s *Server) knowledgeDBConn() (*sql.DB, error) {
+	if s.knowledgeDB != nil {
+		return s.knowledgeDB, nil
 	}
-
-	dbPath := filepath.Join(workingDir, "knowledge", "knowledge.db")
-	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=1")
-	if err != nil {
-		return nil, err
-	}
-
-	if err := db.Ping(); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-
-	return db, nil
+	return nil, fmt.Errorf("knowledge database is not available")
 }
 
 func (s *Server) handleGetKnowledgeGraph(c *gin.Context) {
-	db, err := s.getKnowledgeDB()
+	db, err := s.knowledgeDBConn()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to knowledge database"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "knowledge database not available"})
 		return
 	}
-	defer func() { _ = db.Close() }()
 
 	typeFilter := c.Query("type")
 	limit := c.DefaultQuery("limit", "1000")
@@ -124,12 +109,11 @@ func (s *Server) handleGetKnowledgeGraph(c *gin.Context) {
 }
 
 func (s *Server) handleGetKnowledgeStats(c *gin.Context) {
-	db, err := s.getKnowledgeDB()
+	db, err := s.knowledgeDBConn()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to knowledge database"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "knowledge database not available"})
 		return
 	}
-	defer func() { _ = db.Close() }()
 
 	stats, err := s.getGraphStats(db)
 	if err != nil {
@@ -147,12 +131,11 @@ func (s *Server) handleGetKnowledgeNode(c *gin.Context) {
 		return
 	}
 
-	db, err := s.getKnowledgeDB()
+	db, err := s.knowledgeDBConn()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to knowledge database"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "knowledge database not available"})
 		return
 	}
-	defer func() { _ = db.Close() }()
 
 	node, err := s.getNodeByID(db, nodeID)
 	if err != nil {
