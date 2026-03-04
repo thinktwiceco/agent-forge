@@ -18,13 +18,14 @@ func (w *WebBrowser) getContent(agentContext map[string]any, args map[string]any
 	contentType := "text"
 	if ct, ok := args["type"].(string); ok && ct != "" {
 		validTypes := map[string]bool{
-			"html":  true,
-			"text":  true,
-			"title": true,
+			"html":             true,
+			"text":             true,
+			"title":            true,
+			"interactive_tree": true,
 		}
 		if !validTypes[ct] {
 			w.sessionManager.RecordOperation(false)
-			return core.NewErrorResponse(fmt.Sprintf("invalid content type: %s. Must be one of: html, text, title", ct))
+			return core.NewErrorResponse(fmt.Sprintf("invalid content type: %s. Must be one of: html, text, title, interactive_tree", ct))
 		}
 		contentType = ct
 	}
@@ -140,6 +141,10 @@ func (w *WebBrowser) getContent(agentContext map[string]any, args map[string]any
 		case "title":
 			err = chromedp.Run(timeoutCtx,
 				chromedp.Title(&content),
+			)
+		case "interactive_tree":
+			err = chromedp.Run(timeoutCtx,
+				chromedp.Evaluate(getScript("interactive_tree"), &content),
 			)
 		}
 	}

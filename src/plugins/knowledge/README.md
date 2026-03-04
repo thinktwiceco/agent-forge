@@ -399,6 +399,16 @@ Store rich metadata with nodes:
 - `tags`: Categorization tags
 - Custom fields as needed
 
+### 5. Knowledge Retention Hook
+
+The plugin automatically appends a reminder to all successful tool executions:
+- Prompts the agent to consider saving information
+- Encourages proactive knowledge retention
+- Only applies to successful tool calls
+- Message: `[Reminder]: is this worth saving or just transactional? If you are not sure, ask your human!`
+
+This hook helps agents develop a habit of persisting useful information in the knowledge graph.
+
 ## Best Practices
 
 ### 1. Organize with Categories
