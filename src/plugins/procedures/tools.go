@@ -164,14 +164,14 @@ func (p *ProceduresPlugin) handleInstallableProcedures() llms.ToolReturn {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Found %d installable procedure(s) in thinktwiceco/agent-forge:\n\n", len(procs)))
+	fmt.Fprintf(&sb, "Found %d installable procedure(s) in thinktwiceco/agent-forge:\n\n", len(procs))
 	for _, proc := range procs {
-		sb.WriteString(fmt.Sprintf("- %s", proc.Slug))
+		fmt.Fprintf(&sb, "- %s", proc.Slug)
 		if proc.Name != "" && proc.Name != proc.Slug {
-			sb.WriteString(fmt.Sprintf(" (%s)", proc.Name))
+			fmt.Fprintf(&sb, " (%s)", proc.Name)
 		}
 		if proc.Description != "" {
-			sb.WriteString(fmt.Sprintf(": %s", proc.Description))
+			fmt.Fprintf(&sb, ": %s", proc.Description)
 		}
 		sb.WriteString("\n")
 	}

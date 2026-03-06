@@ -133,9 +133,9 @@ func patchDotEnv(path string, updates map[string]string) error {
 		val := existing[key]
 		if val == "" {
 			// Write as commented-out placeholder to preserve the key name
-			sb.WriteString(fmt.Sprintf("# %s=\n", key))
+			fmt.Fprintf(&sb, "# %s=\n", key)
 		} else {
-			sb.WriteString(fmt.Sprintf("%s=%s\n", key, val))
+			fmt.Fprintf(&sb, "%s=%s\n", key, val)
 		}
 	}
 
