@@ -348,6 +348,20 @@ func main() {
 - Multi-agent orchestration
 - File uploads and knowledge integration
 
+**Chat interface** — Real-time streaming, conversation history, active tasks:
+
+![Chat](assets/chat-main.png)
+
+**Settings** — Agent identity, sub-agents, plugins, and API keys:
+
+![Agent](assets/settings-agent.png) ![Sub-agents](assets/settings-subagents.png)
+
+![Plugins](assets/settings-plugins.png) ![API Keys](assets/settings-api-keys.png)
+
+**Knowledge graph** — Node types, filters, and visualization:
+
+![Knowledge Graph](assets/knowledge-graph.png)
+
 ### Installation
 
 #### Option A: Binary Release (Recommended)
