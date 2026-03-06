@@ -32,8 +32,6 @@
 ## [0.4.10] - 2026-02-28
 - [f8c6661](http://github.com/thinktwiceco/agent-forge/commit/f8c6661acafa852628358efe39d16c5fbb2ce811) - feat(plugins): add knowledge plugin with graph and semantic search (#34)
 
-
-## [Unreleased]
 ## [0.4.8] - 2026-02-27
 - [cd3615f](http://github.com/thinktwiceco/agent-forge/commit/cd3615fb0c196bb44aeb2edf88c324dc0d16e0de) - chore(release): prepare release v0.4.8 (#30)
 - [7249fc6](http://github.com/thinktwiceco/agent-forge/commit/7249fc6800bdd52c3158abe9275b7e42e4296027) - fix: replace WriteString+Sprintf with Fprintf for staticcheck QF1012
@@ -47,6 +45,7 @@
 - [67df18f](http://github.com/thinktwiceco/agent-forge/commit/67df18f2263d20e85d1762195bf7fce350204162) - chore: add commit history to v0.4.6 changelog
 
 ## [0.4.6] - 2026-02-18
+
 ### Fixed
 - fix: stop gitignoring go.work (module workspace)
 - [0fb186c](http://github.com/thinktwiceco/agent-forge/commit/0fb186cc949bbecd8d918391f17e97dbc24c2870) - fix(agents): use %w for error wrapping in executor (#25)
