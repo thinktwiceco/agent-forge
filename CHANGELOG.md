@@ -1,3 +1,15 @@
+## [Unreleased]
+
+## [0.4.14] - 2026-03-04
+- [94495fe](http://github.com/thinktwiceco/agent-forge/commit/94495feb91cd2f90dc093b930e096ef7822c60f6) - chore(release): prepare release v0.4.14 (#38)
+- [ac67d85](http://github.com/thinktwiceco/agent-forge/commit/ac67d85724e2a6bbf59a4f8ea6eabf6fe9b592dd) - feat(plugins): add retention hook, bracket prompts, install templates, interactive_tree
+- [e80d169](http://github.com/thinktwiceco/agent-forge/commit/e80d1697f39f7d9c8270247af3a7cb9e86a8467d) - chore(release): prepare release v0.4.14 with robust sqlite metadata filtering
+- [a080412](http://github.com/thinktwiceco/agent-forge/commit/a08041230b1318fde3636adcf8b2876c5eb868b9) - chore(release): prepare release v0.4.13
+- [7dd4c98](http://github.com/thinktwiceco/agent-forge/commit/7dd4c9843a539e83c95afa6c44cb4c55d69fe5d0) - fix(knowledge): solve 'malformed JSON' regression in traversal tools
+- [f47781f](http://github.com/thinktwiceco/agent-forge/commit/f47781fd7865b08a8fb9c2f3060300851ed8130c) - chore(release): prepare release v0.4.12
+- [b16d922](http://github.com/thinktwiceco/agent-forge/commit/b16d9226cfdcd60f25024a06561b93c8b9a2820b) - fix(knowledge): solve explore_fact() title and ID retrieval issue
+
+
 ## [0.4.14] - 2026-03-01
 - fix(integrations): robust metadata filtering in SQLite vector DB
 - chore(release): prepare release v0.4.14
