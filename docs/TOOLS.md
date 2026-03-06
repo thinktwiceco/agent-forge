@@ -84,6 +84,7 @@ agent := agents.NewAgent(&agents.AgentConfig{
 
 ### Available Operations
 
+- **init**: Initialize a new repository
 - **status**: Show working tree status
 - **diff**: Show changes between commits
 - **log**: Show commit logs
@@ -93,7 +94,6 @@ agent := agents.NewAgent(&agents.AgentConfig{
 - **pull**: Fetch and integrate changes
 - **branch**: List, create, or delete branches
 - **checkout**: Switch branches or restore files
-- **reset**: Reset current HEAD
 - **clone**: Clone a repository
 
 ### YAML Configuration
@@ -320,8 +320,15 @@ agent := agents.NewAgent(&agents.AgentConfig{
 
 - **navigate**: Navigate to a URL
 - **click**: Click an element by CSS selector
+- **fill**: Fill a form field with a visible value
+- **fill_secret**: Fill a form field with a secret value (value not logged)
 - **get_content**: Get page content (HTML, text, or title)
 - **save_content**: Save content to file in working directory
+- **web_search**: Search the web using the Brave Search API
+- **upload_file**: Upload a file via a file input element
+- **refresh**: Refresh the current page
+- **list_sessions**: List all active browser sessions
+- **close_session**: Close a browser session
 
 ### YAML Configuration
 
@@ -351,9 +358,10 @@ agent := agents.NewAgent(&agents.AgentConfig{
 
 ### Available Actions
 
-- **index**: Index documents for semantic search
+- **index**: Index text content for semantic search
+- **indexFile**: Index a file from the filesystem for semantic search
 - **search**: Search indexed documents
-- **list**: List all indexed documents
+- **listDocuments**: List all indexed documents
 - **delete**: Delete indexed documents
 
 ### YAML Configuration
@@ -384,6 +392,10 @@ func NewCustomTool() llms.Tool {
 - Available operations
 - Examples`,
         TroubleshootingInfo: `Common issues and solutions`,
+        // Optional: return per-item details when the expand tool calls DetailsAbout(item)
+        DetailsAboutFunc: func(item string) string {
+            return fmt.Sprintf("Details about %s: ...", item)
+        },
         Parameters: []core.Parameter{
             {
                 Name:        "param1",
@@ -427,6 +439,26 @@ func validateParam1(value any) error {
 - **NewErrorResponse(error)**: Error response
 - **NewFailureResponse(error, data)**: Error with partial data
 - **NewEphemeralResponse(data)**: Success, not stored in history
+
+### Hooks
+
+`Hooks` is an optional interface for external validation injected by the agent framework (e.g. sandboxing):
+
+```go
+type Hooks interface {
+    IsSafePath(path string) bool
+    IsSafeCommand(cmd string) bool
+}
+```
+
+Assign a `Hooks` implementation to the tool to enforce path or command restrictions at runtime:
+
+```go
+tool := NewCustomTool()
+tool.(*core.Tool).SetHooks(myHooks)
+```
+
+The framework calls `GetHooks()` before invoking the handler; the tool itself must check the hooks when applicable.
 
 ## See Also
 

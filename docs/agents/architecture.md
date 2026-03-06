@@ -44,7 +44,7 @@ graph TB
 
 **Extensions:**
 - `src/tools/` - Built-in tools (fs, git, postgres, api, web, vector)
-- `src/plugins/` - Plugin system (logger, todo)
+- `src/plugins/` - Plugin system (logger, todo, vault, procedures, knowledge, scheduler)
 
 ## Import Patterns
 

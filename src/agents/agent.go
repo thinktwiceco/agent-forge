@@ -216,17 +216,9 @@ func (a *Agent) ChatStream(ctx context.Context, message string, chatId string) *
 	}
 	responseCh := core.NewResponseCh(a.config.AgentName, a.config.Trace, chatId, onChunkRead)
 
-	// Store the response channel temporarily for use in executeChatWithTools
-	oldResponseCh := a.responseCh
-	a.responseCh = responseCh
-
 	// Start the tool execution loop in a goroutine
 	go func() {
 		defer responseCh.Close()
-		// Restore the old responseCh after this call completes
-		defer func() {
-			a.responseCh = oldResponseCh
-		}()
 
 		if err := a.executor.ExecuteChatWithTools(ctx, hm, responseCh); err != nil {
 			responseCh.Error <- err

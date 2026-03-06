@@ -35,6 +35,23 @@ type AgentContext struct {
 	PluginFields map[string]any
 }
 
+// Snapshot returns a new AgentContext for a single ChatStream call.
+// Immutable fields are copied by value; mutable fields (SessionStorage, PluginFields,
+// LastSubagentMessage) start fresh so concurrent calls cannot bleed state into each other.
+func (ac *AgentContext) Snapshot() *AgentContext {
+	return &AgentContext{
+		AgentName:  ac.AgentName,
+		Trace:      ac.Trace,
+		Model:      ac.Model,
+		Tools:      ac.Tools,
+		WorkingDir: ac.WorkingDir,
+		SubAgents:  ac.SubAgents,
+		// mutable fields start empty for each call
+		SessionStorage: make(map[string]any),
+		PluginFields:   make(map[string]any),
+	}
+}
+
 // BuildContext converts the AgentContext struct to a map[string]any and merges
 // in the session-specific responseCh parameter.
 //

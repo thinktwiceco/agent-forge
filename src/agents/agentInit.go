@@ -1,3 +1,26 @@
+// ─── Agent Layer: Initialization ─────────────────────────────────────────────
+//
+// The agent layer is purely a runtime concern. It derives all of its state from
+// agents.AgentConfig (produced by builder.AgentBuilder.Build()) and holds no
+// durable state of its own. On every AgentManager.Reload() the entire agent is
+// discarded and rebuilt from scratch — a safe operation because:
+//
+//  1. In-flight chats hold a pointer to the old agent (captured before the swap)
+//     and complete normally; the new agent only serves subsequent requests.
+//  2. The RWMutex in AgentManager guarantees a clean pointer swap without races.
+//
+// Plugin wiring is deferred to EventAgentInitialization so that all agent
+// infrastructure (hooks, inbox, tools slice) is ready before plugins attach to
+// it. The initialization handler:
+//
+//   - Injects WorkingDir into WorkingDirAware plugins
+//   - Injects the agent inbox into InboxAware plugins (allows async injection)
+//   - Registers lifecycle hooks from HookProvider plugins
+//   - Appends tools from ToolProvider plugins to the agent's tool list
+//   - Appends system-prompt fragments from PromptProvider plugins
+//
+// Nothing in this file writes to disk or persists across restarts.
+
 package agents
 
 import (
@@ -254,6 +277,12 @@ func (a *Agent) createPluginInitializationHandler() OnAgentInitializationHook {
 					agentforge.Debug("🔌 [handlePluginInitialization] Injecting working directory %s to plugin", agent.config.WorkingDir)
 					wda.SetWorkingDir(agent.config.WorkingDir)
 				}
+			}
+
+			// Inject inbox queue if the plugin supports it
+			if ia, ok := plugin.(core.InboxAware); ok {
+				agentforge.Debug("🔌 [handlePluginInitialization] Injecting inbox queue to plugin %s", plugin.Name())
+				ia.SetInbox(agent.inbox)
 			}
 
 			// Check if plugin provides hooks

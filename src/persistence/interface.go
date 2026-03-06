@@ -7,3 +7,9 @@ type Persistence interface {
 	SaveHistory(chatId string, history []*llms.UnifiedMessage) string
 	GetHistory(chatId string, limit, offset int) []*llms.UnifiedMessage
 }
+
+// ConversationMetadata interface defines methods for managing conversation metadata (e.g. title)
+type ConversationMetadata interface {
+	GetTitle(chatId string) string
+	SetTitle(chatId string, title string) error
+}

@@ -132,4 +132,6 @@ func (p *TodoPlugin) SystemPrompt() string {
 - [Logger](./logger/README.md) - Configurable output formatting for agent responses
 - [Todo](./todo/README.md) - Task management and todo list functionality for agents
 - [Procedures](./procedures/plugin.go) - Structured multi-phase procedures from `working_dir/procedures/`
-- [Vault](./vault/plugin.go) - Encrypted secret storage in `working_dir/vault/` with `saveSecret`, `listSecrets`, and `resolveSecret` for tools
+- [Vault](./vault/plugin.go) - Encrypted secret storage in `working_dir/vault/` with `saveSecret`, `listSecrets`, `deleteSecret`, and `resolveSecret` for tools
+- [Knowledge](./knowledge/README.md) - Knowledge graph integration
+- [Scheduler](./scheduler/plugin.go) - Task scheduling and inbox integration for autonomous message injection

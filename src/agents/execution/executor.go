@@ -73,6 +73,10 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 		}
 	}()
 
+	// Per-call snapshot: mutable fields (SessionStorage, PluginFields, LastSubagentMessage)
+	// are isolated to this call so concurrent ChatStream invocations cannot bleed state.
+	callCtx := e.agentContext.Snapshot()
+
 	iteration := 0
 	var cleanupFuncs []func()
 
@@ -262,6 +266,16 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 
 		agentforge.Debug("Detected %d tool calls, executing tools", len(toolCalls))
 		for _, toolCall := range toolCalls {
+			// Deep-copy Arguments so hook mutations (e.g. vault secret decryption)
+			// do not corrupt the shared map that the history entry still references.
+			if toolCall.Arguments != nil {
+				argsCopy := make(map[string]any, len(toolCall.Arguments))
+				for k, v := range toolCall.Arguments {
+					argsCopy[k] = v
+				}
+				toolCall.Arguments = argsCopy
+			}
+
 			agentforge.Debug("Executing tool: %s (ID: %s)", toolCall.Name, toolCall.ID)
 			executingChunk := llms.ChunkResponse{
 				Status:        llms.StatusToolExecuting,
@@ -277,15 +291,30 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 				return nil
 			}
 
+			var hookErrs []error
 			if e.hooks != nil && e.hooks.OnBeforeToolExecution != nil {
-				errs := e.hooks.OnBeforeToolExecution(&toolCall)
+				hookErrs = e.hooks.OnBeforeToolExecution(&toolCall)
 				if e.hooks.LogHookErrors != nil {
-					e.hooks.LogHookErrors(errs)
+					e.hooks.LogHookErrors(hookErrs)
 				}
 			}
 
 			toolStart := time.Now()
-			toolResult := e.ExecuteTool(toolCall, responseCh)
+			var toolResult llms.ToolResult
+			if len(hookErrs) > 0 {
+				msgs := make([]string, len(hookErrs))
+				for i, err := range hookErrs {
+					msgs[i] = err.Error()
+				}
+				toolResult = llms.ToolResult{
+					ToolCallID: toolCall.ID,
+					ToolName:   toolCall.Name,
+					Success:    false,
+					Error:      strings.Join(msgs, "; "),
+				}
+			} else {
+				toolResult = e.executeToolWithContext(toolCall, responseCh, callCtx)
+			}
 			if e.config.Tracer != nil {
 				e.config.Tracer.TraceToolExecution(ctx, telemetry.ToolExecutionEvent{
 					AgentName: e.config.AgentName,
@@ -355,16 +384,24 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 	return fmt.Errorf("reached maximum tool iterations (%d)", e.config.MaxToolIterations)
 }
 
-// ExecuteTool finds and executes a tool by name.
+// ExecuteTool finds and executes a tool by name using the shared agentContext.
+// Used by test helpers (agentChat.go); production code uses executeToolWithContext.
 func (e *Executor) ExecuteTool(toolCall llms.ToolCall, responseCh *core.ResponseCh) llms.ToolResult {
+	return e.executeToolWithContext(toolCall, responseCh, e.agentContext)
+}
+
+// executeToolWithContext finds and executes a tool using the provided per-call context.
+// This keeps mutable state mutations isolated to the callCtx snapshot, preventing
+// cross-chat bleed when multiple ChatStream calls run concurrently.
+func (e *Executor) executeToolWithContext(toolCall llms.ToolCall, responseCh *core.ResponseCh, callCtx *core.AgentContext) llms.ToolResult {
 	if e.hooks != nil && e.hooks.OnContextBuild != nil {
-		errs := e.hooks.OnContextBuild(e.agentContext)
+		errs := e.hooks.OnContextBuild(callCtx)
 		if e.hooks.LogHookErrors != nil {
 			e.hooks.LogHookErrors(errs)
 		}
 	}
 
-	agentContext := e.agentContext.BuildContext(responseCh)
+	agentContext := callCtx.BuildContext(responseCh)
 
 	var tool llms.Tool
 	for _, t := range e.tools {
@@ -386,7 +423,7 @@ func (e *Executor) ExecuteTool(toolCall llms.ToolCall, responseCh *core.Response
 
 	result := tool.Call(agentContext, toolCall.Arguments)
 
-	if err := e.agentContext.SyncFromMap(agentContext); err != nil {
+	if err := callCtx.SyncFromMap(agentContext); err != nil {
 		agentforge.Debug("Warning: failed to sync context after tool execution: %v", err)
 	}
 

@@ -1,5 +1,31 @@
 package builder
 
+// ─── Application Configuration Layer ─────────────────────────────────────────
+//
+// This package owns the middle configuration layer: the agent's identity,
+// behaviour, and capability set as declared in config.yaml.
+//
+// Responsibility split:
+//
+//	builder.Config        — direct YAML→Go mapping; source of truth on disk
+//	builder.AgentBuilder  — validates the config, resolves model strings into
+//	                        LLMEngine instances, instantiates tools and plugins,
+//	                        then produces an agents.AgentConfig ready for
+//	                        agents.NewAgent().
+//
+// What belongs here (application concerns):
+//   - Agent name, system prompt, model selection, working directory, persistence
+//   - Tool list with per-tool settings (mode, DB URL, allowed tables…)
+//   - Sub-agent role→model assignments
+//   - Plugin list by name (resolved via registry at build time)
+//   - Vector-storage config (optional)
+//
+// What does NOT belong here (agent-layer concerns):
+//   - Plugin hook wiring, tool injection, system-prompt fragments from plugins
+//     (all done inside agents.agentInit.go at EventAgentInitialization)
+//   - Executor configuration (max iterations, tracer)
+//   - Context window strategy, truncation, history management
+
 import (
 	"fmt"
 	"os"

@@ -13,6 +13,8 @@ Create directory: `src/tools/{toolname}/`
 package mytool
 
 import (
+    "fmt"
+
     "github.com/thinktwiceco/agent-forge/src/core"
     "github.com/thinktwiceco/agent-forge/src/llms"
 )
@@ -22,6 +24,11 @@ func NewMyTool(config string) llms.Tool {
         Name:        "my_tool",
         Description: "Brief description",
         AdvanceDesc: `Detailed instructions and examples`,
+        TroubleshootingInfo: `Common issues and solutions`,
+        // Optional: called by the expand tool to get per-item details
+        DetailsAboutFunc: func(item string) string {
+            return fmt.Sprintf("Details about %s: ...", item)
+        },
         Parameters: []core.Parameter{
             {
                 Name:        "operation",
@@ -72,3 +79,18 @@ core.NewErrorResponse("error")            // Error
 core.NewFailureResponse(err, partial)     // Error with partial data
 core.NewEphemeralResponse(result)         // Success, don't store in history
 ```
+
+## Hooks (Optional)
+
+Implement `core.Hooks` to add path or command sandboxing:
+
+```go
+type core.Hooks interface {
+    IsSafePath(path string) bool
+    IsSafeCommand(cmd string) bool
+}
+
+tool.(*core.Tool).SetHooks(myHooks)
+```
+
+See [TOOLS.md](../TOOLS.md#hooks) for details.

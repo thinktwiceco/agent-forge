@@ -1,0 +1,2 @@
+name: Gmail Login
+description: A procedure to guide the agent through logging into Gmail using web browser tools. Includes navigation, element identification, form filling using vault credentials, and authentication steps with specific selectors that have been tested.

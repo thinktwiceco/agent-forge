@@ -141,6 +141,15 @@ func (s *Server) setupRoutes() {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 	})
 
+	s.engine.GET("/settings", func(c *gin.Context) {
+		data, err := fs.ReadFile(staticFS, "settings.html")
+		if err != nil {
+			c.String(http.StatusNotFound, "settings.html not found")
+			return
+		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+	})
+
 	api := s.engine.Group("/api")
 	api.POST("/chat", s.handleChat)
 	api.POST("/chat/stop", s.handleStopChat)
@@ -149,8 +158,14 @@ func (s *Server) setupRoutes() {
 	api.GET("/conversations", s.handleListConversations)
 	api.GET("/conversations/:id", s.handleGetConversation)
 	api.DELETE("/conversations/:id", s.handleDeleteConversation)
+	api.PUT("/conversations/:id/title", s.handleRenameConversation)
 	api.GET("/config", s.handleGetConfig)
+	api.PUT("/config", s.handleUpdateAgentConfig)
 	api.PUT("/config/tools/:toolName", s.handleUpdateToolConfig)
+	api.PUT("/config/plugins", s.handleUpdatePlugins)
+	api.PUT("/config/subagents", s.handleUpdateSubagents)
+	api.GET("/config/providers", s.handleGetProviders)
+	api.PUT("/config/providers", s.handleUpdateProviders)
 	api.POST("/agent/reload", s.handleReload)
 	api.GET("/todos", s.handleGetTodos)
 

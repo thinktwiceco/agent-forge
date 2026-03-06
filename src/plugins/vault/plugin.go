@@ -68,6 +68,7 @@ func (p *VaultPlugin) Tools() []llms.Tool {
 	return []llms.Tool{
 		newSaveSecretTool(p),
 		newListSecretsTool(p),
+		newDeleteSecretTool(p),
 	}
 }
 
@@ -75,14 +76,31 @@ func (p *VaultPlugin) Tools() []llms.Tool {
 func (p *VaultPlugin) SystemPrompt() string {
 	return `
 [VAULT]
-- Encrypted secret storage (API keys, passwords)
-- saveSecret(key, value): Store secret. key = identifier (e.g. "openai-api-key"), value = plaintext
-- listSecrets(): List stored key identifiers (never values)
+- Encrypted secret storage for sensitive values (passwords, API keys, tokens).
+- saveSecret(key, value): Encrypt and persist a secret. key = short identifier, value = plaintext secret.
+- listSecrets(): List stored key identifiers only — never the values.
+- deleteSecret(key): Permanently remove a secret from the vault.
 
-[RESOLVE SECRETS IN TOOLS]
-- Tool params starting with resolveSecret* (e.g. resolveSecretApiKey, resolveSecretPassword)
-- Steps: 1) Call listSecrets() 2) Pass vault key as arg value. Example: resolveSecretApiKey: "openai-api-key"
-- Runtime auto-decrypts before tool execution. Never see or handle plaintext.
+[USING SECRETS IN TOOLS — fill_secret]
+To type a secret into a web form without exposing the plaintext:
+  1. Call listSecrets() to find the vault key name (e.g. "github-password").
+  2. Use action "fill_secret" with the vault key as resolveSecretValue — NOT the actual secret.
+     Example:
+       action: "fill_secret"
+       selector: "#password"
+       resolveSecretValue: "github-password"
+  3. The runtime decrypts it automatically before the tool runs. You never handle the plaintext.
+
+IMPORTANT:
+- resolveSecretVaultKey must be a vault KEY NAME (from listSecrets), NOT the actual password/token.
+- Never put plaintext secrets into any tool argument. Use fill_secret instead of fill for passwords.
+- Any tool argument whose name starts with "resolveSecret" is auto-decrypted the same way.
+
+COMMON MISTAKE — do not do this:
+  WRONG: resolveSecretVaultKey: "user@example.com"   ← plaintext email, not a vault key
+  WRONG: resolveSecretVaultKey: "mysecretpassword"   ← plaintext password, not a vault key
+  RIGHT: resolveSecretVaultKey: "gmail-username"     ← key name returned by listSecrets()
+  RIGHT: resolveSecretVaultKey: "gmail-password"     ← key name returned by listSecrets()
 `
 }
 
@@ -151,7 +169,7 @@ func (p *VaultPlugin) onBeforeToolExecution(a *agents.Agent, toolCall *llms.Tool
 
 		decrypted, err := p.resolveSecret(vaultKey)
 		if err != nil {
-			return fmt.Errorf("vault: failed to resolve secret for argument '%s': %w", k, err)
+			return fmt.Errorf("vault: key '%s' not found for argument '%s'. Available keys: %v. Pass a key name from listSecrets(), not the actual secret value", vaultKey, k, p.listSecretKeys())
 		}
 
 		toolCall.Arguments[k] = decrypted
@@ -204,6 +222,23 @@ func init() {
 	registry.Register(PLUGIN_NAME, func(workingDir string) core.Plugin {
 		return NewVaultPlugin(workingDir)
 	})
+}
+
+// deleteSecret removes a secret from the in-memory cache and from disk.
+func (p *VaultPlugin) deleteSecret(key string) error {
+	p.mu.Lock()
+	if _, exists := p.secrets[key]; !exists {
+		p.mu.Unlock()
+		return fmt.Errorf("vault: secret '%s' not found", key)
+	}
+	delete(p.secrets, key)
+	secretsCopy := make(map[string]string, len(p.secrets))
+	for k, v := range p.secrets {
+		secretsCopy[k] = v
+	}
+	p.mu.Unlock()
+
+	return saveSecrets(p.dir, secretsCopy)
 }
 
 // listSecretKeys returns all stored secret key identifiers.

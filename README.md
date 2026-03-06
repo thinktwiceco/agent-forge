@@ -419,8 +419,9 @@ Navigate to `http://localhost:8080` after starting the server.
 Features:
 - Real-time chat with streaming responses
 - Conversation history and management
+- Settings page (`/settings`) - Agent config, providers, tools
+- Knowledge page (`/knowledge`) - Knowledge graph visualization
 - File uploads
-- Knowledge graph integration
 - Todo list management
 
 #### API Endpoints
@@ -428,26 +429,44 @@ Features:
 **Chat:**
 ```bash
 # Start new conversation
-POST /api/server/{agentName}/chat
+POST /api/chat
 {"message": "Hello!"}
 
 # Resume conversation
-POST /api/server/{agentName}/chat?conversationId={uuid}
+POST /api/chat?conversationId={uuid}
 {"message": "Continue..."}
+
+POST /api/chat/stop     # Stop in-progress chat
+GET  /api/chat/push    # SSE push for real-time updates
 ```
 
 **Conversations:**
 ```bash
-GET /api/server/{agentName}/conversations
-GET /api/server/{agentName}/conversations/{conversationId}
-DELETE /api/server/{agentName}/conversations/{conversationId}
+GET    /api/conversations           # List conversations
+GET    /api/conversations/:id       # Get conversation
+DELETE /api/conversations/:id       # Delete conversation
+PUT    /api/conversations/:id/title # Rename conversation
 ```
 
-**Additional:**
-- `GET /api/server/config` - Get agent configuration
-- `GET /api/server/todos` - Get todos
-- `POST /api/server/upload` - Upload files
-- `GET /api/server/knowledge/*` - Knowledge graph endpoints
+**Configuration:**
+```bash
+GET /api/config              # Get agent configuration
+PUT /api/config              # Update agent config
+PUT /api/config/tools/:name  # Update tool config
+PUT /api/config/plugins      # Update plugins list
+PUT /api/config/subagents    # Update subagents
+GET /api/config/providers    # Get push providers (Instagram, Telegram)
+PUT /api/config/providers    # Update provider settings
+POST /api/agent/reload       # Reload agent from config
+```
+
+**Other:**
+- `GET /api/todos` - Get todos
+- `POST /api/upload` - Upload files
+- `GET /api/fs/list`, `GET /api/fs/read` - FS visualization
+- `GET /api/knowledge/graph`, `GET /api/knowledge/stats`, `GET /api/knowledge/node/:id` - Knowledge graph
+- `POST /api/webhooks/:provider` - Webhook receiver (Instagram, Telegram)
+- `POST /api/webhooks/:provider/sync` - Webhook sync
 
 #### Directory Structure
 

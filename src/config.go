@@ -8,6 +8,25 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// ─── Environment / Secrets Layer ─────────────────────────────────────────────
+//
+// This file owns the lowest configuration layer: infrastructure secrets and
+// operational flags sourced exclusively from the process environment (.env file
+// or real env vars). It is intentionally kept separate from agent behaviour
+// config (builder.Config / config.yaml) and is NEVER written by the UI.
+//
+// Layer overview:
+//
+//	Environment (.env)   ← this file
+//	   │
+//	Application (config.yaml / builder.Config)
+//	   │
+//	Runtime (agents.AgentConfig / agents.Agent)
+//
+// The UI Settings page exposes the application layer (config.yaml) and can
+// read/update provider keys, but all writes go through the .env file path;
+// the agent must be reloaded for new API keys to take effect.
+
 // Config holds the application configuration loaded from environment variables.
 //
 // Configuration values are loaded from:
