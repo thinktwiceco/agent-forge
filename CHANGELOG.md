@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-06
+- [cbd921b](http://github.com/thinktwiceco/agent-forge/commit/cbd921b794bf650982ae71e8961829d364595829) - chore(release): prepare release v0.5.0 (#40)
+- [cb84608](http://github.com/thinktwiceco/agent-forge/commit/cb8460864f5d8504266462f87f0c5270b398835d) - chore: update changelog for v0.4.9 [skip ci] (#33)
+- [4d47752](http://github.com/thinktwiceco/agent-forge/commit/4d47752c9f30486ae90c5f871b2040c250433b00) - chore: update changelog for v0.4.11 [skip ci] (#37)
+- [757df27](http://github.com/thinktwiceco/agent-forge/commit/757df2741fb0d1b88b4149bbd8caab969ec9e0cc) - chore: update changelog for v0.4.14 [skip ci] (#39)
+
+
+## [Unreleased]
 ## [0.4.14] - 2026-03-04
 - [94495fe](http://github.com/thinktwiceco/agent-forge/commit/94495feb91cd2f90dc093b930e096ef7822c60f6) - chore(release): prepare release v0.4.14 (#38)
 - [ac67d85](http://github.com/thinktwiceco/agent-forge/commit/ac67d85724e2a6bbf59a4f8ea6eabf6fe9b592dd) - feat(plugins): add retention hook, bracket prompts, install templates, interactive_tree
