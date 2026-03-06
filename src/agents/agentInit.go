@@ -148,6 +148,7 @@ func (a *Agent) initAgentContext() {
 		TruncationStrategy: a.config.TruncationStrategy,
 		MaxContextTokens:   a.maxContextTokens,
 		ReservedTokens:     a.reservedOutputTokens,
+		WorkingDir:         a.config.WorkingDir,
 	})
 	a.agentContext = a.contextMgr.Context()
 	a.executor.UpdateAgentContext(a.agentContext)
@@ -246,6 +247,14 @@ func (a *Agent) createPluginInitializationHandler() OnAgentInitializationHook {
 		// Register all the plugins using interface segregation
 		for i, plugin := range agent.config.Plugins {
 			agentforge.Debug("🔌 [handlePluginInitialization] Processing plugin %d: %s", i+1, plugin.Name())
+
+			// Inject working directory if the plugin supports it
+			if wda, ok := plugin.(core.WorkingDirAware); ok {
+				if agent.config.WorkingDir != "" {
+					agentforge.Debug("🔌 [handlePluginInitialization] Injecting working directory %s to plugin", agent.config.WorkingDir)
+					wda.SetWorkingDir(agent.config.WorkingDir)
+				}
+			}
 
 			// Check if plugin provides hooks
 			if hp, ok := plugin.(core.HookProvider); ok {

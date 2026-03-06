@@ -27,7 +27,6 @@ agent:
       allowedSchemas: ["public"]
   subagents:
     reasoning: "deepseek::deepseek-chat"
-    vector: "deepseek::deepseek-chat"
   plugins:
     - "logger"
     - "todo"
@@ -183,7 +182,6 @@ Subagents are specialized agents that can be delegated tasks by the main agent.
 | OS Agent | `os` | Handles OS-level operations and file system tasks | Model specification and `working_dir` required |
 | Git Agent | `git` | Specialized Git repository management | Model specification and `working_dir` required |
 | Web Agent | `web` | Web automation and browser operations | Model specification and `working_dir` required |
-| Vector DB Agent | `vector` | Semantic search and document management | Model specification and `vector-storage` section required |
 
 ### Subagents Details
 
@@ -191,7 +189,6 @@ Subagents are specialized agents that can be delegated tasks by the main agent.
 - **OS Agent**: Handles file system operations and OS-related tasks within a restricted directory. All paths are validated for security.
 - **Git Agent**: Provides specialized Git repository operations including branch management, commit history, and version control workflows.
 - **Web Agent**: Manages browser sessions for web navigation, form interaction, content extraction, and JavaScript execution.
-- **Vector DB Agent**: Provides semantic search capabilities, document indexing, and knowledge base queries. Requires vector storage configuration.
 
 ## Plugins Configuration
 
@@ -218,7 +215,7 @@ The optional `vector-storage` section configures vector database and embedding g
 | `sqlite` | map | No | SQLite-specific configuration | See [SQLite Configuration](#sqlite-configuration) |
 | `milvus` | map | No | Milvus-specific configuration | See [Milvus Configuration](#milvus-configuration) |
 
-*Required if vector tools or subagents are used.
+*Required if vector tool is used.
 
 ### SQLite Configuration
 
@@ -321,8 +318,6 @@ agent:
   working_dir: "/path/to/docs"
   tools:
     - "vector"
-  subagents:
-    vector: "deepseek::deepseek-chat"
 
 vector-storage:
   vector_db: "sqlite"
@@ -446,7 +441,6 @@ agent:
     os: "deepseek::deepseek-chat"
     git: "deepseek::deepseek-chat"
     web: "deepseek::deepseek-chat"
-    vector: "deepseek::deepseek-chat"
   plugins:
     - "logger"
     - "todo"

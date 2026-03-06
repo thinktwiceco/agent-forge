@@ -62,7 +62,6 @@ src/
 │       ├── saGitAgent.go        # Git agent template
 │       ├── saOsAgent.go        # OS agent template
 │       ├── saReasoning.go      # Reasoning agent template
-│       ├── saVector.go         # Vector agent template
 │       └── saWebAgent.go       # Web agent template
 │
 ├── core/                        # Core abstractions
@@ -97,7 +96,7 @@ src/
 
 System agent implementations have been moved to `src/agents/system/`:
 
-- **Templates**: Each system agent (`saCodingAgent.go`, `saGitAgent.go`, `saOsAgent.go`, `saReasoning.go`, `saVector.go`, `saWebAgent.go`) provides a template creation function (e.g., `CreateCodingAgentTemplate()`)
+- **Templates**: Each system agent (`saCodingAgent.go`, `saGitAgent.go`, `saOsAgent.go`, `saReasoning.go`, `saWebAgent.go`) provides a template creation function (e.g., `CreateCodingAgentTemplate()`)
 - **Constants**: Agent names, traces, and tones are defined in `system/constants.go`
 - **Constructors**: Actual agent constructors (e.g., `CodingAgent()`, `GitAgent()`) remain in the agents package in `systemAgentConstructors.go`
 

@@ -1,9 +1,37 @@
 ## [Unreleased]
 
-## [0.4.9] - 2026-02-27
+## [0.4.14] - 2026-03-04
+- [94495fe](http://github.com/thinktwiceco/agent-forge/commit/94495feb91cd2f90dc093b930e096ef7822c60f6) - chore(release): prepare release v0.4.14 (#38)
+- [ac67d85](http://github.com/thinktwiceco/agent-forge/commit/ac67d85724e2a6bbf59a4f8ea6eabf6fe9b592dd) - feat(plugins): add retention hook, bracket prompts, install templates, interactive_tree
+- [e80d169](http://github.com/thinktwiceco/agent-forge/commit/e80d1697f39f7d9c8270247af3a7cb9e86a8467d) - chore(release): prepare release v0.4.14 with robust sqlite metadata filtering
+- [a080412](http://github.com/thinktwiceco/agent-forge/commit/a08041230b1318fde3636adcf8b2876c5eb868b9) - chore(release): prepare release v0.4.13
+- [7dd4c98](http://github.com/thinktwiceco/agent-forge/commit/7dd4c9843a539e83c95afa6c44cb4c55d69fe5d0) - fix(knowledge): solve 'malformed JSON' regression in traversal tools
+- [f47781f](http://github.com/thinktwiceco/agent-forge/commit/f47781fd7865b08a8fb9c2f3060300851ed8130c) - chore(release): prepare release v0.4.12
+- [b16d922](http://github.com/thinktwiceco/agent-forge/commit/b16d9226cfdcd60f25024a06561b93c8b9a2820b) - fix(knowledge): solve explore_fact() title and ID retrieval issue
 
 
-## [Unreleased]
+## [0.4.14] - 2026-03-01
+- fix(integrations): robust metadata filtering in SQLite vector DB
+- chore(release): prepare release v0.4.14
+
+## [0.4.13] - 2026-03-01
+- fix(knowledge): fix "malformed JSON" error in traversal tools by adding json_valid check
+- refactor(knowledge): store NULL instead of empty strings for node metadata
+
+## [0.4.12] - 2026-03-01
+- fix(knowledge): fix explore_fact returning empty results for titles/IDs
+
+## [0.4.11] - 2026-03-01
+- [0782cee](http://github.com/thinktwiceco/agent-forge/commit/0782cee14936589a8795005fd04cf7c03b5042ab) - Merge branch 'release/v0.4.11' into main
+- [d0c8b7c](http://github.com/thinktwiceco/agent-forge/commit/d0c8b7ce6439507f3f8dce7ee557fea7f0a8e2d5) - chore(release): prepare release v0.4.11 (#36)
+- [f3f4d02](http://github.com/thinktwiceco/agent-forge/commit/f3f4d023426aa02f1856b2ab4c1062f94548bb57) - fix: update layout and refine knowledge plugin
+- [9925fbc](http://github.com/thinktwiceco/agent-forge/commit/9925fbc343a166a82467667596bfc88c0e13f99a) - chore(release): prepare release v0.4.11
+- [4cf9e73](http://github.com/thinktwiceco/agent-forge/commit/4cf9e73c3c78f0e9faf5c6e9cd05e4ea1651cdcc) - docs: update model providers and replace vector with vision subagent
+- [ecf33f9](http://github.com/thinktwiceco/agent-forge/commit/ecf33f93e009fe55500aced97b56ed321b9e0f5b) - chore: update changelog for v0.4.10 [skip ci] (#35)
+
+## [0.4.10] - 2026-02-28
+- [f8c6661](http://github.com/thinktwiceco/agent-forge/commit/f8c6661acafa852628358efe39d16c5fbb2ce811) - feat(plugins): add knowledge plugin with graph and semantic search (#34)
+
 ## [0.4.8] - 2026-02-27
 - [cd3615f](http://github.com/thinktwiceco/agent-forge/commit/cd3615fb0c196bb44aeb2edf88c324dc0d16e0de) - chore(release): prepare release v0.4.8 (#30)
 - [7249fc6](http://github.com/thinktwiceco/agent-forge/commit/7249fc6800bdd52c3158abe9275b7e42e4296027) - fix: replace WriteString+Sprintf with Fprintf for staticcheck QF1012
@@ -17,6 +45,7 @@
 - [67df18f](http://github.com/thinktwiceco/agent-forge/commit/67df18f2263d20e85d1762195bf7fce350204162) - chore: add commit history to v0.4.6 changelog
 
 ## [0.4.6] - 2026-02-18
+
 ### Fixed
 - fix: stop gitignoring go.work (module workspace)
 - [0fb186c](http://github.com/thinktwiceco/agent-forge/commit/0fb186cc949bbecd8d918391f17e97dbc24c2870) - fix(agents): use %w for error wrapping in executor (#25)

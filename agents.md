@@ -8,6 +8,7 @@ R5|machine-first|thinking,language,always
 R6|update refs|on change,touches agents.md
 R7|propose refactor|module too big|>400 LOC per file
 R8|maintain patterns|existing,always
+R9|no XML tags|system prompts,tool descriptions|use [brackets] not <tags>
 
 docs/agents
 

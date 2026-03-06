@@ -1,0 +1,21 @@
+# Minimal agent configuration - customize as needed
+agent:
+  name: "$AGENT_NAME"
+  system_prompt: |
+    You are a helpful assistant. Customize this prompt for your use case.
+  model: "togetherai::MiniMaxAI/MiniMax-M2.5"
+  working_dir: "${AGENT_WORKING_DIR}"
+  persistence: "json"
+  tools:
+    - name: fs
+    - name: git
+    - name: postgres
+  subagents:
+    reasoning: "deepseek::deepseek-chat"
+    web: "togetherai::MiniMaxAI/MiniMax-M2.5"
+  plugins:
+    - "todo"
+    - "knowledge"
+    - "procedures"
+    - "vault"
+

@@ -60,8 +60,8 @@ func NewWebTool(dir string) llms.Tool {
 		case "get_content":
 			return `get_content: Pull content from the current page (or navigate first) and return it directly.
 - Optional: url (string) — if provided, navigates to this URL before pulling content
-- Optional: type (string) — "html", "text", or "title" (default: "text")
-- Optional: strip (boolean, default true) — strip noise elements; set false to keep nav/buttons visible
+- Optional: type (string) — "html", "text", "title", or "interactive_tree" (default: "text"). "interactive_tree" returns a condensed list of interactive elements like inputs and buttons.
+- Optional: strip (boolean, default true) — strip noise elements; set false to keep nav/buttons visible (only applies to text/html)
 - Optional: timeout (number, default 60) — timeout in seconds
 - Optional: settle_ms (number, default 500) — ms to wait after readyState complete; increase for JS-heavy SPAs
 - Optional: session (string) — browser session name`

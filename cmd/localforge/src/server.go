@@ -2,13 +2,16 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"embed"
 	"io/fs"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/thinktwiceco/agent-forge/cmd/localforge/src/providers"
 )
 
@@ -24,6 +27,7 @@ type Server struct {
 	convRegistry     *ConversationRegistry
 	pushRegistry     *PushRegistry
 	providerRegistry *ProviderRegistry
+	knowledgeDB      *sql.DB // opened once at startup; nil if DB not yet available
 	devMode          bool
 	appDir           string
 }
@@ -56,8 +60,37 @@ func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoMa
 		devMode:          devMode,
 		appDir:           appDir,
 	}
+
+	// Open the knowledge DB once so all handlers share a connection pool.
+	// If the DB file doesn't exist yet we leave knowledgeDB nil and handlers
+	// that need it will return an appropriate error.
+	if db, err := openKnowledgeDB(configMgr); err != nil {
+		log.Printf("knowledge DB not available at startup (will retry per-request): %v", err)
+	} else {
+		server.knowledgeDB = db
+	}
+
 	server.setupRoutes()
 	return server
+}
+
+// openKnowledgeDB opens the SQLite knowledge database using settings from the config.
+func openKnowledgeDB(configMgr *ConfigManager) (*sql.DB, error) {
+	cfg := configMgr.GetConfig()
+	workingDir := cfg.Agent.WorkingDir
+	if workingDir == "" {
+		workingDir = "."
+	}
+	dbPath := filepath.Join(workingDir, "knowledge", "knowledge.db")
+	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=1")
+	if err != nil {
+		return nil, err
+	}
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return db, nil
 }
 
 func (s *Server) staticFileSystem() (fs.FS, error) {
@@ -99,6 +132,15 @@ func (s *Server) setupRoutes() {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 	})
 
+	s.engine.GET("/knowledge", func(c *gin.Context) {
+		data, err := fs.ReadFile(staticFS, "knowledge.html")
+		if err != nil {
+			c.String(http.StatusNotFound, "knowledge.html not found")
+			return
+		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+	})
+
 	api := s.engine.Group("/api")
 	api.POST("/chat", s.handleChat)
 	api.POST("/chat/stop", s.handleStopChat)
@@ -111,6 +153,15 @@ func (s *Server) setupRoutes() {
 	api.PUT("/config/tools/:toolName", s.handleUpdateToolConfig)
 	api.POST("/agent/reload", s.handleReload)
 	api.GET("/todos", s.handleGetTodos)
+
+	// FS visualization endpoints
+	api.GET("/fs/list", s.handleFSList)
+	api.GET("/fs/read", s.handleFSRead)
+
+	// Knowledge graph endpoints
+	api.GET("/knowledge/graph", s.handleGetKnowledgeGraph)
+	api.GET("/knowledge/stats", s.handleGetKnowledgeStats)
+	api.GET("/knowledge/node/:id", s.handleGetKnowledgeNode)
 
 	// Webhook endpoints
 	api.POST("/webhooks/:provider", s.handleWebhook)
@@ -129,6 +180,9 @@ func (s *Server) Run(port string) error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
+	if s.knowledgeDB != nil {
+		_ = s.knowledgeDB.Close()
+	}
 	if s.httpSrv == nil {
 		return nil
 	}
