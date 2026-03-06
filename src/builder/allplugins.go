@@ -7,6 +7,7 @@ import (
 	_ "github.com/thinktwiceco/agent-forge/src/plugins/knowledge"
 	_ "github.com/thinktwiceco/agent-forge/src/plugins/logger"
 	_ "github.com/thinktwiceco/agent-forge/src/plugins/procedures"
+	_ "github.com/thinktwiceco/agent-forge/src/plugins/scheduler"
 	_ "github.com/thinktwiceco/agent-forge/src/plugins/todo"
 	_ "github.com/thinktwiceco/agent-forge/src/plugins/vault"
 )

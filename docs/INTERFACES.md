@@ -21,7 +21,7 @@ type HistoryManager interface {
     AddUserMessage(msg string)
     AddSystemMessage(msg string)
     AddAssistantMessage(msg string, tokens TokenUsage)
-    AddAssistantMessageWithToolCalls(content string, toolCalls []llms.ToolCall, tokens TokenUsage)
+    AddAssistantMessageWithToolCalls(content string, reasoningContent string, toolCalls []llms.ToolCall, tokens TokenUsage)
     AddToolMessage(toolCallID, result string, ephemeral bool)
     Messages() []*llms.UnifiedMessage
     SetMessages(messages []*llms.UnifiedMessage)

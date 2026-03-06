@@ -52,9 +52,11 @@ func NewWebTool(dir string) llms.Tool {
 - Optional: wait_visible (boolean, default true) — wait for element to be visible before filling
 - Optional: session (string) — browser session name`
 		case "fill_secret":
-			return `fill_secret: Same as fill but the value is resolved from the vault plugin.
+			return `fill_secret: Type a vault secret into a form input. NOT the same as fill — do NOT put the actual password here.
 - Required: selector (string) — CSS selector for the input element
-- Required: resolveSecretValue (string) — vault key whose decrypted value will be typed
+- Required: resolveSecretVaultKey (string) — the vault KEY NAME from listSecrets(), NOT the actual secret value
+  WRONG: resolveSecretVaultKey: "user@example.com"   ← plaintext, will fail
+  RIGHT: resolveSecretVaultKey: "gmail-username"      ← key name from listSecrets()
 - Optional: wait_visible (boolean, default true)
 - Optional: session (string) — browser session name`
 		case "get_content":
@@ -157,7 +159,7 @@ func NewWebTool(dir string) llms.Tool {
 			{
 				Name:        "selector",
 				Type:        "string",
-				Description: "CSS selector for the element (required for 'click' action)",
+				Description: "CSS selector for the element (required for 'click', 'fill', 'fill_secret', and 'upload_file' actions)",
 				Required:    false,
 			},
 			{
@@ -173,9 +175,9 @@ func NewWebTool(dir string) llms.Tool {
 				Required:    false,
 			},
 			{
-				Name:        "resolveSecretValue",
+				Name:        "resolveSecretVaultKey",
 				Type:        "string",
-				Description: "Vault key whose decrypted value will be typed into the element (required for 'fill_secret' action). Resolved automatically by the vault plugin.",
+				Description: "Vault KEY NAME to look up and decrypt (required for 'fill_secret' action). Must be a key from listSecrets() — e.g. \"gmail-password\". NOT the actual password or plaintext value.",
 				Required:    false,
 			},
 			{

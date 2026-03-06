@@ -1,3 +1,22 @@
+// ─── Plugin Capability Interfaces ────────────────────────────────────────────
+//
+// Plugins are opt-in capability bundles. The agent layer discovers what a
+// plugin can contribute via interface assertion during EventAgentInitialization
+// (see agents/agentInit.go: createPluginInitializationHandler).
+//
+// Interface segregation keeps the agent decoupled from any specific plugin:
+//
+//	Plugin          — base: every plugin must have a name
+//	HookProvider    — opt-in: receive agent lifecycle events
+//	ToolProvider    — opt-in: expose additional tools to the LLM
+//	PromptProvider  — opt-in: append instructions to the system prompt
+//	WorkingDirAware — opt-in: receive the agent's working directory on init
+//	InboxAware      — opt-in: receive the agent's inbox queue so the plugin
+//	                  can inject autonomous messages (e.g. scheduler, webhooks)
+//
+// Adding a new capability = add a new interface here + assert it in
+// createPluginInitializationHandler. No other agent code needs to change.
+
 package core
 
 import (
@@ -5,6 +24,7 @@ import (
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/queue"
 )
 
 // Identifier provides minimal identification for an agent or component.
@@ -77,6 +97,13 @@ type PromptProvider interface {
 // that need to know the agent's working directory.
 type WorkingDirAware interface {
 	SetWorkingDir(dir string)
+}
+
+// InboxAware is an optional interface for plugins that need a reference
+// to the agent's inbox queue so they can inject messages autonomously
+// (e.g. scheduled tasks, webhooks).
+type InboxAware interface {
+	SetInbox(q *queue.Queue)
 }
 
 // LegacyPlugin wraps old-style plugins for backward compatibility.

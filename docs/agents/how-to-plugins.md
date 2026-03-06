@@ -122,9 +122,11 @@ This applies to:
 
 ## Available Events
 
-See [src/core/interfaces.go](../../src/core/interfaces.go) for all events:
+See [src/plugins/README.md](../../src/plugins/README.md#lifecycle-events) for the full event list. Key events:
 - `EventAgentInitialization`, `EventAgentInitialized`
 - `EventToolExecution`, `EventBeforeToolExecution`
 - `EventNewUserMessage`, `EventNewAssistantMessage`
 - `EventNewChunk`, `EventContextBuild`
-- `EventAddedSystemAgent`, `EventAddedTools`
+- `EventAddSystemAgent`, `EventAddedSystemAgent`
+- `EventNewAssistantMessageWithToolCalls`
+- `EventAddedTools`

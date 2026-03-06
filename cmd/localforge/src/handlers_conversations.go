@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -38,6 +39,8 @@ func (s *Server) handleListConversations(c *gin.Context) {
 		return
 	}
 
+	meta := persistence.NewJSONConversationMetadata(baseDir)
+
 	type item struct {
 		summary ConversationSummary
 		modTime time.Time
@@ -55,10 +58,11 @@ func (s *Server) handleListConversations(c *gin.Context) {
 		if err != nil {
 			continue
 		}
-		id := entry.Name()[:len(entry.Name())-len(".json")]
+		id := strings.TrimSuffix(entry.Name(), ".json")
 		items = append(items, item{
 			summary: ConversationSummary{
 				ID:        id,
+				Title:     meta.GetTitle(id),
 				UpdatedAt: info.ModTime().UTC().Format(time.RFC3339),
 			},
 			modTime: info.ModTime(),
@@ -117,6 +121,44 @@ func (s *Server) handleDeleteConversation(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete conversation"})
+		return
+	}
+
+	// Clean up title sidecar; ignore missing-file errors
+	_ = persistence.NewJSONConversationMetadata(baseDir).DeleteTitle(chatID)
+
+	c.Status(http.StatusNoContent)
+}
+
+func (s *Server) handleRenameConversation(c *gin.Context) {
+	chatID := c.Param("id")
+	if chatID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation id is required"})
+		return
+	}
+
+	cfg := s.configMgr.GetConfig()
+	if cfg.Agent.Persistence != "json" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "persistence is disabled"})
+		return
+	}
+
+	var req RenameChatRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Title) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "title is required"})
+		return
+	}
+
+	baseDir := s.conversationsBaseDir()
+
+	// Verify the conversation exists before setting a title
+	if _, err := os.Stat(filepath.Join(baseDir, chatID+".json")); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return
+	}
+
+	if err := persistence.NewJSONConversationMetadata(baseDir).SetTitle(chatID, req.Title); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save title"})
 		return
 	}
 

@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settings</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <style>
+    /* ─── Settings layout ─────────────────────────────────────────────────── */
+    .settings-app {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .settings-nav {
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .settings-nav-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .settings-nav-header a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 12px;
+    }
+
+    .settings-nav-header a:hover {
+      color: var(--text-primary);
+    }
+
+    .settings-nav-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .settings-nav-item {
+      display: block;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background var(--transition), color var(--transition);
+      cursor: pointer;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+
+    .settings-nav-item:hover {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .settings-nav-item.active {
+      background: var(--bg-surface);
+      color: var(--accent);
+      border-left: 2px solid var(--accent);
+      padding-left: 8px;
+    }
+
+    .settings-content {
+      overflow-y: auto;
+      padding: 32px 40px;
+      background: var(--bg-app);
+    }
+
+    /* ─── Section cards ───────────────────────────────────────────────────── */
+    .settings-section {
+      display: none;
+      max-width: 720px;
+    }
+
+    .settings-section.active {
+      display: block;
+    }
+
+    .settings-section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0 0 4px 0;
+    }
+
+    .settings-section-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin: 0 0 24px 0;
+    }
+
+    .settings-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .settings-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0 0 16px 0;
+    }
+
+    /* ─── Fields ──────────────────────────────────────────────────────────── */
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-family: inherit;
+      padding: 8px 10px;
+      box-sizing: border-box;
+      transition: border-color var(--transition);
+    }
+
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      outline: none;
+      border-color: var(--border-active);
+    }
+
+    .field textarea {
+      resize: vertical;
+      min-height: 100px;
+      line-height: 1.5;
+    }
+
+    .field textarea.tall {
+      min-height: 180px;
+    }
+
+    .field-hint {
+      font-size: 11px;
+      color: var(--text-faint);
+      margin-top: 4px;
+    }
+
+    /* ─── Password / token field ──────────────────────────────────────────── */
+    .token-field {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .token-field input {
+      flex: 1;
+      font-family: monospace;
+      letter-spacing: 0.05em;
+    }
+
+    .token-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .token-badge.set {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+    }
+
+    .token-badge.unset {
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--error);
+    }
+
+    /* ─── Subagents table ─────────────────────────────────────────────────── */
+    .subagent-row {
+      display: grid;
+      grid-template-columns: 1fr 2fr auto;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .subagent-row input {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-family: inherit;
+      padding: 7px 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .subagent-row input:focus {
+      outline: none;
+      border-color: var(--border-active);
+    }
+
+    /* ─── Plugin checkboxes ───────────────────────────────────────────────── */
+    .plugin-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 8px;
+    }
+
+    .plugin-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: border-color var(--transition);
+    }
+
+    .plugin-item:hover {
+      border-color: var(--border-hover);
+    }
+
+    .plugin-item.checked {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.07);
+    }
+
+    .plugin-item input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .plugin-item span {
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+
+    /* ─── Section footer ──────────────────────────────────────────────────── */
+    .section-footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .save-status {
+      font-size: 12px;
+      color: var(--text-muted);
+      transition: color var(--transition);
+    }
+
+    .save-status.ok {
+      color: var(--success);
+    }
+
+    .save-status.err {
+      color: var(--error);
+    }
+
+    /* ─── Reload bar ──────────────────────────────────────────────────────── */
+    .reload-bar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(15, 17, 21, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 40px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: -32px -40px 28px -40px;
+    }
+
+    .reload-bar-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      flex: 1;
+    }
+
+    .reload-status {
+      font-size: 12px;
+    }
+
+    .reload-status.ok {
+      color: var(--success);
+    }
+
+    .reload-status.err {
+      color: var(--error);
+    }
+
+    /* ─── Provider group ──────────────────────────────────────────────────── */
+    .provider-group-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 16px 0 8px 0;
+    }
+
+    .provider-group-label:first-child {
+      margin-top: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="settings-app">
+    <!-- Left nav -->
+    <nav class="settings-nav">
+      <div class="settings-nav-header">
+        <a href="/">← Back</a>
+        <span class="settings-nav-title">Settings</span>
+      </div>
+      <button class="settings-nav-item active" data-section="agent">Agent</button>
+      <button class="settings-nav-item" data-section="subagents">Sub-agents</button>
+      <button class="settings-nav-item" data-section="plugins">Plugins</button>
+      <button class="settings-nav-item" data-section="tools">Tools</button>
+      <button class="settings-nav-item" data-section="apikeys">API Keys</button>
+    </nav>
+
+    <!-- Main content -->
+    <main class="settings-content">
+      <!-- Sticky reload bar -->
+      <div class="reload-bar">
+        <span class="reload-bar-title" id="reload-agent-name">Agent</span>
+        <span class="reload-status" id="reload-status"></span>
+        <button class="btn primary" id="reload-btn">Reload Agent</button>
+      </div>
+
+      <!-- Agent section -->
+      <section class="settings-section active" id="section-agent">
+        <h1 class="settings-section-title">Agent</h1>
+        <p class="settings-section-desc">Identity, model, and runtime behaviour.</p>
+
+        <div class="settings-card">
+          <p class="settings-card-title">Identity</p>
+          <div class="field">
+            <label>Name</label>
+            <input type="text" id="agent-name" placeholder="My Agent" />
+          </div>
+          <div class="field">
+            <label>Model</label>
+            <input type="text" id="agent-model" placeholder="togetherai::provider/model-name" />
+            <div class="field-hint">Format: <code>provider::model</code> — e.g. <code>openai::gpt-4o</code>, <code>togetherai::meta-llama/Llama-3.3-70B-Instruct-Turbo</code></div>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <p class="settings-card-title">System Prompt</p>
+          <div class="field">
+            <textarea class="tall" id="agent-system-prompt" placeholder="You are…"></textarea>
+            <div class="field-hint">Plugin instructions are appended automatically at runtime.</div>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <p class="settings-card-title">Runtime</p>
+          <div class="field">
+            <label>Working Directory</label>
+            <input type="text" id="agent-working-dir" placeholder="/path/to/workdir" />
+          </div>
+          <div class="field">
+            <label>Persistence</label>
+            <select id="agent-persistence">
+              <option value="json">json (file-backed history)</option>
+              <option value="">none (in-memory only)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="section-footer">
+          <button class="btn primary" id="save-agent">Save</button>
+          <span class="save-status" id="save-agent-status"></span>
+        </div>
+      </section>
+
+      <!-- Sub-agents section -->
+      <section class="settings-section" id="section-subagents">
+        <h1 class="settings-section-title">Sub-agents</h1>
+        <p class="settings-section-desc">Assign specialist models to roles. The main agent delegates tasks to these sub-agents.</p>
+
+        <div class="settings-card">
+          <p class="settings-card-title">Role → Model</p>
+          <div id="subagents-list"></div>
+          <button class="btn" id="add-subagent" style="margin-top: 8px;">+ Add role</button>
+        </div>
+
+        <div class="section-footer">
+          <button class="btn primary" id="save-subagents">Save</button>
+          <span class="save-status" id="save-subagents-status"></span>
+        </div>
+      </section>
+
+      <!-- Plugins section -->
+      <section class="settings-section" id="section-plugins">
+        <h1 class="settings-section-title">Plugins</h1>
+        <p class="settings-section-desc">Enable or disable capability plugins. Changes take effect after reloading the agent.</p>
+
+        <div class="settings-card">
+          <p class="settings-card-title">Available plugins</p>
+          <div class="plugin-grid" id="plugins-grid"></div>
+        </div>
+
+        <div class="section-footer">
+          <button class="btn primary" id="save-plugins">Save</button>
+          <span class="save-status" id="save-plugins-status"></span>
+        </div>
+      </section>
+
+      <!-- Tools section -->
+      <section class="settings-section" id="section-tools">
+        <h1 class="settings-section-title">Tools</h1>
+        <p class="settings-section-desc">Per-tool configuration. Only tools defined in the agent config appear here.</p>
+        <div id="tools-list"></div>
+      </section>
+
+      <!-- API Keys section -->
+      <section class="settings-section" id="section-apikeys">
+        <h1 class="settings-section-title">API Keys</h1>
+        <p class="settings-section-desc">Provider tokens are stored in your local <code>.env</code> file and never sent to any external service. Reload the agent after saving keys.</p>
+        <div id="providers-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/static/js/settings.js"></script>
+</body>
+
+</html>

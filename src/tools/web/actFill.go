@@ -15,9 +15,9 @@ func (w *WebBrowser) fill(agentContext map[string]any, args map[string]any) llms
 }
 
 // fillSecret handles the fill_secret action: same as fill but the value is
-// pre-decrypted by the vault plugin via the resolveSecretValue argument key.
+// pre-decrypted by the vault plugin via the resolveSecretVaultKey argument key.
 func (w *WebBrowser) fillSecret(agentContext map[string]any, args map[string]any) llms.ToolReturn {
-	return w.doFill(agentContext, args, "fill_secret", "resolveSecretValue")
+	return w.doFill(agentContext, args, "fill_secret", "resolveSecretVaultKey")
 }
 
 // doFill is the shared implementation for fill and fill_secret.

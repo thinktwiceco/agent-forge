@@ -20,12 +20,9 @@
       </div>
       <div class="sidebar-nav"
         style="display: flex; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px;">
-        <a href="/knowledge" class="btn" style="flex: 1; text-align: center; text-decoration: none;">
-          <span style="margin-right: 4px;">🧠</span> Knowledge
-        </a>
-        <button id="workspace-toggle" class="btn" style="flex: 1; text-align: center; text-decoration: none;">
-          <span style="margin-right: 4px;">📁</span> Workspace
-        </button>
+        <a href="/knowledge" class="btn" style="flex: 1; text-align: center; text-decoration: none;">Knowledge</a>
+        <button id="workspace-toggle" class="btn" style="flex: 1; text-align: center; text-decoration: none;">Workspace</button>
+        <a href="/settings" class="btn" style="flex: 1; text-align: center; text-decoration: none;">Settings</a>
       </div>
       <div id="conversation-list" class="conversation-list"></div>
     </aside>
@@ -71,19 +68,6 @@
 
     <aside class="config">
       <div id="todos-panel" class="todos-panel"></div>
-
-      <div class="config-section-wrapper">
-        <div class="config-header">
-          <h2>Agent Config</h2>
-          <div class="config-header-actions">
-            <button id="config-toggle" class="btn-icon" aria-label="Toggle config">
-              <span class="toggle-icon">▼</span>
-            </button>
-            <button id="reload-agent" class="btn">Reload</button>
-          </div>
-        </div>
-        <div id="config-body" class="config-body config-collapsed"></div>
-      </div>
     </aside>
   </div>
 

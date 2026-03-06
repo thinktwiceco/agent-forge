@@ -1,15 +1,12 @@
 import { ChatManager } from "./chat.js";
 import { ConversationManager } from "./conversations.js";
-import { ConfigPanel } from "./config.js";
 import { TodoManager } from "./todos.js";
 import { FileSystemManager } from "./fs.js";
 
-// Load conversation ID from localStorage
 function loadConversationId() {
   return localStorage.getItem('currentConversationId') || '';
 }
 
-// Save conversation ID to localStorage
 function saveConversationId(id) {
   if (id) {
     localStorage.setItem('currentConversationId', id);
@@ -20,23 +17,35 @@ function saveConversationId(id) {
 
 const appState = {
   agentName: null,
-  conversationId: loadConversationId(), // Load from storage
+  conversationId: loadConversationId(),
   events: new EventTarget(),
 };
 
 const chatManager = new ChatManager(appState);
 const conversationManager = new ConversationManager(appState, chatManager);
-const configPanel = new ConfigPanel(appState);
 const todoManager = new TodoManager();
 const fsManager = new FileSystemManager();
 
+async function loadAgentName() {
+  try {
+    const res = await fetch("/api/config");
+    if (!res.ok) return;
+    const cfg = await res.json();
+    appState.agentName = cfg.name || null;
+    const nameLabel = document.getElementById("agent-name-label");
+    if (nameLabel && cfg.name) nameLabel.textContent = cfg.name;
+    if (cfg.name) document.title = cfg.name;
+  } catch {
+    // non-critical
+  }
+}
+
 async function bootstrap() {
-  await configPanel.load();
+  await loadAgentName();
   await conversationManager.refreshList();
   conversationManager.bindNewChat();
   todoManager.start();
 
-  // Auto-load last conversation if exists
   if (appState.conversationId) {
     await chatManager.loadConversation(appState.conversationId);
     conversationManager.setActive(appState.conversationId);

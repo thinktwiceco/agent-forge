@@ -273,4 +273,5 @@ type PromptProvider interface { Plugin; SystemPrompt() string }
 - ✅ Tests updated and passing
 - ✅ New Builder API available (recommended)
 - ⚠️ Some internal APIs changed (use interfaces)
-- ⚠️ Some old agent*.go files remain (will be consolidated)
+
+**History vs Persistence:** `src/history/` manages conversation history; `src/persistence/` provides storage backends (e.g. JSON). The history package uses persistence implementations for save/load.

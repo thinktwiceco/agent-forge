@@ -1,3 +1,21 @@
+// ─── Agent Lifecycle Manager ──────────────────────────────────────────────────
+//
+// AgentManager owns the runtime *agents.Agent and is responsible for building
+// and hot-swapping it when the configuration changes.
+//
+// Reload safety:
+//   - GetAgent() acquires a read-lock and returns a pointer to the current agent.
+//     Callers (e.g. chat handlers) hold this pointer for the duration of a request.
+//   - Reload() builds a brand-new agent, then acquires a write-lock only to swap
+//     the pointer. Any request that already called GetAgent() before the swap
+//     continues to completion on the old agent — there is no disruption.
+//   - The chunkRouter callback is re-applied to the new agent so background-drain
+//     push events are routed correctly after a reload.
+//
+// Reload is triggered explicitly via POST /api/agent/reload. Config mutations
+// (PUT /config, PUT /config/providers, etc.) write to disk but do NOT auto-reload,
+// giving the operator the chance to batch multiple changes before restarting.
+
 package main
 
 import (

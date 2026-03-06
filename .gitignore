@@ -88,3 +88,4 @@ UglyCatToysHeadOfMarketing/
 ShelfCycle/
 TEST/cmd/localforge/delegation-test.txt
 cmd/localforge/web/
+!.env.template

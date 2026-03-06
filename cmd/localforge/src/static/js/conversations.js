@@ -68,6 +68,15 @@ export class ConversationManager {
       timeEl.className = "conv-time";
       timeEl.textContent = relTime;
 
+      const renameBtn = document.createElement("button");
+      renameBtn.className = "conv-rename";
+      renameBtn.title = "Rename conversation";
+      renameBtn.textContent = "✎";
+      renameBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._startInlineRename(el, titleEl, item.id, label);
+      });
+
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "conv-delete";
       deleteBtn.title = "Delete conversation";
@@ -79,6 +88,7 @@ export class ConversationManager {
 
       el.appendChild(titleEl);
       el.appendChild(timeEl);
+      el.appendChild(renameBtn);
       el.appendChild(deleteBtn);
 
       el.addEventListener("click", () => {
@@ -88,6 +98,45 @@ export class ConversationManager {
 
       this.listEl.appendChild(el);
     });
+  }
+
+  _startInlineRename(itemEl, titleEl, id, currentLabel) {
+    if (itemEl.querySelector(".conv-rename-input")) return; // already editing
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "conv-rename-input";
+    input.value = currentLabel;
+
+    titleEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    const commit = async () => {
+      const newTitle = input.value.trim();
+      if (newTitle && newTitle !== currentLabel) {
+        try {
+          await fetch(`/api/conversations/${id}/title`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: newTitle }),
+          });
+        } catch {
+          // Silently ignore — list will resync
+        }
+      }
+      await this.refreshList();
+    };
+
+    const cancel = async () => {
+      await this.refreshList();
+    };
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); commit(); }
+      if (e.key === "Escape") { e.preventDefault(); cancel(); }
+    });
+    input.addEventListener("blur", commit);
   }
 
   async deleteConversation(id) {

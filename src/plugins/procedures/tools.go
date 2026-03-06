@@ -2,6 +2,7 @@ package procedures
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
@@ -12,11 +13,13 @@ const PROCEDURE_TOOL = "procedure"
 func newProcedureTool(plugin *ProceduresPlugin) llms.Tool {
 	return &core.Tool{
 		Name:        PROCEDURE_TOOL,
-		Description: `Execute structured multi-step procedures. start_procedure: begin named procedure (requires name). next_step: advance to next step. goto_step: jump to a specific step (requires stepNumber). Each action returns files with instructions.`,
+		Description: `Execute structured multi-step procedures. start_procedure: begin named procedure (requires name). next_step: advance to next step. goto_step: jump to a specific step (requires stepNumber). installable_procedures: list procedures available on GitHub. install_procedure: download a procedure from GitHub (requires procedureSlug).`,
 		AdvanceDesc: `[ACTIONS]
 - start_procedure: Begin from step 0. Required: name
 - next_step: Advance to next step of active procedure
 - goto_step: Jump to a specific step by number. Required: stepNumber (0-based)
+- installable_procedures: List all procedures available for installation from the remote GitHub repository
+- install_procedure: Download a procedure from GitHub into the local procedures/ folder. Required: procedureSlug (directory name in the remote repo, e.g. 'gmail-login')
 
 [STEP CONTENT]
 - Each action returns step folder files. Read for instructions.
@@ -25,16 +28,18 @@ func newProcedureTool(plugin *ProceduresPlugin) llms.Tool {
 [CREATING PROCEDURES]
 - New procedures MUST be created inside procedures/ (e.g. procedures/my-procedure/manifest.yaml, procedures/my-procedure/0/instructions.md). Never create at working dir root.`,
 		TroubleshootingInfo: `Troubleshooting:
-- Ensure 'action' is 'start_procedure', 'next_step', or 'goto_step'.
+- Ensure 'action' is 'start_procedure', 'next_step', 'goto_step', 'installable_procedures', or 'install_procedure'.
 - 'name' is required for start_procedure and must match a known procedure name exactly.
 - 'stepNumber' is required for goto_step (0-based index).
+- 'procedureSlug' is required for install_procedure and must match a directory name in the remote repo's procedures/ folder.
 - Call start_procedure before next_step or goto_step; there is no active procedure otherwise.
-- next_step returns an error when the last step has already been reached.`,
+- next_step returns an error when the last step has already been reached.
+- install_procedure requires internet access to reach the GitHub API.`,
 		Parameters: []core.Parameter{
 			{
 				Name:        "action",
 				Type:        "string",
-				Description: "The action: 'start_procedure', 'next_step', or 'goto_step'",
+				Description: "The action: 'start_procedure', 'next_step', 'goto_step', 'installable_procedures', or 'install_procedure'",
 				Required:    true,
 			},
 			{
@@ -47,6 +52,12 @@ func newProcedureTool(plugin *ProceduresPlugin) llms.Tool {
 				Name:        "stepNumber",
 				Type:        "number",
 				Description: "0-based step index (required for goto_step)",
+				Required:    false,
+			},
+			{
+				Name:        "procedureSlug",
+				Type:        "string",
+				Description: "Directory name of the procedure in the remote GitHub repo (required for install_procedure)",
 				Required:    false,
 			},
 		},
@@ -63,9 +74,13 @@ func newProcedureTool(plugin *ProceduresPlugin) llms.Tool {
 				return plugin.handleNextStep()
 			case "goto_step":
 				return plugin.handleGotoStep(args)
+			case "installable_procedures":
+				return plugin.handleInstallableProcedures()
+			case "install_procedure":
+				return plugin.handleInstallProcedure(args)
 			default:
 				return core.NewErrorResponse(fmt.Sprintf(
-					"unknown action '%s'. Valid actions are: 'start_procedure', 'next_step', 'goto_step'", action,
+					"unknown action '%s'. Valid actions are: 'start_procedure', 'next_step', 'goto_step', 'installable_procedures', 'install_procedure'", action,
 				))
 			}
 		},
@@ -135,6 +150,57 @@ func (p *ProceduresPlugin) handleNextStep() llms.ToolReturn {
 	return core.NewEphemeralResponse(fmt.Sprintf(
 		"Current step: %d\nProcedure '%s' — %s\n\n%s",
 		nextPhase, p.activeProcedure.Name, status, content,
+	))
+}
+
+func (p *ProceduresPlugin) handleInstallableProcedures() llms.ToolReturn {
+	procs, err := fetchInstallableProcedures()
+	if err != nil {
+		return core.NewErrorResponse(fmt.Sprintf("failed to fetch installable procedures: %v", err))
+	}
+
+	if len(procs) == 0 {
+		return core.NewEphemeralResponse("No installable procedures found in the remote repository.")
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Found %d installable procedure(s) in thinktwiceco/agent-forge:\n\n", len(procs))
+	for _, proc := range procs {
+		fmt.Fprintf(&sb, "- %s", proc.Slug)
+		if proc.Name != "" && proc.Name != proc.Slug {
+			fmt.Fprintf(&sb, " (%s)", proc.Name)
+		}
+		if proc.Description != "" {
+			fmt.Fprintf(&sb, ": %s", proc.Description)
+		}
+		sb.WriteString("\n")
+	}
+	sb.WriteString("\nUse install_procedure with procedureSlug to install any of the above.")
+
+	return core.NewEphemeralResponse(sb.String())
+}
+
+func (p *ProceduresPlugin) handleInstallProcedure(args map[string]any) llms.ToolReturn {
+	slug, ok := args["procedureSlug"].(string)
+	if !ok || slug == "" {
+		return core.NewErrorResponse("procedureSlug parameter is required for install_procedure")
+	}
+
+	count, err := installProcedure(slug, p.dir)
+	if err != nil {
+		return core.NewErrorResponse(fmt.Sprintf("failed to install procedure '%s': %v", slug, err))
+	}
+
+	if err := p.loadProcedures(); err != nil {
+		return core.NewEphemeralResponse(fmt.Sprintf(
+			"Procedure '%s' installed (%d file(s) written) but failed to reload procedures: %v",
+			slug, count, err,
+		))
+	}
+
+	return core.NewEphemeralResponse(fmt.Sprintf(
+		"Procedure '%s' installed successfully (%d file(s) written). It is now available — use start_procedure to begin.",
+		slug, count,
 	))
 }
 
