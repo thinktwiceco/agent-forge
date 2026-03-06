@@ -163,7 +163,14 @@ echo "Binary installed: $BINARY_PATH"
 if [ -f "$INSTALL_DIR/config.yaml" ]; then
   echo "config.yaml already exists — skipping (delete it to regenerate)."
 else
-  cat > "$INSTALL_DIR/config.yaml" << EOF
+  # Try to use external template file, fallback to embedded heredoc
+  TEMPLATE_FILE="$(dirname "$0")/../installation/templates/config.yaml.template"
+  if [ -f "$TEMPLATE_FILE" ]; then
+    # Replace $AGENT_NAME but keep ${AGENT_WORKING_DIR} as literal
+    sed "s/\$AGENT_NAME/$AGENT_NAME/g" "$TEMPLATE_FILE" > "$INSTALL_DIR/config.yaml"
+    echo "config.yaml created."
+  else
+    cat > "$INSTALL_DIR/config.yaml" << EOF
 # Minimal agent configuration - customize as needed
 agent:
   name: "$AGENT_NAME"
@@ -178,19 +185,29 @@ agent:
   subagents:
     reasoning: "deepseek::deepseek-reasoner"
 EOF
-  echo "config.yaml created."
+    echo "config.yaml created."
+  fi
 fi
 
 # ─── .env placeholder ────────────────────────────────────────────────────────
 
 if [ ! -f "$INSTALL_DIR/.env" ]; then
-  cat > "$INSTALL_DIR/.env" << 'ENVEOF'
+  # Try to use external template file, fallback to embedded heredoc
+  TEMPLATE_FILE="$(dirname "$0")/../installation/templates/.env.template"
+  if [ -f "$TEMPLATE_FILE" ]; then
+    # Replace $AGENT_WORKING_DIR with actual install directory
+    sed "s|\$AGENT_WORKING_DIR|$INSTALL_DIR|g" "$TEMPLATE_FILE" > "$INSTALL_DIR/.env"
+    echo ".env placeholder created."
+  else
+    cat > "$INSTALL_DIR/.env" << ENVEOF
 # Add your API keys here. This file is NOT committed to git.
+AGENT_WORKING_DIR=$INSTALL_DIR
 # AF_TOGETHERAI_API_KEY=your_key_here
 # AF_OPENAI_API_KEY=your_key_here
 # AF_DEEPSEEK_API_KEY=your_key_here
 ENVEOF
-  echo ".env placeholder created."
+    echo ".env placeholder created."
+  fi
 fi
 
 # ─── launcher ────────────────────────────────────────────────────────────────
@@ -198,20 +215,34 @@ fi
 if [ "$OS" = "windows" ]; then
   LAUNCHER="$INSTALL_DIR/start.bat"
   if [ ! -f "$LAUNCHER" ]; then
-    cat > "$LAUNCHER" << 'BATEOF'
+    # Try to use external template file, fallback to embedded heredoc
+    TEMPLATE_FILE="$(dirname "$0")/../installation/templates/start.bat.template"
+    if [ -f "$TEMPLATE_FILE" ]; then
+      cp "$TEMPLATE_FILE" "$LAUNCHER"
+      echo "start.bat created."
+    else
+      cat > "$LAUNCHER" << 'BATEOF'
 @echo off
 SET AGENT_WORKING_DIR=%~dp0
 cd /d %~dp0
 bin\localforge.exe -config config.yaml -port 8080
 BATEOF
-    echo "start.bat created."
+      echo "start.bat created."
+    fi
   else
     echo "start.bat already exists — skipping."
   fi
 else
   LAUNCHER="$INSTALL_DIR/start.sh"
   if [ ! -f "$LAUNCHER" ]; then
-    cat > "$LAUNCHER" << 'STARTEOF'
+    # Try to use external template file, fallback to embedded heredoc
+    TEMPLATE_FILE="$(dirname "$0")/../installation/templates/start.sh.template"
+    if [ -f "$TEMPLATE_FILE" ]; then
+      cp "$TEMPLATE_FILE" "$LAUNCHER"
+      chmod +x "$LAUNCHER"
+      echo "start.sh created."
+    else
+      cat > "$LAUNCHER" << 'STARTEOF'
 #!/bin/bash
 set -euo pipefail
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
@@ -220,8 +251,9 @@ export AGENT_WORKING_DIR="$INSTALL_DIR"
 cd "$INSTALL_DIR"
 exec ./bin/localforge -config config.yaml -port 8080
 STARTEOF
-    chmod +x "$LAUNCHER"
-    echo "start.sh created."
+      chmod +x "$LAUNCHER"
+      echo "start.sh created."
+    fi
   else
     echo "start.sh already exists — skipping."
   fi

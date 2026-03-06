@@ -1,0 +1,4 @@
+@echo off
+SET AGENT_WORKING_DIR=%~dp0
+cd /d %~dp0
+bin\localforge.exe -config config.yaml -port 8080

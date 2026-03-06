@@ -335,13 +335,15 @@ func (p *KnowledgePlugin) saveNode(nodeType, content string, embeddingID string,
 	nodeID := uuid.New().String()
 	now := time.Now()
 
-	var metadataJSON []byte
-	var err error
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	var metadataValue sql.NullString
 	if metadata != nil {
-		metadataJSON, err = json.Marshal(metadata)
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal metadata: %w", err)
-		}
+		metadataValue.String = string(metadataJSON)
+		metadataValue.Valid = true
 	}
 
 	query := `
@@ -349,7 +351,7 @@ func (p *KnowledgePlugin) saveNode(nodeType, content string, embeddingID string,
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 
-	_, err = p.db.ExecContext(ctx, query, nodeID, nodeType, content, embeddingID, string(metadataJSON), now, now)
+	_, err = p.db.ExecContext(ctx, query, nodeID, nodeType, content, embeddingID, metadataValue, now, now)
 	if err != nil {
 		return "", fmt.Errorf("failed to insert node: %w", err)
 	}
@@ -553,13 +555,15 @@ func (p *KnowledgePlugin) queryNodes(ctx context.Context, query string, args ...
 func (p *KnowledgePlugin) updateNode(nodeID, nodeType, content string, metadata map[string]any) error {
 	ctx := context.Background()
 
-	var metadataJSON []byte
-	var err error
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	var metadataValue sql.NullString
 	if metadata != nil {
-		metadataJSON, err = json.Marshal(metadata)
-		if err != nil {
-			return fmt.Errorf("failed to marshal metadata: %w", err)
-		}
+		metadataValue.String = string(metadataJSON)
+		metadataValue.Valid = true
 	}
 
 	query := `
@@ -568,7 +572,7 @@ func (p *KnowledgePlugin) updateNode(nodeID, nodeType, content string, metadata 
 		WHERE id = ?
 	`
 
-	result, err := p.db.ExecContext(ctx, query, nodeType, content, string(metadataJSON), time.Now(), nodeID)
+	result, err := p.db.ExecContext(ctx, query, nodeType, content, metadataValue, time.Now(), nodeID)
 	if err != nil {
 		return fmt.Errorf("failed to update node: %w", err)
 	}

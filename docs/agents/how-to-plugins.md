@@ -69,7 +69,10 @@ func (p *MyPlugin) Tools() []llms.Tool {
 
 // Optional: Implement PromptProvider
 func (p *MyPlugin) SystemPrompt() string {
-    return "Instructions for this plugin..."
+    return `[MY PLUGIN]
+- Instructions for this plugin
+- Use [square brackets] not <angle brackets>
+- Ensures compatibility with all LLM providers`
 }
 ```
 
@@ -80,6 +83,42 @@ agent, err := agents.NewBuilder(llm, "agent").
     WithPlugins(myplugin.NewMyPlugin("config")).
     Build()
 ```
+
+## System Prompt Best Practices
+
+**CRITICAL: Do not use XML-style tags (`<tag>...</tag>`) in system prompts or tool descriptions.**
+
+Some LLM providers filter or reject angle brackets. Always use square brackets instead:
+
+✅ **Good:**
+```go
+func (p *MyPlugin) SystemPrompt() string {
+    return `[PLUGIN NAME]
+[INSTRUCTIONS]
+- Step 1: Do this
+- Step 2: Do that
+
+[CONSTRAINTS]
+- Never do X
+- Always do Y`
+}
+```
+
+❌ **Bad:**
+```go
+func (p *MyPlugin) SystemPrompt() string {
+    return `<PLUGIN_NAME>
+<INSTRUCTIONS>
+- Step 1: Do this
+</INSTRUCTIONS>
+</PLUGIN_NAME>`
+}
+```
+
+This applies to:
+- System prompts (`SystemPrompt()`)
+- Tool descriptions (`Description` field)
+- Dynamic prompt sections
 
 ## Available Events
 

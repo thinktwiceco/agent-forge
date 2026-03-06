@@ -8,6 +8,7 @@ import (
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/agents"
 	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 	"github.com/thinktwiceco/agent-forge/src/plugins/registry"
 )
 
@@ -44,7 +45,24 @@ func (p *KnowledgePlugin) Name() string {
 func (p *KnowledgePlugin) Hooks() map[core.Event]core.AgentHookFn {
 	return map[core.Event]core.AgentHookFn{
 		core.EventAgentInitialized: agents.OnAgentInitializedHook(p.onInit),
+		core.EventToolExecution:    agents.OnToolExecutionHook(p.onToolExecution),
 	}
+}
+
+// onToolExecution appends a reminder to tool responses to prompt knowledge retention
+func (p *KnowledgePlugin) onToolExecution(a *agents.Agent, toolResult *llms.ToolResult) error {
+	// Skip if tool execution failed
+	if !toolResult.Success {
+		return nil
+	}
+
+	// Append reminder to the tool result
+	if toolResult.Result != "" {
+		toolResult.Result += "\n\n"
+	}
+	toolResult.Result += "[Knowledge Reminder]: is this worth saving or just transactional? If you are not sure, ask your human!"
+
+	return nil
 }
 
 // onInit initializes the plugin when the agent is initialized
@@ -88,13 +106,15 @@ func (p *KnowledgePlugin) SystemPrompt() string {
 		semanticInfo = " with semantic search"
 	}
 
-	return fmt.Sprintf(`<KNOWLEDGE_GRAPH_SYSTEM>
-<METADATA>
+	return fmt.Sprintf(`[KNOWLEDGE GRAPH SYSTEM]
 Type: Hierarchical Graph%s
-Purpose: Proactive persistent memory.
-</METADATA>
+Purpose: Proactive persistent memory
 
-<SCHEMA>
+[EXTEND PERSONALITY]
+As an assistant, you are curious about the the user.
+Make sure to save information that are relevant to the user.
+
+[SCHEMA]
 Nodes:
   CATEGORY: Top-level. field:name=content field:title=optional
   SUBCATEGORY: Recursive child. field:name=content field:title=optional
@@ -105,31 +125,24 @@ Edges:
   has_subcategory: [Category|Subcategory] -> Subcategory
   has_fact: [Category|Subcategory] -> Fact
   has_document: [Category|Fact] -> Document
-  is_relevant_to: [Any] <-> [Any]
-</SCHEMA>
+  is_relevant_to: [Any] bidirectional [Any]
 
-<TOOL_USAGE_EXPANSION>
-<RETRIEVAL>
+[TOOL USAGE - RETRIEVAL]
 1. DISCOVERY: Use 'get_categories' to identify top-level nodes.
 2. TRAVERSAL: Use 'explore_category' or 'explore_subcategory'. Yields LIGHT NODES (titles only for brevity).
 3. EXPANSION: Use 'explore_fact' to retrieve full content of facts discovered in step 2. You MUST expand facts to read their content.
 4. RECURSION: Use 'find' for semantic querying when graph descent is insufficient.
-</RETRIEVAL>
 
-<STORAGE_AND_RELATIONSHIPS>
+[TOOL USAGE - STORAGE AND RELATIONSHIPS]
 1. CLASSIFICATION: When acquiring new knowledge, critically evaluate the correct Category and Subcategory. 
 2. STRUCTURE_CREATION: Use 'add_category' or 'add_subcategory' if the required classification hierarchy does not exist.
 3. INGESTION: Use 'remember' to store the Fact. You MUST provide a short 'title' for optimal light-node retrieval during traversal.
 4. CROSS_REFERENCING: Use 'link_relevant' to connect the new node to other Categories, Subcategories, or Facts to build horizontal relationships.
 5. FILE_ATTACHMENT: Use 'attach_document' to bind file paths to related nodes.
-</STORAGE_AND_RELATIONSHIPS>
-</TOOL_USAGE_EXPANSION>
 
-<CONSTRAINTS>
+[CONSTRAINTS]
 - SILENT_EXECUTION: Execute tools without conversational narration (e.g., do not say "I am checking..."). Formulate responses as innate knowledge.
 - PROACTIVE_RETENTION: Automatically store user preferences, goals, context, findings, and corrections post-response.
-</CONSTRAINTS>
-</KNOWLEDGE_GRAPH_SYSTEM>
 `, semanticInfo)
 }
 
@@ -157,7 +170,7 @@ func (p *KnowledgePlugin) buildCategoriesSection() string {
 
 	// Build the categories list
 	var categoryList string
-	categoryList = "\n<CURRENT_CATEGORIES>\n<INFO>Top-level knowledge organization nodes</INFO>\n"
+	categoryList = "\n[CURRENT CATEGORIES]\nTop-level knowledge organization nodes:\n"
 	for _, cat := range categories {
 		categoryList += fmt.Sprintf("  - %s\n", cat.Content)
 	}
@@ -166,7 +179,7 @@ func (p *KnowledgePlugin) buildCategoriesSection() string {
 		categoryList += fmt.Sprintf("  ... [%d additional categories muted]\n", len(categories)-maxCategories)
 	}
 
-	categoryList += "\n<INSTRUCTION>Evaluate these categories when classifying new knowledge for STORAGE_AND_RELATIONSHIPS operations.</INSTRUCTION>\n</CURRENT_CATEGORIES>\n"
+	categoryList += "\nInstruction: Evaluate these categories when classifying new knowledge for storage operations.\n"
 
 	return categoryList
 }

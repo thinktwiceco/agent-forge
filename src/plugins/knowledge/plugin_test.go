@@ -3,7 +3,11 @@ package knowledge
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
 func setupTestPlugin(t *testing.T) (*KnowledgePlugin, func()) {
@@ -45,6 +49,112 @@ func TestPluginName(t *testing.T) {
 
 	if plugin.Name() != PLUGIN_NAME {
 		t.Errorf("Expected plugin name %s, got %s", PLUGIN_NAME, plugin.Name())
+	}
+}
+
+func TestPluginHooks(t *testing.T) {
+	plugin, cleanup := setupTestPlugin(t)
+	defer cleanup()
+
+	hooks := plugin.Hooks()
+
+	// Should have at least one hook
+	if len(hooks) == 0 {
+		t.Error("Expected at least one hook")
+	}
+
+	// Should have EventAgentInitialized hook
+	if hooks[core.EventAgentInitialized] == nil {
+		t.Error("Expected non-nil hook for EventAgentInitialized")
+	}
+
+	// Should have EventToolExecution hook
+	if hooks[core.EventToolExecution] == nil {
+		t.Error("Expected non-nil hook for EventToolExecution")
+	}
+}
+
+func TestOnToolExecutionHook(t *testing.T) {
+	plugin, cleanup := setupTestPlugin(t)
+	defer cleanup()
+
+	// Create a mock tool result
+	toolResult := &llms.ToolResult{
+		ToolCallID: "test-call-id",
+		ToolName:   "test_tool",
+		Success:    true,
+		Result:     "Original result",
+		Error:      "",
+	}
+
+	// Call the hook
+	err := plugin.onToolExecution(nil, toolResult)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	// Verify the reminder was appended
+	expectedReminder := "[Knowledge Reminder]: is this worth saving or just transactional? If you are not sure, ask your human!"
+	if !strings.Contains(toolResult.Result, expectedReminder) {
+		t.Errorf("Expected reminder to be appended to tool result")
+	}
+
+	// Verify original result is still present
+	if !strings.Contains(toolResult.Result, "Original result") {
+		t.Errorf("Expected original result to be preserved")
+	}
+}
+
+func TestOnToolExecutionHook_FailedTool(t *testing.T) {
+	plugin, cleanup := setupTestPlugin(t)
+	defer cleanup()
+
+	// Create a mock failed tool result
+	toolResult := &llms.ToolResult{
+		ToolCallID: "test-call-id",
+		ToolName:   "test_tool",
+		Success:    false,
+		Result:     "Error result",
+		Error:      "Something went wrong",
+	}
+
+	originalResult := toolResult.Result
+
+	// Call the hook
+	err := plugin.onToolExecution(nil, toolResult)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	// Verify the reminder was NOT appended for failed tools
+	if toolResult.Result != originalResult {
+		t.Errorf("Expected result to be unchanged for failed tool")
+	}
+}
+
+func TestOnToolExecutionHook_EmptyResult(t *testing.T) {
+	plugin, cleanup := setupTestPlugin(t)
+	defer cleanup()
+
+	// Create a mock tool result with empty result
+	toolResult := &llms.ToolResult{
+		ToolCallID: "test-call-id",
+		ToolName:   "test_tool",
+		Success:    true,
+		Result:     "",
+		Error:      "",
+	}
+
+	// Call the hook
+	err := plugin.onToolExecution(nil, toolResult)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	// Verify the reminder was appended (without extra newlines at start)
+	expectedReminder := "[Knowledge Reminder]: is this worth saving or just transactional? If you are not sure, ask your human!"
+	if toolResult.Result != expectedReminder {
+		t.Errorf("Expected reminder to be the entire result for empty result, got: %s", toolResult.Result)
 	}
 }
 
@@ -816,8 +926,8 @@ func TestSystemPromptWithCategories(t *testing.T) {
 	categoriesSection = plugin.buildCategoriesSection()
 
 	// Should contain "CURRENT CATEGORIES"
-	if !contains(categoriesSection, "CURRENT_CATEGORIES") {
-		t.Error("Expected categories section to contain 'CURRENT_CATEGORIES'")
+	if !contains(categoriesSection, "CURRENT CATEGORIES") {
+		t.Error("Expected categories section to contain 'CURRENT CATEGORIES'")
 	}
 
 	// Should contain the category names

@@ -263,14 +263,16 @@ func (q *GraphQuerier) findRelated(nodeIDs []string, depth int) (*GraphResult, e
 	return &GraphResult{Nodes: nodes, Edges: edges}, nil
 }
 
-// findNodesByTypeAndContent searches for nodes by both type and content pattern
-func (q *GraphQuerier) findNodesByTypeAndContent(nodeType, contentPattern string, limit, offset int) ([]Node, error) {
+// findNodesByTypeAndContent searches for nodes by type and an identifier (ID, content snippet, or title).
+func (q *GraphQuerier) findNodesByTypeAndContent(nodeType, identifier string, limit, offset int) ([]Node, error) {
 	ctx := context.Background()
+
+	pattern := "%" + identifier + "%"
 
 	query := `
 		SELECT id, type, content, embedding_id, metadata, created_at, updated_at
 		FROM knowledge_nodes
-		WHERE type = ? AND content LIKE ?
+		WHERE type = ? AND (id = ? OR content LIKE ? OR (metadata IS NOT NULL AND metadata != '' AND json_valid(metadata) AND json_extract(metadata, '$.title') LIKE ?))
 		ORDER BY created_at DESC
 	`
 
@@ -281,7 +283,7 @@ func (q *GraphQuerier) findNodesByTypeAndContent(nodeType, contentPattern string
 		}
 	}
 
-	return q.queryNodes(ctx, query, nodeType, "%"+contentPattern+"%")
+	return q.queryNodes(ctx, query, nodeType, identifier, pattern, pattern)
 }
 
 // findNodesByContentPaginated searches for nodes by content with pagination
