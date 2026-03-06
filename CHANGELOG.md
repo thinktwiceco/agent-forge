@@ -22,7 +22,12 @@
 - fix(knowledge): fix explore_fact returning empty results for titles/IDs
 
 ## [0.4.11] - 2026-03-01
-- chore(release): prepare release v0.4.11
+- [0782cee](http://github.com/thinktwiceco/agent-forge/commit/0782cee14936589a8795005fd04cf7c03b5042ab) - Merge branch 'release/v0.4.11' into main
+- [d0c8b7c](http://github.com/thinktwiceco/agent-forge/commit/d0c8b7ce6439507f3f8dce7ee557fea7f0a8e2d5) - chore(release): prepare release v0.4.11 (#36)
+- [f3f4d02](http://github.com/thinktwiceco/agent-forge/commit/f3f4d023426aa02f1856b2ab4c1062f94548bb57) - fix: update layout and refine knowledge plugin
+- [9925fbc](http://github.com/thinktwiceco/agent-forge/commit/9925fbc343a166a82467667596bfc88c0e13f99a) - chore(release): prepare release v0.4.11
+- [4cf9e73](http://github.com/thinktwiceco/agent-forge/commit/4cf9e73c3c78f0e9faf5c6e9cd05e4ea1651cdcc) - docs: update model providers and replace vector with vision subagent
+- [ecf33f9](http://github.com/thinktwiceco/agent-forge/commit/ecf33f93e009fe55500aced97b56ed321b9e0f5b) - chore: update changelog for v0.4.10 [skip ci] (#35)
 
 ## [0.4.10] - 2026-02-28
 - [f8c6661](http://github.com/thinktwiceco/agent-forge/commit/f8c6661acafa852628358efe39d16c5fbb2ce811) - feat(plugins): add knowledge plugin with graph and semantic search (#34)
