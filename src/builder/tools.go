@@ -11,7 +11,7 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/tools/fs"
 	"github.com/thinktwiceco/agent-forge/src/tools/git"
 	"github.com/thinktwiceco/agent-forge/src/tools/postgres"
-	"github.com/thinktwiceco/agent-forge/src/tools/vector"
+	"github.com/thinktwiceco/agent-forge/src/tools/update"
 	"github.com/thinktwiceco/agent-forge/src/tools/web"
 	"gopkg.in/yaml.v3"
 )
@@ -60,10 +60,10 @@ func (t *Tool) UnmarshalYAML(value *yaml.Node) error {
 const (
 	FILE_SYSTEM_TOOL = "fs"
 	WEB_BROWSER_TOOL = "web"
-	VECTOR_DB_TOOL   = "vector"
 	GIT_TOOL         = "git"
 	POSTGRES_TOOL    = "postgres"
 	API_TOOL         = "api"
+	UPDATE_TOOL      = "update"
 )
 
 func (t *Tool) getTool(
@@ -82,11 +82,6 @@ func (t *Tool) getTool(
 			return nil, fmt.Errorf("working_dir is required for web tool")
 		}
 		return web.NewWebTool(filepath.Join(workingDir, "web")), nil
-	case VECTOR_DB_TOOL:
-		if vectorDB == nil || embeddingGenerator == nil {
-			return nil, fmt.Errorf("vectorDB and embeddingGenerator are required for vector DB tool")
-		}
-		return vector.NewVectorTool(vectorDB, embeddingGenerator), nil
 	case GIT_TOOL:
 		if workingDir == "" {
 			return nil, fmt.Errorf("working_dir is required for git tool")
@@ -151,6 +146,11 @@ func (t *Tool) getTool(
 		}
 
 		return api.NewApiTool(t.Name, endpoints, headers), nil
+	case UPDATE_TOOL:
+		if workingDir == "" {
+			return nil, fmt.Errorf("working_dir is required for update tool")
+		}
+		return update.NewUpdateTool(workingDir), nil
 	}
 	return nil, fmt.Errorf("invalid tool: %s", t.Name)
 }

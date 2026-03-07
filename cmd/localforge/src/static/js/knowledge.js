@@ -1,3 +1,5 @@
+import { setupAuthUI } from "./auth.js";
+
 // Knowledge Graph Visualization with D3.js
 
 class KnowledgeGraph {
@@ -612,4 +614,7 @@ class KnowledgeGraph {
 }
 
 const graph = new KnowledgeGraph();
-graph.init();
+(async () => {
+  await setupAuthUI();
+  await graph.init();
+})();

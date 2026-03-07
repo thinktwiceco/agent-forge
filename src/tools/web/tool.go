@@ -103,7 +103,7 @@ func NewWebTool(dir string) llms.Tool {
 		case "open_session":
 			return `open_session: Open a new named browser session or resume an existing one.
 - Optional: session (string) — name for the session (default: "default"); reuse the same name to resume
-- Optional: headless (boolean, default false) — run browser headlessly
+- Optional: headless (boolean, default: WEB_TOOL_HEADLESS or true) — run browser headlessly
 - Returns confirmation of whether the session was newly created or resumed`
 		default:
 			return fmt.Sprintf("Nothing to add about %s", item)
@@ -112,7 +112,7 @@ func NewWebTool(dir string) llms.Tool {
 
 	return &core.Tool{
 		Name:        "web_browser",
-		Description: "Navigate the web, pull content from pages, interact with buttons and form inputs using a headless browser, and search the web via the Brave Search API.",
+		Description: "Navigate the web, pull content from pages, interact with buttons and form inputs using a browser, and search the web via the Brave Search API.",
 		AdvanceDesc: `Advanced Details:
 - Available actions: open_session, navigate, click, fill, fill_secret, get_content, save_content, web_search, upload_file, refresh, list_sessions, close_session
   Use expand tool with details_about="<action>" for full parameter details on any action.
@@ -125,6 +125,8 @@ func NewWebTool(dir string) llms.Tool {
   * Use web_search to find URLs before navigating
   * Use click/fill to interact with page elements
 - Behavior:
+  * New browser sessions default to headless mode; set WEB_TOOL_HEADLESS=false to make them visible by default
+  * Passing headless explicitly to open_session overrides the environment-based default
   * Browser context (cookies, history) is preserved across calls within the same session
   * web_search calls the Brave Search API directly, no browser needed`,
 		DetailsAboutFunc: detailsAbout,
@@ -158,7 +160,7 @@ func NewWebTool(dir string) llms.Tool {
 			{
 				Name:        "headless",
 				Type:        "boolean",
-				Description: "Whether to run the browser in headless mode (optional for 'open_session', default: false)",
+				Description: "Whether to run the browser in headless mode (optional for 'open_session'; defaults to WEB_TOOL_HEADLESS if set, otherwise true)",
 				Required:    false,
 			},
 			{

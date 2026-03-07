@@ -3,6 +3,9 @@ package web
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 
 	"github.com/chromedp/chromedp"
 	agentforge "github.com/thinktwiceco/agent-forge/src"
@@ -13,8 +16,28 @@ import (
 // Global session manager instance
 var globalSessionManager = NewSessionManager()
 
+const webToolHeadlessEnv = "WEB_TOOL_HEADLESS"
+
+// defaultHeadlessMode resolves the default browser mode.
+// Defaults to true and can be overridden via WEB_TOOL_HEADLESS=true|false.
+func defaultHeadlessMode() bool {
+	raw, ok := os.LookupEnv(webToolHeadlessEnv)
+	if !ok || strings.TrimSpace(raw) == "" {
+		return true
+	}
+
+	headless, err := strconv.ParseBool(strings.TrimSpace(raw))
+	if err != nil {
+		agentforge.Info("Invalid %s value %q; defaulting to headless=true", webToolHeadlessEnv, raw)
+		return true
+	}
+
+	return headless
+}
+
 // getOrCreateBrowser gets an existing browser context or creates a new one.
-// headless controls whether the browser runs in headless mode (default: false).
+// headless controls whether the browser runs in headless mode.
+// When omitted, the default is true and can be overridden via WEB_TOOL_HEADLESS.
 // The browser context persists across tool calls.
 func getOrCreateBrowser(agentContext map[string]any, headless ...bool) (context.Context, error) {
 	return globalSessionManager.GetOrCreateBrowser(agentContext, headless...)
@@ -125,7 +148,7 @@ func (w *WebBrowser) listSessions() llms.ToolReturn {
 
 // openSession opens a new named browser session or resumes an existing one.
 func (w *WebBrowser) openSession(agentContext map[string]any, args map[string]any) llms.ToolReturn {
-	headless := false
+	headless := defaultHeadlessMode()
 	if h, ok := args["headless"].(bool); ok {
 		headless = h
 	}

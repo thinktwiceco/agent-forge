@@ -118,7 +118,61 @@ func TestFsTool_Integration(t *testing.T) {
 		}
 	})
 
-	// 8. Ripgrep Search
+	// 8. Block .env file access
+	t.Run("block_env_files", func(t *testing.T) {
+		if err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte("SECRET_KEY=test-secret"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(tmpDir, "config.env"), []byte("API_KEY=test-key"), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		readEnv := tool.Call(nil, map[string]any{
+			"operation": "read",
+			"path":      ".env",
+		})
+		if readEnv.Success() {
+			t.Error("read should reject .env files")
+		}
+
+		writeEnv := tool.Call(nil, map[string]any{
+			"operation": "write",
+			"path":      ".env.local",
+			"content":   "TOKEN=blocked",
+		})
+		if writeEnv.Success() {
+			t.Error("write should reject .env.* files")
+		}
+
+		infoEnv := tool.Call(nil, map[string]any{
+			"operation": "get_file_info",
+			"path":      "config.env",
+		})
+		if infoEnv.Success() {
+			t.Error("get_file_info should reject *.env files")
+		}
+
+		deleteEnv := tool.Call(nil, map[string]any{
+			"operation": "delete",
+			"path":      ".env",
+		})
+		if deleteEnv.Success() {
+			t.Error("delete should reject .env files")
+		}
+
+		listResult := tool.Call(nil, map[string]any{
+			"operation": "list",
+			"path":      ".",
+		})
+		if !listResult.Success() {
+			t.Fatalf("list failed: %s", listResult.Error())
+		}
+		if strings.Contains(listResult.Data(), ".env") || strings.Contains(listResult.Data(), "config.env") {
+			t.Errorf("list should not expose .env files, got: %s", listResult.Data())
+		}
+	})
+
+	// 9. Ripgrep Search
 	t.Run("ripgrep", func(t *testing.T) {
 		// Create test files
 		testContent1 := "This is a test file\nWith multiple lines\nContaining searchable content"
@@ -195,7 +249,29 @@ func TestFsTool_Integration(t *testing.T) {
 		}
 	})
 
-	// 9. GrepLogs - unavailable when AF_LOG_FILE not set
+	// 10. Ripgrep should exclude .env files
+	t.Run("ripgrep_excludes_env_files", func(t *testing.T) {
+		result := tool.Call(nil, map[string]any{
+			"operation": "ripgrep",
+			"path":      ".",
+			"pattern":   "test-secret|test-key",
+			"flags":     []interface{}{"-n"},
+		})
+
+		if !result.Success() && strings.Contains(result.Error(), "not installed") {
+			t.Skip("ripgrep not installed, skipping test")
+		}
+
+		if !result.Success() {
+			t.Fatalf("ripgrep failed: %s", result.Error())
+		}
+
+		if strings.Contains(result.Data(), ".env") || strings.Contains(result.Data(), "config.env") {
+			t.Errorf("ripgrep should exclude .env files, got: %s", result.Data())
+		}
+	})
+
+	// 11. GrepLogs - unavailable when AF_LOG_FILE not set
 	t.Run("grep_logs_unavailable", func(t *testing.T) {
 		// Ensure AF_LOG_FILE is unset
 		origVal := os.Getenv("AF_LOG_FILE")
@@ -219,7 +295,7 @@ func TestFsTool_Integration(t *testing.T) {
 		}
 	})
 
-	// 10. GrepLogs - works when AF_LOG_FILE is set
+	// 12. GrepLogs - works when AF_LOG_FILE is set
 	t.Run("grep_logs_available", func(t *testing.T) {
 		// Create a temp log file
 		logFile, err := os.CreateTemp("", "grep-logs-test-*.log")

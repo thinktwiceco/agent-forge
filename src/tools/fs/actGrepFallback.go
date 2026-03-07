@@ -100,6 +100,7 @@ func (fs *Fs) grepFallback(relativePath, validatedPath, pattern string, flags []
 		if !hasRecursiveFlag(grepFlags) {
 			grepFlags = append([]string{"-r"}, grepFlags...)
 		}
+		grepFlags = append(grepFlags, "--exclude=.env", "--exclude=.env.*", "--exclude=*.env")
 	}
 
 	args := append(grepFlags, pattern, validatedPath)

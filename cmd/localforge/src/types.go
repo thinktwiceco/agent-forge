@@ -92,6 +92,20 @@ type UpdateProvidersRequest struct {
 	Providers map[string]string `json:"providers" binding:"required"`
 }
 
+// ─── Authentication ───────────────────────────────────────────────────────────
+
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type AuthStatusResponse struct {
+	Enabled       bool   `json:"enabled"`
+	Authenticated bool   `json:"authenticated"`
+	Username      string `json:"username,omitempty"`
+	Next          string `json:"next,omitempty"`
+}
+
 // ─── SSE event names ──────────────────────────────────────────────────────────
 
 type ProviderContext struct {

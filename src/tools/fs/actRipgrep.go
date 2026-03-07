@@ -3,6 +3,7 @@ package fs
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -28,6 +29,10 @@ func (fs *Fs) ripgrep(path, pattern string, flags []string, offset, headLimit in
 	// Add user-provided flags if any
 	if len(flags) > 0 {
 		args = append(args, flags...)
+	}
+
+	if info, err := os.Stat(validatedPath); err == nil && info.IsDir() {
+		args = append(args, "--glob=!.env", "--glob=!.env.*", "--glob=!*.env")
 	}
 
 	// Add pattern

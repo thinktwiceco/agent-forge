@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <style>
+    body {
+      overflow: auto;
+    }
+
+    .login-shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 380px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    .login-card h1 {
+      margin: 0 0 8px 0;
+      font-size: 22px;
+    }
+
+    .login-copy {
+      margin: 0 0 20px 0;
+      color: var(--text-muted);
+    }
+
+    .login-field {
+      margin-bottom: 14px;
+    }
+
+    .login-field label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .login-field input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 14px;
+      padding: 10px 12px;
+    }
+
+    .login-field input:focus {
+      outline: none;
+      border-color: var(--border-active);
+    }
+
+    .login-message {
+      min-height: 20px;
+      margin-top: 12px;
+      color: var(--error);
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="login-shell">
+    <section class="login-card">
+      <div class="brand" style="margin-bottom: 16px;">
+        <span class="brand-icon">✦</span>
+        <span class="brand-name">ThinkTwice Agent</span>
+      </div>
+      <h1>Sign in</h1>
+      <p class="login-copy">Use the localforge admin credentials configured in the environment.</p>
+
+      <form id="login-form">
+        <div class="login-field">
+          <label for="login-username">Username</label>
+          <input id="login-username" name="username" type="text" autocomplete="username" required />
+        </div>
+        <div class="login-field">
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="btn primary" style="width: 100%;">Login</button>
+        <div id="login-message" class="login-message" aria-live="polite"></div>
+      </form>
+    </section>
+  </main>
+
+  <script type="module">
+    import { setupLoginForm } from "/static/js/auth.js";
+    setupLoginForm();
+  </script>
+</body>
+
+</html>

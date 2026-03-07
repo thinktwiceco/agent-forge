@@ -207,7 +207,8 @@ func (sm *SessionManager) getSessionKey(agentContext map[string]any) string {
 }
 
 // GetOrCreateBrowser gets an existing browser context or creates a new one.
-// headless controls whether the browser runs in headless mode (default: false).
+// headless controls whether the browser runs in headless mode.
+// When omitted, the default is true and can be overridden via WEB_TOOL_HEADLESS.
 // The browser context persists across tool calls.
 func (sm *SessionManager) GetOrCreateBrowser(agentContext map[string]any, headless ...bool) (context.Context, error) {
 	sessionKey := sm.getSessionKey(agentContext)
@@ -234,8 +235,8 @@ func (sm *SessionManager) GetOrCreateBrowser(agentContext map[string]any, headle
 		}
 	}
 
-	// Determine headless mode (default to false for better debugging)
-	headlessMode := false
+	// Determine headless mode (default to true, overridable via WEB_TOOL_HEADLESS)
+	headlessMode := defaultHeadlessMode()
 	if len(headless) > 0 {
 		headlessMode = headless[0]
 	}

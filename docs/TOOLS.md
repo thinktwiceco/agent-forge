@@ -10,6 +10,7 @@ Agent Forge includes several built-in tools that extend agent capabilities. This
 - [Postgres Tool](#postgres-tool)
 - [API Tool](#api-tool)
 - [Web Browser Tool](#web-browser-tool)
+- [Update Tool](#update-tool)
 - [Vector Database Tool](#vector-database-tool)
 - [Creating Custom Tools](#creating-custom-tools)
 
@@ -300,7 +301,7 @@ See:
 
 ## Web Browser Tool
 
-The web browser tool provides web automation using a headless browser.
+The web browser tool provides web automation using a browser that runs headlessly by default. Set `WEB_TOOL_HEADLESS=false` to make new sessions visible by default.
 
 ### Basic Usage
 
@@ -336,6 +337,38 @@ agent := agents.NewAgent(&agents.AgentConfig{
 tools:
   - name: "web"
     root: "/path/to/working/dir"
+```
+
+## Update Tool
+
+The update tool runs the root `update-release.sh` script for an agent installation.
+
+### Basic Usage
+
+```go
+import "github.com/thinktwiceco/agent-forge/src/tools/update"
+
+// Create tool for an agent working directory
+updateTool := update.NewUpdateTool("/path/to/agent/root")
+
+// Add to agent
+agent := agents.NewAgent(&agents.AgentConfig{
+    Tools: []llms.Tool{updateTool},
+})
+```
+
+### Behavior
+
+- Resolves exactly `./update-release.sh` in the configured agent root
+- Refuses to run if the script is missing or not a regular file
+- Executes the script with `bash` from the agent root
+- Returns captured stdout and stderr so the caller can inspect the update result
+
+### YAML Configuration
+
+```yaml
+tools:
+  - name: "update"
 ```
 
 ## Vector Database Tool

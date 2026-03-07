@@ -2,6 +2,7 @@ import { ChatManager } from "./chat.js";
 import { ConversationManager } from "./conversations.js";
 import { TodoManager } from "./todos.js";
 import { FileSystemManager } from "./fs.js";
+import { setupAuthUI } from "./auth.js";
 
 function loadConversationId() {
   return localStorage.getItem('currentConversationId') || '';
@@ -41,6 +42,7 @@ async function loadAgentName() {
 }
 
 async function bootstrap() {
+  await setupAuthUI();
   await loadAgentName();
   await conversationManager.refreshList();
   conversationManager.bindNewChat();

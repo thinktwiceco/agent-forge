@@ -1,3 +1,5 @@
+import { setupAuthUI } from "./auth.js";
+
 // All known plugins the registry supports.
 const ALL_PLUGINS = ["todo", "procedures", "vault", "knowledge", "scheduler", "logger"];
 
@@ -413,4 +415,7 @@ function _setStatus(el, msg, ok) {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 const settings = new SettingsManager();
-settings.load();
+(async () => {
+  await setupAuthUI();
+  await settings.load();
+})();

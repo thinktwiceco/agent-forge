@@ -16,13 +16,32 @@ var textExtensions = map[string]bool{
 	".rb": true, ".rs": true, ".java": true, ".kt": true, ".c": true,
 	".h": true, ".cpp": true, ".hpp": true, ".cs": true, ".php": true,
 	".sh": true, ".bash": true, ".zsh": true, ".sql": true, ".csv": true,
-	".toml": true, ".ini": true, ".cfg": true, ".conf": true, ".env": true,
+	".toml": true, ".ini": true, ".cfg": true, ".conf": true,
 	".log": true, ".lock": true, ".sum": true, ".mod": true,
+}
+
+func isEnvFilePath(filePath string) bool {
+	base := strings.ToLower(filepath.Base(filepath.Clean(filePath)))
+	ext := strings.ToLower(filepath.Ext(base))
+
+	return base == ".env" || strings.HasPrefix(base, ".env.") || ext == ".env"
+}
+
+func (fs *Fs) validateNoEnvPath(filePath string) error {
+	if isEnvFilePath(filePath) {
+		return fmt.Errorf("access to .env files is not allowed: %s", filePath)
+	}
+
+	return nil
 }
 
 // validatePath ensures that the given file path stays within the root directory.
 // It returns the validated absolute path or an error if the path escapes the root.
 func (fs *Fs) validatePath(filePath string) (string, error) {
+	if err := fs.validateNoEnvPath(filePath); err != nil {
+		return "", err
+	}
+
 	// Get absolute path of root
 	absRoot, err := filepath.Abs(fs.dir)
 	if err != nil {
