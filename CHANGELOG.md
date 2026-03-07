@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-07
+- [5e2f230](http://github.com/thinktwiceco/agent-forge/commit/5e2f230deb74673b306ec38ebcd48b86ab4cb898) - chore(release): prepare release v0.6.0 (#42)
+- [3ed2764](http://github.com/thinktwiceco/agent-forge/commit/3ed276486c13872649373f751ec2302d87a4eef4) - feat(agents!): parallel tool execution, context truncation, ModelInfo
+
+
+## [Unreleased]
 ## [0.4.14] - 2026-03-04
 - [94495fe](http://github.com/thinktwiceco/agent-forge/commit/94495feb91cd2f90dc093b930e096ef7822c60f6) - chore(release): prepare release v0.4.14 (#38)
 - [ac67d85](http://github.com/thinktwiceco/agent-forge/commit/ac67d85724e2a6bbf59a4f8ea6eabf6fe9b592dd) - feat(plugins): add retention hook, bracket prompts, install templates, interactive_tree
