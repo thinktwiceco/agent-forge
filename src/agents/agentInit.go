@@ -65,6 +65,12 @@ func (a *Agent) ensureConfig() {
 
 	// Initialize context window management fields
 	a.maxContextTokens = a.config.MaxContextTokens
+	if a.maxContextTokens == 0 {
+		if info := a.llmEngine.ModelInfo(); info.ContextWindow > 0 {
+			a.maxContextTokens = info.ContextWindow
+			agentforge.Debug("MaxContextTokens auto-set from ModelInfo: %d", a.maxContextTokens)
+		}
+	}
 	a.reservedOutputTokens = a.config.ReservedOutputTokens
 	a.minRecentMessages = a.config.MinRecentMessages
 	a.enableSummarization = a.config.EnableSummarization
@@ -211,6 +217,11 @@ func (a *Agent) createExecutor() ExecutionEngine {
 		},
 		LogHookErrors: logHookErrors,
 	}
+	var truncateHistory func([]*llms.UnifiedMessage) []*llms.UnifiedMessage
+	if a.maxContextTokens > 0 {
+		truncateHistory = a.contextMgr.TruncateHistory
+	}
+
 	return execution.NewExecutor(
 		a.llmEngine,
 		a.tools,
@@ -219,6 +230,7 @@ func (a *Agent) createExecutor() ExecutionEngine {
 			MaxToolIterations: a.config.MaxToolIterations,
 			AgentName:         a.config.AgentName,
 			Tracer:            a.config.Tracer,
+			TruncateHistory:   truncateHistory,
 		},
 		hooks,
 	)

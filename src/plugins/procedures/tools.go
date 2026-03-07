@@ -95,6 +95,11 @@ func (p *ProceduresPlugin) handleStartProcedure(args map[string]any) llms.ToolRe
 
 	proc, exists := p.procedures[name]
 	if !exists {
+		// Re-scan disk in case procedures were added after initialization.
+		_ = p.loadProcedures()
+		proc, exists = p.procedures[name]
+	}
+	if !exists {
 		available := make([]string, 0, len(p.procedures))
 		for n := range p.procedures {
 			available = append(available, n)

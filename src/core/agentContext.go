@@ -66,6 +66,11 @@ func (ac *AgentContext) BuildContext(responseCh *ResponseCh) map[string]any {
 	context["trace"] = ac.Trace
 	context["model"] = ac.Model
 	context["responseCh"] = responseCh
+	chatId := ""
+	if responseCh != nil {
+		chatId = responseCh.GetChatId()
+	}
+	context["chatId"] = chatId
 	context["tools"] = ac.Tools
 	context["workingDir"] = ac.WorkingDir
 	context["subAgents"] = ac.SubAgents

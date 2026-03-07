@@ -140,14 +140,28 @@ func (p *VaultPlugin) onAgentInitialized(a *agents.Agent) error {
 	return nil
 }
 
+// sensitiveSuffixes is the list of substrings that make a vault key off-limits
+// for direct SessionStorage access. Keys matching any of these can only flow
+// through the onBeforeToolExecution hook (i.e. fill_secret), where the decrypted
+// value is written directly to the browser and never returned to the LLM.
+var sensitiveSuffixes = []string{"password", "token", "secret"}
+
 // onContextBuild injects the resolveSecret function into SessionStorage so tools
 // can programmatically decrypt secrets at runtime.
+// Keys whose names contain "password", "token", or "secret" are blocked here —
+// they may only be resolved through the onBeforeToolExecution hook (fill_secret).
 func (p *VaultPlugin) onContextBuild(a *agents.Agent, agentContext *core.AgentContext) error {
 	if agentContext.SessionStorage == nil {
 		agentContext.SessionStorage = make(map[string]any)
 	}
 
 	agentContext.SessionStorage[sessionStorageKey] = func(key string) (string, error) {
+		lower := strings.ToLower(key)
+		for _, word := range sensitiveSuffixes {
+			if strings.Contains(lower, word) {
+				return "", fmt.Errorf("vault: direct decryption of key %q is not allowed — keys containing %q can only be used via fill_secret", key, word)
+			}
+		}
 		return p.resolveSecret(key)
 	}
 

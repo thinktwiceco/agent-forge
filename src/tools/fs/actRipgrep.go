@@ -17,9 +17,9 @@ func (fs *Fs) ripgrep(path, pattern string, flags []string, offset, headLimit in
 		return "", err
 	}
 
-	// Check if ripgrep is available
+	// Check if ripgrep is available; fall back to grep transparently if not.
 	if _, err := exec.LookPath("rg"); err != nil {
-		return "", fmt.Errorf("ripgrep (rg) is not installed or not in PATH")
+		return fs.grepFallback(path, validatedPath, pattern, flags, offset, headLimit)
 	}
 
 	// Build ripgrep command
@@ -85,8 +85,11 @@ func (fs *Fs) ripgrep(path, pattern string, flags []string, offset, headLimit in
 	}
 	lines = lines[offset:]
 
-	// Apply head_limit
-	if headLimit > 0 && len(lines) > headLimit {
+	// Apply head_limit (default 500 when caller omits it to avoid context overflow)
+	if headLimit == 0 {
+		headLimit = 500
+	}
+	if len(lines) > headLimit {
 		lines = lines[:headLimit]
 	}
 

@@ -1,5 +1,18 @@
 package llms
 
+// ModelInfo contains static metadata about a model.
+// Zero-value means unknown/unsupported for that field.
+type ModelInfo struct {
+	Name              string
+	Provider          string
+	ContextWindow     int // max input tokens; 0 = unknown
+	MaxOutputTokens   int // max completion tokens; 0 = unknown
+	SupportsReasoning bool
+	SupportsVision    bool
+	InputPricePer1M   float64 // USD per 1M input tokens
+	OutputPricePer1M  float64 // USD per 1M output tokens
+}
+
 // Base URLs for LLM providers
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 const TOGETHERAI_BASE_URL = "https://api.together.xyz/v1"
@@ -62,4 +75,58 @@ var ProviderAPIKeyEnvVar = map[string]string{
 	"openai":     OpenAIAPIKeyEnvVar,
 	"deepseek":   DeepSeekAPIKeyEnvVar,
 	"togetherai": TogetherAIAPIKeyEnvVar,
+}
+
+// KnownModels maps model name strings to their static metadata.
+// Models not present return a zero-value ModelInfo (all fields unknown).
+var KnownModels = map[string]ModelInfo{
+	OPENAI_GPT5O: {
+		Name: OPENAI_GPT5O, Provider: "openai",
+		ContextWindow: 128_000, MaxOutputTokens: 16_384,
+		SupportsVision: true,
+	},
+	OPENAI_GPT5_1: {
+		Name: OPENAI_GPT5_1, Provider: "openai",
+		ContextWindow: 128_000, MaxOutputTokens: 16_384,
+		SupportsVision: true,
+	},
+	OPENAI_GPT5_2: {
+		Name: OPENAI_GPT5_2, Provider: "openai",
+		ContextWindow: 128_000, MaxOutputTokens: 16_384,
+		SupportsReasoning: true, SupportsVision: true,
+	},
+	DEEPSEEK_CHAT: {
+		Name: DEEPSEEK_CHAT, Provider: "deepseek",
+		ContextWindow: 64_000, MaxOutputTokens: 8_000,
+		InputPricePer1M: 0.27, OutputPricePer1M: 1.10,
+	},
+	TOGETHERAI_Llama3170BInstructTurbo: {
+		Name: TOGETHERAI_Llama3170BInstructTurbo, Provider: "togetherai",
+		ContextWindow: 128_000, MaxOutputTokens: 4_096,
+	},
+	TOGETHERAI_Llama323BInstructTurbo: {
+		Name: TOGETHERAI_Llama323BInstructTurbo, Provider: "togetherai",
+		ContextWindow: 128_000, MaxOutputTokens: 4_096,
+	},
+	TOGETHERAI_Qwen257BInstructTurbo: {
+		Name: TOGETHERAI_Qwen257BInstructTurbo, Provider: "togetherai",
+		ContextWindow: 32_000, MaxOutputTokens: 4_096,
+	},
+	TOGETHERAI_Qwen3Coder480B: {
+		Name: TOGETHERAI_Qwen3Coder480B, Provider: "togetherai",
+		ContextWindow: 131_072, MaxOutputTokens: 8_192,
+		SupportsReasoning: true,
+	},
+	TOGETHERAI_OPENAIGPTOSS120B: {
+		Name: TOGETHERAI_OPENAIGPTOSS120B, Provider: "togetherai",
+		ContextWindow: 128_000, MaxOutputTokens: 16_384,
+	},
+	TOGETHERAI_ZaiGLM47: {
+		Name: TOGETHERAI_ZaiGLM47, Provider: "togetherai",
+		ContextWindow: 128_000, MaxOutputTokens: 8_192,
+	},
+	TOGETHERAI_KimiK25: {
+		Name: TOGETHERAI_KimiK25, Provider: "togetherai",
+		ContextWindow: 128_000, MaxOutputTokens: 8_192,
+	},
 }

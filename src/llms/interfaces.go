@@ -65,6 +65,7 @@ type LLMEngine interface {
 	ChatStream(messages []*UnifiedMessage, tools []Tool) *ResponseCh
 	Model() string
 	Provider() string
+	ModelInfo() ModelInfo
 }
 
 // Tool is an interface for tools that can be used by agents.

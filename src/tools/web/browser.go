@@ -114,13 +114,36 @@ func (w *WebBrowser) listSessions() llms.ToolReturn {
 	out := fmt.Sprintf("Active browser sessions (%d):\n\n", len(infos))
 	for _, s := range infos {
 		out += fmt.Sprintf("  Session: %s\n    Created:   %s\n    Last used: %s\n    Idle for:  %s\n\n",
-			s.Key,
+			s.Name,
 			s.Created.Format("2006-01-02 15:04:05"),
 			s.LastUsed.Format("2006-01-02 15:04:05"),
 			s.IdleFor,
 		)
 	}
 	return core.NewSuccessResponse(out)
+}
+
+// openSession opens a new named browser session or resumes an existing one.
+func (w *WebBrowser) openSession(agentContext map[string]any, args map[string]any) llms.ToolReturn {
+	headless := false
+	if h, ok := args["headless"].(bool); ok {
+		headless = h
+	}
+
+	sessionName, _ := agentContext["browserSession"].(string)
+	if sessionName == "" {
+		sessionName = "default"
+	}
+
+	isNew, err := w.sessionManager.OpenSession(agentContext, headless)
+	if err != nil {
+		return core.NewErrorResponse(fmt.Sprintf("failed to open browser session '%s': %v", sessionName, err))
+	}
+
+	if isNew {
+		return core.NewSuccessResponse(fmt.Sprintf("New browser session '%s' opened.", sessionName))
+	}
+	return core.NewSuccessResponse(fmt.Sprintf("Resumed existing browser session '%s'.", sessionName))
 }
 
 // closeSession closes the browser session resolved from agentContext.

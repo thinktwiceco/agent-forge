@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
@@ -23,6 +24,9 @@ type Config struct {
 	MaxToolIterations int
 	AgentName         string
 	Tracer            telemetry.Tracer
+	// TruncateHistory is called before each LLM call to keep accumulated history
+	// within the model's context window. Nil means no mid-turn truncation.
+	TruncateHistory func([]*llms.UnifiedMessage) []*llms.UnifiedMessage
 }
 
 // Executor handles tool and chat execution.
@@ -90,6 +94,9 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 
 		iteration++
 		messages := hm.Messages()
+		if e.config.TruncateHistory != nil {
+			messages = e.config.TruncateHistory(messages)
+		}
 		agentforge.Debug("Starting iteration %d with %d messages in history", iteration, len(messages))
 
 		llmResponseCh := e.llmEngine.ChatStream(messages, e.tools)
@@ -264,23 +271,33 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 			TotalTokens:      totalTokens,
 		})
 
-		agentforge.Debug("Detected %d tool calls, executing tools", len(toolCalls))
-		for _, toolCall := range toolCalls {
-			// Deep-copy Arguments so hook mutations (e.g. vault secret decryption)
-			// do not corrupt the shared map that the history entry still references.
-			if toolCall.Arguments != nil {
-				argsCopy := make(map[string]any, len(toolCall.Arguments))
-				for k, v := range toolCall.Arguments {
+		agentforge.Debug("Detected %d tool calls, executing tools in parallel", len(toolCalls))
+
+		type iterResult struct {
+			result   llms.ToolResult
+			duration time.Duration
+			localCtx *core.AgentContext
+		}
+		iterResults := make([]iterResult, len(toolCalls))
+		hookErrsList := make([][]error, len(toolCalls))
+
+		// Pre-phase (serial): deep-copy args, send StatusToolExecuting, run OnBeforeToolExecution.
+		// Hooks that mutate arguments (e.g. vault secret decryption) must run before goroutines start.
+		for i := range toolCalls {
+			tc := &toolCalls[i]
+			if tc.Arguments != nil {
+				argsCopy := make(map[string]any, len(tc.Arguments))
+				for k, v := range tc.Arguments {
 					argsCopy[k] = v
 				}
-				toolCall.Arguments = argsCopy
+				tc.Arguments = argsCopy
 			}
 
-			agentforge.Debug("Executing tool: %s (ID: %s)", toolCall.Name, toolCall.ID)
+			agentforge.Debug("Queuing tool for parallel execution: %s (ID: %s)", tc.Name, tc.ID)
 			executingChunk := llms.ChunkResponse{
 				Status:        llms.StatusToolExecuting,
 				Type:          llms.TypeToolExecuting,
-				ToolExecuting: &toolCall,
+				ToolExecuting: tc,
 				Iteration:     iteration,
 			}
 			executingBytes, err := json.Marshal(executingChunk)
@@ -291,47 +308,72 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 				return nil
 			}
 
-			var hookErrs []error
 			if e.hooks != nil && e.hooks.OnBeforeToolExecution != nil {
-				hookErrs = e.hooks.OnBeforeToolExecution(&toolCall)
+				hookErrsList[i] = e.hooks.OnBeforeToolExecution(tc)
 				if e.hooks.LogHookErrors != nil {
-					e.hooks.LogHookErrors(hookErrs)
+					e.hooks.LogHookErrors(hookErrsList[i])
 				}
+			}
+		}
+
+		// Parallel phase: each tool runs in its own goroutine with an isolated context snapshot.
+		// Writing to iterResults[i] is safe without a mutex since each goroutine owns a unique index.
+		var wg sync.WaitGroup
+		for i, toolCall := range toolCalls {
+			wg.Add(1)
+			go func(idx int, tc llms.ToolCall, hookErrs []error) {
+				defer wg.Done()
+				localCtx := callCtx.Snapshot()
+				start := time.Now()
+				var result llms.ToolResult
+				if len(hookErrs) > 0 {
+					msgs := make([]string, len(hookErrs))
+					for j, herr := range hookErrs {
+						msgs[j] = herr.Error()
+					}
+					result = llms.ToolResult{
+						ToolCallID: tc.ID,
+						ToolName:   tc.Name,
+						Success:    false,
+						Error:      strings.Join(msgs, "; "),
+					}
+				} else {
+					result = e.executeToolWithContext(tc, responseCh, localCtx)
+				}
+				iterResults[idx] = iterResult{result, time.Since(start), localCtx}
+			}(i, toolCall, hookErrsList[i])
+		}
+		wg.Wait()
+
+		// Post-phase (serial): merge context snapshots, run post-execution hooks,
+		// send result chunks, and write to history — all in original tool call order.
+		const maxToolResultLen = 50_000
+		for i, toolCall := range toolCalls {
+			r := iterResults[i]
+
+			// Merge mutable state from the goroutine's isolated snapshot back into callCtx.
+			// Last-writer-wins for keys written by multiple tools in the same batch.
+			if syncErr := callCtx.SyncFromMap(r.localCtx.BuildContext(responseCh)); syncErr != nil {
+				agentforge.Debug("Warning: failed to sync context after parallel tool execution: %v", syncErr)
 			}
 
-			toolStart := time.Now()
-			var toolResult llms.ToolResult
-			if len(hookErrs) > 0 {
-				msgs := make([]string, len(hookErrs))
-				for i, err := range hookErrs {
-					msgs[i] = err.Error()
-				}
-				toolResult = llms.ToolResult{
-					ToolCallID: toolCall.ID,
-					ToolName:   toolCall.Name,
-					Success:    false,
-					Error:      strings.Join(msgs, "; "),
-				}
-			} else {
-				toolResult = e.executeToolWithContext(toolCall, responseCh, callCtx)
-			}
 			if e.config.Tracer != nil {
 				e.config.Tracer.TraceToolExecution(ctx, telemetry.ToolExecutionEvent{
 					AgentName: e.config.AgentName,
 					ToolName:  toolCall.Name,
-					Duration:  time.Since(toolStart),
-					Success:   toolResult.Success,
-					Error:     toolResult.Error,
+					Duration:  r.duration,
+					Success:   r.result.Success,
+					Error:     r.result.Error,
 					Iteration: iteration,
 				})
 			}
 
-			if toolResult.Cleanup != nil {
-				cleanupFuncs = append(cleanupFuncs, toolResult.Cleanup)
+			if r.result.Cleanup != nil {
+				cleanupFuncs = append(cleanupFuncs, r.result.Cleanup)
 			}
 
 			if e.hooks != nil && e.hooks.OnToolExecution != nil {
-				errs := e.hooks.OnToolExecution(&toolResult)
+				errs := e.hooks.OnToolExecution(&r.result)
 				if e.hooks.LogHookErrors != nil {
 					e.hooks.LogHookErrors(errs)
 				}
@@ -340,7 +382,7 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 			resultChunk := llms.ChunkResponse{
 				Status:      llms.StatusToolResult,
 				Type:        llms.TypeToolResult,
-				ToolResults: []llms.ToolResult{toolResult},
+				ToolResults: []llms.ToolResult{r.result},
 				Iteration:   iteration,
 			}
 			resultBytes, err := json.Marshal(resultChunk)
@@ -352,19 +394,23 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 				return nil
 			}
 
-			content := toolResult.Result
-			if !toolResult.Success && toolResult.Error != "" {
+			content := r.result.Result
+			if !r.result.Success && r.result.Error != "" {
 				if content != "" {
-					content = content + "\nError: " + toolResult.Error
+					content = content + "\nError: " + r.result.Error
 				} else {
-					content = "Error: " + toolResult.Error
+					content = "Error: " + r.result.Error
 				}
 			}
-			if toolResult.Success && strings.HasPrefix(content, "data:") {
-				hm.AddToolMessage(toolCall.ID, "[image loaded]", toolResult.Ephemeral)
+			if len(content) > maxToolResultLen {
+				content = content[:maxToolResultLen] +
+					"\n\n[...truncated — use head_limit/offset to paginate]"
+			}
+			if r.result.Success && strings.HasPrefix(content, "data:") {
+				hm.AddToolMessage(toolCall.ID, "[image loaded]", r.result.Ephemeral)
 				hm.AddUserMessageWithImages("", content)
 			} else {
-				hm.AddToolMessage(toolCall.ID, content, toolResult.Ephemeral)
+				hm.AddToolMessage(toolCall.ID, content, r.result.Ephemeral)
 			}
 		}
 

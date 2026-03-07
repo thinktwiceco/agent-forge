@@ -1,0 +1,2 @@
+name: fill-form
+description: "Generic multi-step procedure to fill a web form. Covers goal definition, state inspection, secret resolution, HTML download, CSS selector discovery, input filling (with vault support), button click, and outcome assessment."

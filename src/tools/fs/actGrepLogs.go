@@ -25,9 +25,9 @@ func (fs *Fs) grepLogs(pattern string, flags []string, offset, headLimit int) (s
 		return "", fmt.Errorf("failed to resolve log file path %s: %w", logFilePath, err)
 	}
 
-	// Check if ripgrep is available
+	// Check if ripgrep is available; fall back to grep transparently if not.
 	if _, err := exec.LookPath("rg"); err != nil {
-		return "", fmt.Errorf("ripgrep (rg) is not installed or not in PATH")
+		return fs.grepFallback(logFilePath, absPath, pattern, flags, offset, headLimit)
 	}
 
 	// Build ripgrep command - search in the single log file

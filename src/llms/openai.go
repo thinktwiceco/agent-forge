@@ -76,6 +76,13 @@ func (a *openAILLM) Provider() string {
 	return a.provider
 }
 
+func (a *openAILLM) ModelInfo() ModelInfo {
+	if info, ok := KnownModels[a.model]; ok {
+		return info
+	}
+	return ModelInfo{}
+}
+
 func toOpenAIMessages(messages []*UnifiedMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
 	openaiMessages := make([]openai.ChatCompletionMessageParamUnion, len(messages))
 	for i, message := range messages {

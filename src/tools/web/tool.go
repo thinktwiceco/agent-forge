@@ -100,6 +100,11 @@ func NewWebTool(dir string) llms.Tool {
 			return `close_session: Close the browser session identified by the session parameter.
 - Optional: session (string) — name of the session to close (closes default session if omitted)
 - Use this to free resources when a session is no longer needed`
+		case "open_session":
+			return `open_session: Open a new named browser session or resume an existing one.
+- Optional: session (string) — name for the session (default: "default"); reuse the same name to resume
+- Optional: headless (boolean, default false) — run browser headlessly
+- Returns confirmation of whether the session was newly created or resumed`
 		default:
 			return fmt.Sprintf("Nothing to add about %s", item)
 		}
@@ -109,7 +114,7 @@ func NewWebTool(dir string) llms.Tool {
 		Name:        "web_browser",
 		Description: "Navigate the web, pull content from pages, interact with buttons and form inputs using a headless browser, and search the web via the Brave Search API.",
 		AdvanceDesc: `Advanced Details:
-- Available actions: navigate, click, fill, fill_secret, get_content, save_content, web_search, upload_file, refresh, list_sessions, close_session
+- Available actions: open_session, navigate, click, fill, fill_secret, get_content, save_content, web_search, upload_file, refresh, list_sessions, close_session
   Use expand tool with details_about="<action>" for full parameter details on any action.
 - Common parameters:
   * action (required): the action to perform
@@ -140,14 +145,20 @@ func NewWebTool(dir string) llms.Tool {
 			{
 				Name:        "action",
 				Type:        "string",
-				Description: "The action to perform: 'navigate', 'click', 'fill', 'fill_secret', 'get_content', 'save_content', 'web_search', 'upload_file', 'refresh', 'list_sessions', or 'close_session'",
+				Description: "The action to perform: 'open_session', 'navigate', 'click', 'fill', 'fill_secret', 'get_content', 'save_content', 'web_search', 'upload_file', 'refresh', 'list_sessions', or 'close_session'",
 				Required:    true,
 				Validator:   validateAction,
 			},
 			{
 				Name:        "session",
 				Type:        "string",
-				Description: "Optional name for the browser session. Allows managing multiple independent browser sessions. Omit to use the default session. Use 'list_sessions' to see active sessions and 'close_session' to close one.",
+				Description: "Optional name for the browser session. Allows managing multiple independent browser sessions. Omit to use the default session. Use 'open_session' to create/resume, 'list_sessions' to see active sessions, and 'close_session' to close one.",
+				Required:    false,
+			},
+			{
+				Name:        "headless",
+				Type:        "boolean",
+				Description: "Whether to run the browser in headless mode (optional for 'open_session', default: false)",
 				Required:    false,
 			},
 			{
@@ -262,6 +273,8 @@ func NewWebTool(dir string) llms.Tool {
 			agentforge.Info("Action: ---> %s", action)
 
 			switch action {
+			case "open_session":
+				return w.openSession(agentContext, args)
 			case "navigate":
 				return w.navigate(agentContext, args)
 			case "click":
@@ -285,7 +298,7 @@ func NewWebTool(dir string) llms.Tool {
 			case "close_session":
 				return w.closeSession(agentContext)
 			default:
-				return core.NewErrorResponse(fmt.Sprintf("unknown action: %s. Valid actions are: navigate, click, fill, fill_secret, get_content, save_content, web_search, upload_file, refresh, list_sessions, close_session", action))
+				return core.NewErrorResponse(fmt.Sprintf("unknown action: %s. Valid actions are: open_session, navigate, click, fill, fill_secret, get_content, save_content, web_search, upload_file, refresh, list_sessions, close_session", action))
 			}
 		},
 	}

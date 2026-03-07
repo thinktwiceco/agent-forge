@@ -11,6 +11,7 @@ func validateAction(value any) error {
 		return fmt.Errorf("action must be a string")
 	}
 	validActions := map[string]bool{
+		"open_session":  true,
 		"navigate":      true,
 		"click":         true,
 		"fill":          true,
@@ -24,7 +25,7 @@ func validateAction(value any) error {
 		"close_session": true,
 	}
 	if !validActions[action] {
-		return fmt.Errorf("invalid action: %s. Must be one of: navigate, click, fill, fill_secret, get_content, save_content, web_search, upload_file, refresh, list_sessions, close_session", action)
+		return fmt.Errorf("invalid action: %s. Must be one of: open_session, navigate, click, fill, fill_secret, get_content, save_content, web_search, upload_file, refresh, list_sessions, close_session", action)
 	}
 	return nil
 }

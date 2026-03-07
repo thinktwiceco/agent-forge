@@ -78,10 +78,10 @@ export class ChatManager {
     this.imagePreviewEl = document.getElementById("image-preview");
     this.scrollBtn = document.getElementById("scroll-to-bottom");
 
-    // activeTurn: the currently-open assistant response container.
-    // All stream events (content, tool calls, tool results) render inside one turn.
-    // { el, textEl, toolGroupEl, toolGroupBodyEl, rawText }
-    this.activeTurn = null;
+    // activeTurns: map from chatId → open assistant response container.
+    // Each unique chatId gets its own section; events are routed by chatId.
+    // { el, textEl, toolGroupEl, toolGroupBodyEl, toolCallEntries, rawText }
+    this.activeTurns = new Map();
     this.thinkingEl = null;
     this.abortController = null;
     this.pushController = null;
@@ -370,12 +370,21 @@ export class ChatManager {
     else if (eventType === "tool_call") this.handleToolCallEvent(payload);
     else if (eventType === "tool_executing") this.handleToolExecutingEvent(payload);
     else if (eventType === "tool_result") this.handleToolResultEvent(payload);
+    else if (eventType === "completed") {
+      const chatId = payload.chatId || this.state.conversationId;
+      this.activeTurns.delete(chatId);
+      if (chatId) {
+        this.state.events.dispatchEvent(
+          new CustomEvent("conversationUpdated", { detail: { id: chatId } })
+        );
+      }
+    }
   }
 
   // ── Conversation lifecycle ────────────────────────────────────────────────
   clearMessages() {
     this.messagesEl.innerHTML = "";
-    this.activeTurn = null;
+    this.activeTurns.clear();
     this.thinkingEl = null;
   }
 
@@ -404,7 +413,7 @@ export class ChatManager {
     this._clearEmptyState();
     this.appendUserMessage(text, previewUrls);
 
-    this.activeTurn = null;
+    this.activeTurns.clear();
 
     await this.startStream(message);
   }
@@ -451,10 +460,16 @@ export class ChatManager {
     // Hide system messages
     if (role === "system") return;
 
-    // User messages: close the current turn, render user bubble
+    // User messages: close all open turns, render user bubble
     if (role === "user") {
-      this.activeTurn = null;
-      this.appendUserMessage(msg.content || "", []);
+      this.activeTurns.clear();
+      let content = msg.content || "";
+      const sep = content.indexOf("\n\n");
+      if (sep !== -1 && /^sender:/m.test(content.slice(0, sep))) {
+        if (!/^sender:\s*user\s*$/m.test(content.slice(0, sep))) return;
+        content = content.slice(sep + 2);
+      }
+      this.appendUserMessage(content, []);
       return;
     }
 
@@ -556,19 +571,22 @@ export class ChatManager {
   }
 
   // ── Tool group helpers ────────────────────────────────────────────────────
-  _appendToolGroupEntry(bodyEl, type, text) {
+  _appendToolGroupEntry(bodyEl, type, text, callId = null) {
     const entry = document.createElement("div");
     entry.className = `tool-group-entry entry-${type}`;
     entry.textContent = text;
+    if (callId) entry.dataset.callId = callId;
     bodyEl.appendChild(entry);
     this.scrollToBottom();
+    return entry;
   }
 
-  _updateToolGroupSummary() {
-    if (!this.activeTurn?.toolGroupEl) return;
-    const summary = this.activeTurn.toolGroupEl.querySelector("summary");
+  _updateToolGroupSummary(chatId) {
+    const turn = this.activeTurns.get(chatId);
+    if (!turn?.toolGroupEl) return;
+    const summary = turn.toolGroupEl.querySelector("summary");
     if (!summary) return;
-    const entryCount = this.activeTurn.toolGroupEl.querySelectorAll(".tool-group-entry").length;
+    const entryCount = turn.toolGroupEl.querySelectorAll(".tool-group-entry").length;
     const label = summary.dataset.label || "Assistant";
     summary.textContent = `${label} — ${entryCount} tool action${entryCount !== 1 ? "s" : ""}`;
   }
@@ -651,6 +669,7 @@ export class ChatManager {
       this.setStatus("Idle");
       this.hideStopButton();
       this._removeThinking();
+      this.activeTurns.delete(this.state.conversationId);
       this.state.events.dispatchEvent(
         new CustomEvent("conversationUpdated", { detail: { id: this.state.conversationId } })
       );
@@ -705,23 +724,26 @@ export class ChatManager {
     this.messagesEl.appendChild(turnEl);
     this.scrollToBottom();
 
-    this.activeTurn = {
+    return {
       el: turnEl,
       textEl,
       toolGroupEl: null,
       toolGroupBodyEl: null,
+      toolCallEntries: new Map(),
       rawText: "",
     };
-    return this.activeTurn;
   }
 
-  _ensureTurn(label) {
-    if (!this.activeTurn) this._startTurn(label);
-    return this.activeTurn;
+  _ensureTurn(chatId, label) {
+    if (!this.activeTurns.has(chatId)) {
+      const turn = this._startTurn(label);
+      this.activeTurns.set(chatId, turn);
+    }
+    return this.activeTurns.get(chatId);
   }
 
-  _ensureToolGroup(label) {
-    const turn = this._ensureTurn(label);
+  _ensureToolGroup(chatId, label) {
+    const turn = this._ensureTurn(chatId, label);
     if (!turn.toolGroupEl) {
       // Insert tool group before the copy button
       const details = document.createElement("details");
@@ -753,8 +775,9 @@ export class ChatManager {
 
     this._removeThinking();
 
+    const chatId = payload.chatId || this.state.conversationId || "";
     const label = this.formatAgentLabel(payload);
-    const turn = this._ensureTurn(label);
+    const turn = this._ensureTurn(chatId, label);
 
     turn.rawText += delta;
     turn.textEl.setAttribute("data-raw-content", turn.rawText);
@@ -765,48 +788,84 @@ export class ChatManager {
   handleToolCallEvent(payload) {
     this._removeThinking();
 
+    const chatId = payload.chatId || this.state.conversationId || "";
     const label = this.formatAgentLabel(payload);
-    const turn = this._ensureToolGroup(label);
+    const turn = this._ensureToolGroup(chatId, label);
     const calls = payload.toolCalls || [];
 
-    calls.forEach((call) => {
-      this._appendToolGroupEntry(turn.toolGroupBodyEl, "call", formatToolCallSummary(call));
+    calls.forEach((call, i) => {
+      const callId = call.id || `${formatToolCallSummary(call)}-${i}`;
+      if (!turn.toolCallEntries.has(callId)) {
+        const entry = this._appendToolGroupEntry(turn.toolGroupBodyEl, "call", formatToolCallSummary(call), callId);
+        turn.toolCallEntries.set(callId, entry);
+      }
     });
-    this._updateToolGroupSummary();
+    this._updateToolGroupSummary(chatId);
   }
 
   handleToolExecutingEvent(payload) {
     const call = payload.toolExecuting;
     if (!call) return;
 
+    const chatId = payload.chatId || this.state.conversationId || "";
     const label = this.formatAgentLabel(payload);
-    const turn = this._ensureToolGroup(label);
-    this._appendToolGroupEntry(turn.toolGroupBodyEl, "running", `Running: ${formatToolCallSummary(call)}`);
-    this._updateToolGroupSummary();
+    const turn = this._ensureToolGroup(chatId, label);
+
+    const callId = call.id || formatToolCallSummary(call);
+    const text = formatToolCallSummary(call);
+
+    if (turn.toolCallEntries.has(callId)) {
+      const entry = turn.toolCallEntries.get(callId);
+      entry.className = "tool-group-entry entry-running";
+      entry.textContent = text;
+    } else {
+      const entry = this._appendToolGroupEntry(turn.toolGroupBodyEl, "running", text, callId);
+      turn.toolCallEntries.set(callId, entry);
+      this._updateToolGroupSummary(chatId);
+    }
   }
 
   handleToolResultEvent(payload) {
     const results = payload.toolResults || [];
     if (results.length === 0) return;
 
+    const chatId = payload.chatId || this.state.conversationId || "";
     const label = this.formatAgentLabel(payload);
-    const turn = this._ensureToolGroup(label);
+    const turn = this._ensureToolGroup(chatId, label);
 
     results.forEach((result) => {
+      const callId = result.toolCallId || result.toolName;
       if (!result.success) {
         const toolName = result.toolName || "Tool";
         const errorMsg = result.error || "Unknown error";
-        this._appendToolGroupEntry(turn.toolGroupBodyEl, "error", `✗ ${toolName}: ${errorMsg}`);
+        const text = `✗ ${toolName}: ${errorMsg}`;
+        if (callId && turn.toolCallEntries.has(callId)) {
+          const entry = turn.toolCallEntries.get(callId);
+          entry.className = "tool-group-entry entry-error";
+          entry.textContent = text;
+        } else {
+          this._appendToolGroupEntry(turn.toolGroupBodyEl, "error", text, callId);
+        }
       } else if (!result.ephemeral) {
         const summary = formatToolResultSummary(result);
         if (summary) {
-          this._appendToolGroupEntry(turn.toolGroupBodyEl, "success", summary);
+          if (callId && turn.toolCallEntries.has(callId)) {
+            const entry = turn.toolCallEntries.get(callId);
+            entry.className = "tool-group-entry entry-success";
+            entry.textContent = summary;
+          } else {
+            this._appendToolGroupEntry(turn.toolGroupBodyEl, "success", summary, callId);
+          }
         }
+      } else if (result.ephemeral && callId && turn.toolCallEntries.has(callId)) {
+        // Ephemeral tool completed — remove its entry entirely (no result to show)
+        turn.toolCallEntries.get(callId).remove();
+        turn.toolCallEntries.delete(callId);
       }
     });
-    this._updateToolGroupSummary();
-    // Close the turn — next content from the agent (post-tool response) opens a fresh bubble.
-    this.activeTurn = null;
+    this._updateToolGroupSummary(chatId);
+    // Close this chatId's turn — next content from the same chatId opens a fresh bubble.
+    this.activeTurns.delete(chatId);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

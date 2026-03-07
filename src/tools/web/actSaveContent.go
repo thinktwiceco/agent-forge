@@ -160,7 +160,7 @@ func (w *WebBrowser) saveContent(agentContext map[string]any, args map[string]an
 	response := &saveContentResponse{
 		Operation: "save_content",
 		Filename:  filename,
-		Path:      filePath,
+		Path:      filepath.Join("web", filename),
 		Success:   true,
 	}
 

@@ -46,7 +46,7 @@ func newScheduleTool(p *SchedulerPlugin) llms.Tool {
 				Required:    false,
 			},
 		},
-		Handler: func(_ map[string]any, args map[string]any) llms.ToolReturn {
+		Handler: func(agentCtx map[string]any, args map[string]any) llms.ToolReturn {
 			if p.sched == nil {
 				return core.NewErrorResponse("scheduler not initialized")
 			}
@@ -67,6 +67,10 @@ func newScheduleTool(p *SchedulerPlugin) llms.Tool {
 			}
 
 			chatID, _ := args["chat_id"].(string)
+			// Fall back to the current conversation so the reminder is delivered here.
+			if chatID == "" {
+				chatID, _ = agentCtx["chatId"].(string)
+			}
 
 			id, err := p.sched.schedule(TaskTypeAgentReminder, message, chatID, scheduledAt)
 			if err != nil {

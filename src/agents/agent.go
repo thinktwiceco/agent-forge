@@ -98,6 +98,7 @@ func NewAgent(config *AgentConfig) *Agent {
 	})
 
 	a.ensureHooks()
+	a.inbox = queue.New(64)
 	a.registerPlugins()
 
 	errs := a.hooks.agentInitializationEvent(a, config)
@@ -150,10 +151,6 @@ func NewAgent(config *AgentConfig) *Agent {
 	// Create executor
 	a.executor = a.createExecutor()
 
-	// Initialize the internal inbox queue and start a background drain goroutine.
-	// This ensures the delegate tool always has a queue available, even when the agent
-	// is used via HTTP without an explicit Drain call.
-	a.inbox = queue.New(64)
 	a.loadDelegateTool()
 	a.executor.UpdateTools(a.tools)
 	a.startBackgroundDrain()

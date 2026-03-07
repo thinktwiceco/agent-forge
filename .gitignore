@@ -37,6 +37,7 @@ cmd/localforge/sandbox/*
 cmd/localforge/procedures/
 cmd/localforge/data/
 cmd/localforge/vault/
+cmd/localforge/uploaded/
 
 # Node.js
 node_modules/

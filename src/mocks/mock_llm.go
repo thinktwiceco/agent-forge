@@ -11,6 +11,7 @@ import (
 type MockLLMEngine struct {
 	ModelName     string
 	ProviderName  string
+	MockModelInfo llms.ModelInfo
 	Responses     []string // Queue of text responses to return
 	RecordedCalls [][]*llms.UnifiedMessage
 	ResponseDelay time.Duration
@@ -98,4 +99,8 @@ func (m *MockLLMEngine) Model() string {
 
 func (m *MockLLMEngine) Provider() string {
 	return m.ProviderName
+}
+
+func (m *MockLLMEngine) ModelInfo() llms.ModelInfo {
+	return m.MockModelInfo
 }

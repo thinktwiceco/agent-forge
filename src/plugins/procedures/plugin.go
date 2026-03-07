@@ -18,10 +18,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed default
-var defaultProcedure embed.FS
+//go:embed default learn-procedure fill-form
+var defaultProcedures embed.FS
 
-const defaultProcedureDir = "create-procedure"
+const (
+	defaultProcedureDir  = "create-procedure"
+	learnProcedureDir    = "learn-procedure"
+	fillFormProcedureDir = "fill-form"
+)
 
 const PLUGIN_NAME = "procedures"
 
@@ -60,7 +64,7 @@ func NewProceduresPlugin(workingDir string) *ProceduresPlugin {
 		dir:        dir,
 		procedures: make(map[string]*Procedure),
 	}
-	p.ensureDefaultProcedure()
+	p.ensureDefaultProcedures()
 	return p
 }
 
@@ -98,6 +102,15 @@ func (p *ProceduresPlugin) SystemPrompt() string {
 	sb.WriteString("- Tool: procedure\n")
 	sb.WriteString("- Structured multi-step tasks. Actions: start_procedure, next_step, goto_step (jump to step by number).\n")
 	sb.WriteString("- Procedures live in procedures/ folder. When creating procedures, always use paths under procedures/ (e.g. procedures/my-procedure/).\n\n")
+	sb.WriteString("[PROCEDURE EXECUTION RULE — MANDATORY]\n")
+	sb.WriteString("At ANY step or tool call, if the outcome is not exactly what the step describes, or a Tool returne any error or unexpected result as expected:\n")
+	sb.WriteString("1. STOP immediately. Do not continue, retry, guess, or attempt to work around the problem.\n")
+	sb.WriteString("2. Report to the user with:\n")
+	sb.WriteString("   - Step: which step you were on\n")
+	sb.WriteString("   - Expected: what you expected to happen or find\n")
+	sb.WriteString("   - Found: what actually happened or was present\n")
+	sb.WriteString("   - Evidence: any tool output, error message, or file path relevant to the failure\n")
+	sb.WriteString("This rule is absolute and overrides any instinct to recover autonomously.\n\n")
 	sb.WriteString("[AVAILABLE]\n")
 
 	// Sort names for deterministic output
@@ -124,6 +137,7 @@ func (p *ProceduresPlugin) Tools() []llms.Tool {
 
 // loadProcedures scans baseDir for procedure subfolders and parses their manifests.
 func (p *ProceduresPlugin) loadProcedures() error {
+	p.procedures = make(map[string]*Procedure)
 	entries, err := os.ReadDir(p.dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -181,17 +195,23 @@ func loadProcedure(dir string) (*Procedure, error) {
 	}, nil
 }
 
-// ensureDefaultProcedure copies the embedded default procedure to the procedures
-// directory when the default procedure folder does not exist.
-func (p *ProceduresPlugin) ensureDefaultProcedure() {
-	destDir := filepath.Join(p.dir, defaultProcedureDir)
+// ensureDefaultProcedures copies embedded default procedures (create-procedure, learn-procedure)
+// to the procedures directory when they do not exist.
+func (p *ProceduresPlugin) ensureDefaultProcedures() {
+	p.ensureProcedure("default", defaultProcedureDir)
+	p.ensureProcedure("learn-procedure", learnProcedureDir)
+	p.ensureProcedure("fill-form", fillFormProcedureDir)
+}
+
+func (p *ProceduresPlugin) ensureProcedure(embedDir, destName string) {
+	destDir := filepath.Join(p.dir, destName)
 	if _, err := os.Stat(destDir); err == nil {
-		return // default procedure already exists
+		return // procedure already exists
 	}
 
-	fsys, err := fs.Sub(defaultProcedure, "default")
+	fsys, err := fs.Sub(defaultProcedures, embedDir)
 	if err != nil {
-		agentforge.Info("procedures plugin: failed to open default procedure: %v", err)
+		agentforge.Info("procedures plugin: failed to open %s: %v", embedDir, err)
 		return
 	}
 
@@ -210,10 +230,10 @@ func (p *ProceduresPlugin) ensureDefaultProcedure() {
 		_ = os.MkdirAll(filepath.Dir(destPath), 0755)
 		return os.WriteFile(destPath, data, 0644)
 	}); err != nil {
-		agentforge.Info("procedures plugin: failed to copy default procedure: %v", err)
+		agentforge.Info("procedures plugin: failed to copy %s: %v", embedDir, err)
 		return
 	}
-	agentforge.Info("procedures plugin: copied default procedure to %s", destDir)
+	agentforge.Info("procedures plugin: copied %s to %s", embedDir, destDir)
 }
 
 func init() {

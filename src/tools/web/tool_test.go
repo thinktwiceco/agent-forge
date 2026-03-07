@@ -11,6 +11,7 @@ func TestValidateAction(t *testing.T) {
 		action  any
 		wantErr bool
 	}{
+		{"valid_open_session", "open_session", false},
 		{"valid_navigate", "navigate", false},
 		{"valid_click", "click", false},
 		{"valid_get_content", "get_content", false},

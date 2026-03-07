@@ -88,9 +88,10 @@ func (p *SchedulerPlugin) SystemPrompt() string {
 	return `[SCHEDULER]
 - Tool: schedule
 - Use to create a reminder that fires at a specific future time
-- Parameters: message (reminder text), scheduled_at (RFC3339 datetime e.g. 2026-03-05T15:00:00Z), chat_id (optional)
+- Parameters: message (reminder text), scheduled_at (RFC3339 datetime e.g. 2026-03-05T15:00:00Z), chat_id (optional, defaults to current conversation)
 - Returns a task_id for reference
-- When the reminder fires you receive an inbox message: sender=scheduler, task_type=agent_reminder`
+- When the reminder fires you receive an inbox message: sender=scheduler, task_type=agent_reminder
+- The reminder is automatically delivered to the current conversation unless you specify a different chat_id`
 }
 
 func init() {

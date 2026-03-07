@@ -21,6 +21,7 @@ const (
 type browserSession struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
+	name     string
 	created  time.Time
 	lastUsed time.Time
 }
@@ -147,6 +148,7 @@ func (sm *SessionManager) StopCleanup() {
 // SessionInfo holds summary information about a single browser session.
 type SessionInfo struct {
 	Key      string
+	Name     string
 	Created  time.Time
 	LastUsed time.Time
 	IdleFor  time.Duration
@@ -162,6 +164,7 @@ func (sm *SessionManager) ListSessions() []SessionInfo {
 	for key, s := range sm.sessions {
 		infos = append(infos, SessionInfo{
 			Key:      key,
+			Name:     s.name,
 			Created:  s.created,
 			LastUsed: s.lastUsed,
 			IdleFor:  now.Sub(s.lastUsed).Truncate(time.Second),
@@ -267,10 +270,15 @@ func (sm *SessionManager) GetOrCreateBrowser(agentContext map[string]any, headle
 		cancelCtx()
 		cancelAlloc()
 	}
+	sessionName, _ := agentContext["browserSession"].(string)
+	if sessionName == "" {
+		sessionName = "default"
+	}
 	now := time.Now()
 	sm.sessions[sessionKey] = &browserSession{
 		ctx:      ctx,
 		cancel:   cancelFunc,
+		name:     sessionName,
 		created:  now,
 		lastUsed: now,
 	}
@@ -358,4 +366,36 @@ func (sm *SessionManager) recordOperation(success bool) {
 // RecordOperation records an operation for metrics (public method)
 func (sm *SessionManager) RecordOperation(success bool) {
 	sm.recordOperation(success)
+}
+
+// OpenSession opens or resumes a named browser session.
+// Returns isNew=true when a fresh Chrome instance was created, false when an existing session was resumed.
+func (sm *SessionManager) OpenSession(agentContext map[string]any, headless ...bool) (isNew bool, err error) {
+	sessionKey := sm.getSessionKey(agentContext)
+
+	sm.mutex.RLock()
+	_, exists := sm.sessions[sessionKey]
+	sm.mutex.RUnlock()
+
+	if exists {
+		// Validate the context is still alive before declaring it resumable.
+		sm.mutex.RLock()
+		session := sm.sessions[sessionKey]
+		sm.mutex.RUnlock()
+		if session != nil {
+			select {
+			case <-session.ctx.Done():
+				// stale — fall through to create below
+			default:
+				session.lastUsed = time.Now()
+				return false, nil
+			}
+		}
+	}
+
+	_, err = sm.GetOrCreateBrowser(agentContext, headless...)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

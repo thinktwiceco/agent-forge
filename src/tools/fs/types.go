@@ -21,27 +21,24 @@ func (r *fileOperationResponse) String() string {
 	case "Read":
 		return fmt.Sprintf(`File Operation: Read
 Path (relative): %s
-Path (absolute): %s
 Size: %d bytes
 Modified: %s
 Content:
 ---
 %s
----`, r.RelativePath, r.AbsolutePath, r.Size, r.Modified, r.Content)
+---`, r.RelativePath, r.Size, r.Modified, r.Content)
 	case "Write":
 		return fmt.Sprintf(`File Operation: Write (%s)
 Path (relative): %s
-Path (absolute): %s
 Size: %d bytes
 Modified: %s
-Directory: %s`, r.Status, r.RelativePath, r.AbsolutePath, r.Size, r.Modified, r.Directory)
+Directory: %s`, r.Status, r.RelativePath, r.Size, r.Modified, r.Directory)
 	case "Delete":
 		return fmt.Sprintf(`File Operation: Delete
 Path (relative): %s
-Path (absolute): %s
 Size: %d bytes
 Last Modified: %s
-Status: Successfully deleted`, r.RelativePath, r.AbsolutePath, r.Size, r.LastModified)
+Status: Successfully deleted`, r.RelativePath, r.Size, r.LastModified)
 	default:
 		return fmt.Sprintf("Unknown operation: %s", r.Operation)
 	}
@@ -58,11 +55,9 @@ type rootDirectoryResponse struct {
 // String formats the root directory response as a string.
 func (r *rootDirectoryResponse) String() string {
 	return fmt.Sprintf(`Sandbox Root Directory:
-Path (absolute): %s
-Path (relative): %s
 Exists: true
 Is Directory: %v
-Permissions: %s`, r.AbsolutePath, r.RelativePath, r.IsDirectory, r.Permissions)
+Permissions: %s`, r.IsDirectory, r.Permissions)
 }
 
 // fileEntry represents a single file or directory entry in a listing.
@@ -87,10 +82,9 @@ type listFilesResponse struct {
 func (r *listFilesResponse) String() string {
 	result := fmt.Sprintf(`File Operation: List
 Directory (relative): %s
-Directory (absolute): %s
 Total entries: %d
 
-`, r.RelativePath, r.AbsolutePath, r.Count)
+`, r.RelativePath, r.Count)
 
 	if len(r.Entries) == 0 {
 		result += "Directory is empty.\n"
@@ -125,14 +119,13 @@ type fileInfoResponse struct {
 func (r *fileInfoResponse) String() string {
 	return fmt.Sprintf(`File Information:
 Path (relative): %s
-Path (absolute): %s
 Size: %d bytes
 Permissions: %s
 Mode: %s
 Is Directory: %v
 Last Modified: %s
 Owner UID: %d
-Owner GID: %d`, r.RelativePath, r.AbsolutePath, r.Size, r.Permissions, r.Mode, r.IsDirectory, r.Modified, r.UID, r.GID)
+Owner GID: %d`, r.RelativePath, r.Size, r.Permissions, r.Mode, r.IsDirectory, r.Modified, r.UID, r.GID)
 }
 
 // ripgrepResponse represents a ripgrep search result.
@@ -153,8 +146,7 @@ type ripgrepResponse struct {
 func (r *ripgrepResponse) String() string {
 	result := fmt.Sprintf(`File Operation: Ripgrep Search
 Pattern: %s
-Path (relative): %s
-Path (absolute): %s`, r.Pattern, r.RelativePath, r.AbsolutePath)
+Path (relative): %s`, r.Pattern, r.RelativePath)
 
 	if len(r.Flags) > 0 {
 		result += fmt.Sprintf("\nFlags: %s", fmt.Sprintf("%v", r.Flags))
