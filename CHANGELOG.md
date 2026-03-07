@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [0.6.1] - 2026-03-07
+- [852eb82](http://github.com/thinktwiceco/agent-forge/commit/852eb82081a63471e0028c585b575f592d978c11) - chore(release): prepare release v0.6.1 (#44)
+- [33b97da](http://github.com/thinktwiceco/agent-forge/commit/33b97dae8706e228bc5636e386a4339da0056407) - chore: update changelog for v0.6.0 [skip ci] (#43)
+
+
+## [Unreleased]
 ## [0.6.0] - 2026-03-07
 - [3ed2764](http://github.com/thinktwiceco/agent-forge/commit/3ed276486c13872649373f751ec2302d87a4eef4) - feat(agents!): parallel tool execution, context truncation, ModelInfo
 
