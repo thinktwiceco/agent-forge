@@ -10,7 +10,6 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/tools/fs"
 	"github.com/thinktwiceco/agent-forge/src/tools/git"
 	imagetool "github.com/thinktwiceco/agent-forge/src/tools/image"
-	"github.com/thinktwiceco/agent-forge/src/tools/vector"
 	"github.com/thinktwiceco/agent-forge/src/tools/web"
 )
 
@@ -77,19 +76,6 @@ func OsAgent(llmEngine llms.LLMEngine, root string) core.SubAgent {
 func ReasoningAgent(llmEngine llms.LLMEngine) core.SubAgent {
 	template := system.CreateReasoningAgentTemplate()
 	config := systemConfigToAgentConfig(template.ToConfig(llmEngine))
-
-	agent := NewAgent(&config)
-	return agent.AgentAsSubAgent()
-}
-
-// VectorAgent creates a vector database operations agent.
-func VectorAgent(llmEngine llms.LLMEngine, vectorDB core.VectorDB, embeddingGenerator core.EmbeddingGenerator) core.SubAgent {
-	template := system.CreateVectorAgentTemplate()
-	config := systemConfigToAgentConfig(template.ToConfig(llmEngine))
-
-	// Add vector tool
-	vectorTool := vector.NewVectorTool(vectorDB, embeddingGenerator)
-	config.Tools = []llms.Tool{vectorTool}
 
 	agent := NewAgent(&config)
 	return agent.AgentAsSubAgent()

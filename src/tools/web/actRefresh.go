@@ -12,7 +12,7 @@ import (
 
 // refresh reloads the current browser page.
 func (w *WebBrowser) refresh(agentContext map[string]any) llms.ToolReturn {
-	ctx, err := getOrCreateBrowser(agentContext, false)
+	ctx, err := getOrCreateBrowser(agentContext)
 	if err != nil {
 		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to initialize browser: %v", err))

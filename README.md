@@ -148,7 +148,7 @@ See [docs/AGENT_BUILDER.md](docs/AGENT_BUILDER.md) for comprehensive documentati
 |------|-----------------|-------------|
 | File System | `fs.NewFsTool(root)` | File operations within root directory |
 | Git | `git.NewGitTool(repoRoot)` | Git operations (add, commit, push, etc.) |
-| Web | `web.NewWebTool(workingDir)` | Web automation with headless browser |
+| Web | `web.NewWebTool(workingDir)` | Web automation with browser sessions; headless by default |
 | Postgres | `postgres.NewPostgresTool(url, mode, tables, schemas)` | Database operations with whitelisting |
 | API | `api.NewApiTool(name, endpoints, authHook)` | HTTP API calls with auth support |
 | Vector | `vector.NewVectorTool(db, embeddings)` | Semantic search and indexing |

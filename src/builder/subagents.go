@@ -16,7 +16,6 @@ const (
 	CODING_AGENT    Subagent = "coding"
 	OS_AGENT        Subagent = "os"
 	WEB_AGENT       Subagent = "web"
-	VECTOR_DB_AGENT Subagent = "vector"
 	VISION_AGENT    Subagent = "vision"
 )
 
@@ -37,11 +36,6 @@ func (s Subagent) getSubagent(
 		return agents.OsAgent(llmEngine, workingDir), nil
 	case WEB_AGENT:
 		return agents.WebAgent(llmEngine, workingDir), nil
-	case VECTOR_DB_AGENT:
-		if vectorDB == nil || embeddingGenerator == nil {
-			return nil, fmt.Errorf("vectorDB and embeddingGenerator are required for vector DB subagent")
-		}
-		return agents.VectorAgent(llmEngine, vectorDB, embeddingGenerator), nil
 	case VISION_AGENT:
 		return agents.VisionAgent(llmEngine, workingDir), nil
 	}

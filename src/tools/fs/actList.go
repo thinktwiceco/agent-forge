@@ -37,6 +37,10 @@ func (fs *Fs) listFiles(path string) (string, error) {
 	// Build file entries list
 	fileEntries := make([]fileEntry, 0, len(entries))
 	for _, entry := range entries {
+		if !entry.IsDir() && isEnvFilePath(entry.Name()) {
+			continue
+		}
+
 		info, err := entry.Info()
 		if err != nil {
 			// Skip entries we can't get info for

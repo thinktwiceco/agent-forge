@@ -26,8 +26,8 @@ func (w *WebBrowser) navigate(agentContext map[string]any, args map[string]any) 
 		return core.NewErrorResponse(fmt.Sprintf("invalid URL: %v", err))
 	}
 
-	// Get or create browser context with headless=false to follow navigation
-	ctx, err := getOrCreateBrowser(agentContext, false)
+	// Get or create browser context using the configured default headless mode.
+	ctx, err := getOrCreateBrowser(agentContext)
 	if err != nil {
 		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to initialize browser: %v", err))

@@ -87,3 +87,33 @@ func TestNewWebTool(t *testing.T) {
 		t.Error("action param should be required")
 	}
 }
+
+func TestDefaultHeadlessMode(t *testing.T) {
+	t.Run("defaults to true when env unset", func(t *testing.T) {
+		t.Setenv(webToolHeadlessEnv, "")
+		if got := defaultHeadlessMode(); !got {
+			t.Fatalf("defaultHeadlessMode() = %v, want true", got)
+		}
+	})
+
+	t.Run("reads false from env", func(t *testing.T) {
+		t.Setenv(webToolHeadlessEnv, "false")
+		if got := defaultHeadlessMode(); got {
+			t.Fatalf("defaultHeadlessMode() = %v, want false", got)
+		}
+	})
+
+	t.Run("reads true from env", func(t *testing.T) {
+		t.Setenv(webToolHeadlessEnv, "true")
+		if got := defaultHeadlessMode(); !got {
+			t.Fatalf("defaultHeadlessMode() = %v, want true", got)
+		}
+	})
+
+	t.Run("falls back to true on invalid env", func(t *testing.T) {
+		t.Setenv(webToolHeadlessEnv, "not-a-bool")
+		if got := defaultHeadlessMode(); !got {
+			t.Fatalf("defaultHeadlessMode() = %v, want true", got)
+		}
+	})
+}

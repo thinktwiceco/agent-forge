@@ -25,6 +25,7 @@
     .settings-nav-header {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 10px;
       padding-bottom: 12px;
       margin-bottom: 16px;
@@ -39,6 +40,13 @@
 
     .settings-nav-header a:hover {
       color: var(--text-primary);
+    }
+
+    .settings-nav-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
     }
 
     .settings-nav-title {
@@ -350,8 +358,11 @@
     <!-- Left nav -->
     <nav class="settings-nav">
       <div class="settings-nav-header">
-        <a href="/">← Back</a>
-        <span class="settings-nav-title">Settings</span>
+          <div class="settings-nav-header-left">
+            <a href="/">← Back</a>
+            <span class="settings-nav-title">Settings</span>
+          </div>
+          <button class="btn" data-auth-logout hidden>Logout</button>
       </div>
       <button class="settings-nav-item active" data-section="agent">Agent</button>
       <button class="settings-nav-item" data-section="subagents">Sub-agents</button>

@@ -9,9 +9,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
+	localauth "github.com/thinktwiceco/agent-forge/cmd/localforge/src/auth"
 	"github.com/thinktwiceco/agent-forge/cmd/localforge/src/providers"
 )
 
@@ -30,11 +33,15 @@ type Server struct {
 	knowledgeDB      *sql.DB // opened once at startup; nil if DB not yet available
 	devMode          bool
 	appDir           string
+	staticFS         fs.FS
+	authConfig       localauth.Config
+	sessionStore     *localauth.SessionStore
 }
 
 func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoManager, devMode bool, appDir string) *Server {
+	authConfig := localauth.LoadConfigFromEnv()
 	engine := gin.New()
-	engine.Use(gin.Logger(), gin.Recovery(), corsMiddleware())
+	engine.Use(gin.Logger(), gin.Recovery(), corsMiddleware(authConfig.Enabled))
 
 	// Initialize provider registry
 	providerRegistry := NewProviderRegistry()
@@ -59,6 +66,17 @@ func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoMa
 		providerRegistry: providerRegistry,
 		devMode:          devMode,
 		appDir:           appDir,
+		authConfig:       authConfig,
+		sessionStore:     localauth.NewSessionStore(),
+	}
+
+	staticFS, err := server.staticFileSystem()
+	if err != nil {
+		panic(err)
+	}
+	server.staticFS = staticFS
+	if authConfig.Enabled {
+		server.sessionStore.StartCleanup(time.Hour)
 	}
 
 	// Open the knowledge DB once so all handlers share a connection pool.
@@ -101,14 +119,9 @@ func (s *Server) staticFileSystem() (fs.FS, error) {
 }
 
 func (s *Server) setupRoutes() {
-	staticFS, err := s.staticFileSystem()
-	if err != nil {
-		panic(err)
-	}
-
 	// Serve static files. In dev mode wrap the handler to disable browser caching
 	// so file edits are visible immediately without a hard refresh.
-	staticHandler := http.StripPrefix("/static", http.FileServer(http.FS(staticFS)))
+	staticHandler := http.StripPrefix("/static", http.FileServer(http.FS(s.staticFS)))
 	if s.devMode {
 		original := staticHandler
 		staticHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -122,35 +135,23 @@ func (s *Server) setupRoutes() {
 	s.engine.HEAD("/static/*filepath", func(c *gin.Context) {
 		staticHandler.ServeHTTP(c.Writer, c.Request)
 	})
+	s.engine.GET("/login", s.handleLoginPage)
 
-	s.engine.GET("/", func(c *gin.Context) {
-		data, err := fs.ReadFile(staticFS, "index.html")
-		if err != nil {
-			c.String(http.StatusNotFound, "index.html not found")
-			return
-		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
-	})
+	pageRoutes := s.engine.Group("")
+	pageRoutes.Use(localauth.Middleware(s.authConfig, s.sessionStore, localauth.UnauthorizedRedirect))
+	pageRoutes.GET("/", s.serveStaticPage("index.html"))
+	pageRoutes.GET("/knowledge", s.serveStaticPage("knowledge.html"))
+	pageRoutes.GET("/settings", s.serveStaticPage("settings.html"))
 
-	s.engine.GET("/knowledge", func(c *gin.Context) {
-		data, err := fs.ReadFile(staticFS, "knowledge.html")
-		if err != nil {
-			c.String(http.StatusNotFound, "knowledge.html not found")
-			return
-		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
-	})
-
-	s.engine.GET("/settings", func(c *gin.Context) {
-		data, err := fs.ReadFile(staticFS, "settings.html")
-		if err != nil {
-			c.String(http.StatusNotFound, "settings.html not found")
-			return
-		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
-	})
+	publicAPI := s.engine.Group("/api")
+	publicAPI.GET("/auth/me", s.handleAuthMe)
+	publicAPI.POST("/auth/login", s.handleAuthLogin)
+	publicAPI.POST("/auth/logout", s.handleAuthLogout)
+	publicAPI.POST("/webhooks/:provider", s.handleWebhook)
+	publicAPI.POST("/webhooks/:provider/sync", s.handleWebhookSync)
 
 	api := s.engine.Group("/api")
+	api.Use(localauth.Middleware(s.authConfig, s.sessionStore, localauth.UnauthorizedJSON))
 	api.POST("/chat", s.handleChat)
 	api.POST("/chat/stop", s.handleStopChat)
 	api.POST("/upload", s.handleUpload)
@@ -177,10 +178,6 @@ func (s *Server) setupRoutes() {
 	api.GET("/knowledge/graph", s.handleGetKnowledgeGraph)
 	api.GET("/knowledge/stats", s.handleGetKnowledgeStats)
 	api.GET("/knowledge/node/:id", s.handleGetKnowledgeNode)
-
-	// Webhook endpoints
-	api.POST("/webhooks/:provider", s.handleWebhook)
-	api.POST("/webhooks/:provider/sync", s.handleWebhookSync)
 }
 
 func (s *Server) Run(port string) error {
@@ -204,15 +201,41 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpSrv.Shutdown(ctx)
 }
 
-func corsMiddleware() gin.HandlerFunc {
+func (s *Server) serveStaticPage(name string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		data, err := fs.ReadFile(s.staticFS, name)
+		if err != nil {
+			c.String(http.StatusNotFound, "%s not found", name)
+			return
+		}
+		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+	}
+}
+
+func corsMiddleware(authEnabled bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !authEnabled {
+			c.Header("Access-Control-Allow-Origin", "*")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		} else if origin := c.Request.Header.Get("Origin"); origin != "" && sameOrigin(origin, c.Request.Host) {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Vary", "Origin")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		}
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
 		c.Next()
 	}
+}
+
+func sameOrigin(origin string, host string) bool {
+	trimmed := strings.TrimSpace(origin)
+	if trimmed == "" {
+		return false
+	}
+	return strings.HasSuffix(trimmed, "://"+host)
 }

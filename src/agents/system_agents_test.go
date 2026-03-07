@@ -121,24 +121,6 @@ func TestReasoningAgent_Constructor(t *testing.T) {
 	}
 }
 
-func TestVectorAgent_Constructor(t *testing.T) {
-	mockLLM := mocks.NewMockLLMEngine()
-	// Pass nil for dependencies as we are testing constructor logic mainly
-	agent := VectorAgent(mockLLM, nil, nil)
-
-	if agent == nil {
-		t.Fatal("VectorAgent returned nil")
-	}
-
-	if agent.Name() != AgentNameSystemVector {
-		t.Errorf("Expected name %s, got %s", AgentNameSystemVector, agent.Name())
-	}
-
-	if agent.BasicDescription() == "" {
-		t.Error("BasicDescription should not be empty")
-	}
-}
-
 func TestSystemAgentTemplate_Methods(t *testing.T) {
 	tmpl, err := system.NewSystemAgentTemplate("test", "trace")
 	if err != nil {

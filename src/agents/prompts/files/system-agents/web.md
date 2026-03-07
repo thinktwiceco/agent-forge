@@ -93,7 +93,7 @@ Web navigation and content. 4 actions: navigate, click, get_content (when reques
 
 ## AdvanceDescription
 
-- Purpose: Web navigation and content via headless browser
+- Purpose: Web navigation and content via browser sessions (headless by default)
 - Tool: web_browser (navigate, click, get_content, save_content)
 - Capabilities: Navigate; click by selector; pull content; save to file; persistent context
 - Content: save_content = default. get_content = explicit request only. Report path.
