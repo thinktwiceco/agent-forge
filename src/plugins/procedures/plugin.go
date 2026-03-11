@@ -47,7 +47,7 @@ type Procedure struct {
 type ProceduresPlugin struct {
 	// dir is the directory for user-created procedures (workingDir/procedures).
 	dir string
-	// repositoryDir is the directory for remotely installed procedures (workingDir/repository/procedures).
+	// repositoryDir is the directory for remotely installed procedures (workingDir/procedures).
 	repositoryDir   string
 	procedures      map[string]*Procedure
 	activeProcedure *Procedure
@@ -55,11 +55,10 @@ type ProceduresPlugin struct {
 }
 
 // NewProceduresPlugin creates a new ProceduresPlugin.
-// User procedures live in workingDir/procedures.
-// Repository-installed procedures live in workingDir/repository/procedures.
+// User and repository-installed procedures both live in workingDir/procedures.
 func NewProceduresPlugin(workingDir string) *ProceduresPlugin {
 	dir := filepath.Join(workingDir, "procedures")
-	repositoryDir := filepath.Join(workingDir, "repository", "procedures")
+	repositoryDir := filepath.Join(workingDir, "procedures")
 	_ = os.MkdirAll(dir, 0755)
 	_ = os.MkdirAll(repositoryDir, 0755)
 	p := &ProceduresPlugin{
@@ -104,7 +103,7 @@ func (p *ProceduresPlugin) SystemPrompt() string {
 	sb.WriteString("[PROCEDURES]\n")
 	sb.WriteString("- Tool: procedure\n")
 	sb.WriteString("- Structured multi-step tasks. Actions: start_procedure, next_step, goto_step (jump to step by number).\n")
-	sb.WriteString("- User-created procedures live in procedures/. Repository-installed procedures live in repository/procedures/. When creating procedures, always use paths under procedures/ (e.g. procedures/my-procedure/).\n\n")
+	sb.WriteString("- User-created and repository-installed procedures live in procedures/. When creating procedures, always use paths under procedures/ (e.g. procedures/my-procedure/).\n\n")
 	sb.WriteString("[PROCEDURE EXECUTION RULE — MANDATORY]\n")
 	sb.WriteString("At ANY step or tool call, if the outcome is not exactly what the step describes, or a Tool returne any error or unexpected result as expected:\n")
 	sb.WriteString("1. STOP immediately. Do not continue, retry, guess, or attempt to work around the problem.\n")

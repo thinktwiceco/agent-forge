@@ -250,7 +250,7 @@ services := map[string]api.ServiceConfig{
     },
 }
 
-repositoryDir := ""   // path to repository/api_configs for install_api_config; empty disables
+repositoryDir := ""   // path to api_config for install_api_config (workingDir/api_config when using builder); empty disables
 workingDir := "/path/to/agent/working/dir"  // base path for resolving relative file paths in resolvers
 tool := api.NewApiTool("api", services, repositoryDir, workingDir)
 ```

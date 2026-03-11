@@ -30,7 +30,7 @@ func (w *apiToolWrapper) ServiceNames() []string {
 // NewApiTool creates a unified API tool from a map of service configurations.
 // name is the tool name visible to the agent (typically "api").
 // services maps service names to their endpoint + header configurations.
-// repositoryDir is the local directory for remotely installed configs (empty = no repository).
+// repositoryDir is the local directory for remotely installed configs (e.g. api_config; empty = no repository).
 // workingDir is the base path for resolving relative file paths in resolvers (e.g. resolve_to_base64).
 // The returned value also implements ServiceProvider for service discovery.
 func NewApiTool(name string, services map[string]ServiceConfig, repositoryDir, workingDir string) ServiceProvider {
@@ -142,7 +142,7 @@ func (a *Api) generateParameters() []core.Parameter {
 		{
 			Name:        "configName",
 			Type:        "string",
-			Description: "Service config name to install (filename without .json from the remote repository/api_configs/ folder) — required for install_api_config",
+			Description: "Service config name to install (filename without .json from the remote repository; installed to api_config/) — required for install_api_config",
 			Required:    false,
 		},
 		{
