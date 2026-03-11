@@ -1,11 +1,14 @@
 package agents
 
 import (
+	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/thinktwiceco/agent-forge/src/agents/system"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/tools/api"
 	"github.com/thinktwiceco/agent-forge/src/tools/expand"
 	"github.com/thinktwiceco/agent-forge/src/tools/fs"
 	"github.com/thinktwiceco/agent-forge/src/tools/git"
@@ -95,13 +98,30 @@ func VisionAgent(llmEngine llms.LLMEngine, workingDir string) core.SubAgent {
 }
 
 // WebAgent creates a web operations agent.
-func WebAgent(llmEngine llms.LLMEngine, workingDir string) core.SubAgent {
+// extraTools are appended after the built-in web tool (e.g. the API tool).
+// If an API tool is present, the agent description is enriched with the
+// available service names so the main agent can discover them without a live call.
+func WebAgent(llmEngine llms.LLMEngine, workingDir string, extraTools ...llms.Tool) core.SubAgent {
 	template := system.CreateWebAgentTemplate()
 	config := systemConfigToAgentConfig(template.ToConfig(llmEngine))
 
-	// Add web tool
 	webTool := web.NewWebTool(filepath.Join(workingDir, "web"))
-	config.Tools = []llms.Tool{webTool}
+	config.Tools = append([]llms.Tool{webTool}, extraTools...)
+
+	// Handshake: enrich the description with API service names so the main
+	// agent's system prompt includes them without needing a live delegation.
+	var apiServices []string
+	for _, t := range extraTools {
+		if sp, ok := t.(api.ServiceProvider); ok {
+			apiServices = append(apiServices, sp.ServiceNames()...)
+		}
+	}
+	if len(apiServices) > 0 {
+		config.Description = strings.TrimRight(config.Description, "\n") +
+			fmt.Sprintf("\nAPI services available: %s. Use action=show_apis to list endpoints.", strings.Join(apiServices, ", "))
+		config.AdvanceDescription = strings.TrimRight(config.AdvanceDescription, "\n") +
+			fmt.Sprintf("\n- API services: %s (use show_apis → show_api → call endpoint)", strings.Join(apiServices, ", "))
+	}
 
 	agent := NewAgent(&config)
 	return agent.AgentAsSubAgent()

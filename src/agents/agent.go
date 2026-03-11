@@ -331,9 +331,12 @@ func (a *Agent) Troubleshooting() string {
 	return a.config.Troubleshooting
 }
 
-// DetailsAbout returns "Nothing to add about <item>" for agents, as agents do not
-// expose per-item detail. This implements the agentforge.Discoverable interface.
+// DetailsAbout returns per-item details when DetailsAboutFunc is set; otherwise
+// "Nothing to add about <item>". Implements the agentforge.Discoverable interface.
 func (a *Agent) DetailsAbout(item string) string {
+	if a.config.DetailsAboutFunc != nil {
+		return a.config.DetailsAboutFunc(item)
+	}
 	return fmt.Sprintf("Nothing to add about %s", item)
 }
 

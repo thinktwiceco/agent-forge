@@ -64,46 +64,65 @@ func (q *GraphQuerier) queryNodes(ctx context.Context, query string, args ...int
 	return nodes, nil
 }
 
-// getDirectLightNodes returns light nodes reachable from fromID via a specific edge type.
-func (q *GraphQuerier) getDirectLightNodes(fromID, edgeType string) ([]LightNode, error) {
+// getOutNodesWithEdge returns all nodes reachable via outgoing edges from nodeID,
+// each annotated with the connecting edge type.
+func (q *GraphQuerier) getOutNodesWithEdge(nodeID string) ([]LightNodeWithEdge, error) {
 	ctx := context.Background()
 	query := `
-		SELECT n.id, n.type, n.content, n.embedding_id, n.metadata, n.created_at, n.updated_at
+		SELECT n.id, n.type, n.content, n.metadata, e.relation_type
 		FROM knowledge_nodes n
 		JOIN knowledge_edges e ON e.to_node_id = n.id
-		WHERE e.from_node_id = ? AND e.relation_type = ?
-		ORDER BY n.created_at ASC
+		WHERE e.from_node_id = ?
+		ORDER BY e.relation_type, n.created_at ASC
 	`
-	nodes, err := q.queryNodes(ctx, query, fromID, edgeType)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]LightNode, len(nodes))
-	for i, n := range nodes {
-		out[i] = toLightNode(n)
-	}
-	return out, nil
+	return q.scanLightNodesWithEdge(ctx, query, nodeID)
 }
 
-// getDirectLightParents returns light nodes that point TO toID via a specific edge type.
-func (q *GraphQuerier) getDirectLightParents(toID, edgeType string) ([]LightNode, error) {
+// getInNodesWithEdge returns all nodes that have an outgoing edge pointing TO nodeID,
+// each annotated with the connecting edge type.
+func (q *GraphQuerier) getInNodesWithEdge(nodeID string) ([]LightNodeWithEdge, error) {
 	ctx := context.Background()
 	query := `
-		SELECT n.id, n.type, n.content, n.embedding_id, n.metadata, n.created_at, n.updated_at
+		SELECT n.id, n.type, n.content, n.metadata, e.relation_type
 		FROM knowledge_nodes n
 		JOIN knowledge_edges e ON e.from_node_id = n.id
-		WHERE e.to_node_id = ? AND e.relation_type = ?
-		ORDER BY n.created_at ASC
+		WHERE e.to_node_id = ?
+		ORDER BY e.relation_type, n.created_at ASC
 	`
-	nodes, err := q.queryNodes(ctx, query, toID, edgeType)
+	return q.scanLightNodesWithEdge(ctx, query, nodeID)
+}
+
+// scanLightNodesWithEdge executes a query that selects (id, type, content, metadata, relation_type)
+// and maps the rows to LightNodeWithEdge, deriving Title from metadata.title or truncated content.
+func (q *GraphQuerier) scanLightNodesWithEdge(ctx context.Context, query string, args ...interface{}) ([]LightNodeWithEdge, error) {
+	rows, err := q.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query neighbors: %w", err)
 	}
-	out := make([]LightNode, len(nodes))
-	for i, n := range nodes {
-		out[i] = toLightNode(n)
+	defer func() { _ = rows.Close() }()
+
+	var result []LightNodeWithEdge
+	for rows.Next() {
+		var id, nodeType, content, edgeType string
+		var metadataJSON sql.NullString
+		if err := rows.Scan(&id, &nodeType, &content, &metadataJSON, &edgeType); err != nil {
+			return nil, fmt.Errorf("failed to scan neighbor: %w", err)
+		}
+		title := content
+		if len(title) > 80 {
+			title = title[:80] + "..."
+		}
+		if metadataJSON.Valid && metadataJSON.String != "" {
+			var meta map[string]any
+			if err := json.Unmarshal([]byte(metadataJSON.String), &meta); err == nil {
+				if t, ok := meta["title"].(string); ok && t != "" {
+					title = t
+				}
+			}
+		}
+		result = append(result, LightNodeWithEdge{ID: id, Type: nodeType, Title: title, EdgeType: edgeType})
 	}
-	return out, nil
+	return result, rows.Err()
 }
 
 // getEdgesBetweenNodes retrieves all edges between a set of nodes
@@ -261,29 +280,6 @@ func (q *GraphQuerier) findRelated(nodeIDs []string, depth int) (*GraphResult, e
 	}
 
 	return &GraphResult{Nodes: nodes, Edges: edges}, nil
-}
-
-// findNodesByTypeAndContent searches for nodes by type and an identifier (ID, content snippet, or title).
-func (q *GraphQuerier) findNodesByTypeAndContent(nodeType, identifier string, limit, offset int) ([]Node, error) {
-	ctx := context.Background()
-
-	pattern := "%" + identifier + "%"
-
-	query := `
-		SELECT id, type, content, embedding_id, metadata, created_at, updated_at
-		FROM knowledge_nodes
-		WHERE type = ? AND (id = ? OR content LIKE ? OR (metadata IS NOT NULL AND metadata != '' AND json_valid(metadata) AND json_extract(metadata, '$.title') LIKE ?))
-		ORDER BY created_at DESC
-	`
-
-	if limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", limit)
-		if offset > 0 {
-			query += fmt.Sprintf(" OFFSET %d", offset)
-		}
-	}
-
-	return q.queryNodes(ctx, query, nodeType, identifier, pattern, pattern)
 }
 
 // findNodesByContentPaginated searches for nodes by content with pagination

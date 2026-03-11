@@ -45,24 +45,27 @@ type Procedure struct {
 // ProceduresPlugin discovers procedures from a directory and provides a
 // tool that lets the agent walk through them phase by phase.
 type ProceduresPlugin struct {
-	// dir is the directory this plugin scans for procedures (agent working_dir/procedures).
-	dir             string
+	// dir is the directory for user-created procedures (workingDir/procedures).
+	dir string
+	// repositoryDir is the directory for remotely installed procedures (workingDir/repository/procedures).
+	repositoryDir   string
 	procedures      map[string]*Procedure
 	activeProcedure *Procedure
 	currentPhase    int
 }
 
 // NewProceduresPlugin creates a new ProceduresPlugin.
-// The plugin operates in the "procedures" subdirectory of workingDir.
-//
-// Parameters:
-//   - workingDir: The agent working directory. The plugin will use workingDir/procedures.
+// User procedures live in workingDir/procedures.
+// Repository-installed procedures live in workingDir/repository/procedures.
 func NewProceduresPlugin(workingDir string) *ProceduresPlugin {
 	dir := filepath.Join(workingDir, "procedures")
+	repositoryDir := filepath.Join(workingDir, "repository", "procedures")
 	_ = os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(repositoryDir, 0755)
 	p := &ProceduresPlugin{
-		dir:        dir,
-		procedures: make(map[string]*Procedure),
+		dir:           dir,
+		repositoryDir: repositoryDir,
+		procedures:    make(map[string]*Procedure),
 	}
 	p.ensureDefaultProcedures()
 	return p
@@ -101,7 +104,7 @@ func (p *ProceduresPlugin) SystemPrompt() string {
 	sb.WriteString("[PROCEDURES]\n")
 	sb.WriteString("- Tool: procedure\n")
 	sb.WriteString("- Structured multi-step tasks. Actions: start_procedure, next_step, goto_step (jump to step by number).\n")
-	sb.WriteString("- Procedures live in procedures/ folder. When creating procedures, always use paths under procedures/ (e.g. procedures/my-procedure/).\n\n")
+	sb.WriteString("- User-created procedures live in procedures/. Repository-installed procedures live in repository/procedures/. When creating procedures, always use paths under procedures/ (e.g. procedures/my-procedure/).\n\n")
 	sb.WriteString("[PROCEDURE EXECUTION RULE — MANDATORY]\n")
 	sb.WriteString("At ANY step or tool call, if the outcome is not exactly what the step describes, or a Tool returne any error or unexpected result as expected:\n")
 	sb.WriteString("1. STOP immediately. Do not continue, retry, guess, or attempt to work around the problem.\n")
@@ -135,16 +138,27 @@ func (p *ProceduresPlugin) Tools() []llms.Tool {
 	}
 }
 
-// loadProcedures scans baseDir for procedure subfolders and parses their manifests.
+// loadProcedures scans both the user procedures dir and the repository dir,
+// then merges the results (repository entries overwrite on name collision).
 func (p *ProceduresPlugin) loadProcedures() error {
 	p.procedures = make(map[string]*Procedure)
-	entries, err := os.ReadDir(p.dir)
+	for _, dir := range []string{p.dir, p.repositoryDir} {
+		if err := p.loadProceduresFromDir(dir); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// loadProceduresFromDir scans a single directory for procedure subfolders.
+func (p *ProceduresPlugin) loadProceduresFromDir(dir string) error {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			agentforge.Info("procedures plugin: directory '%s' not found, no procedures loaded", p.dir)
+			agentforge.Info("procedures plugin: directory '%s' not found, skipping", dir)
 			return nil
 		}
-		return fmt.Errorf("procedures plugin: failed to read directory '%s': %w", p.dir, err)
+		return fmt.Errorf("procedures plugin: failed to read directory '%s': %w", dir, err)
 	}
 
 	for _, entry := range entries {
@@ -152,7 +166,7 @@ func (p *ProceduresPlugin) loadProcedures() error {
 			continue
 		}
 
-		procDir := filepath.Join(p.dir, entry.Name())
+		procDir := filepath.Join(dir, entry.Name())
 		proc, err := loadProcedure(procDir)
 		if err != nil {
 			agentforge.Info("procedures plugin: skipping '%s': %v", procDir, err)

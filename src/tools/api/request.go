@@ -33,7 +33,11 @@ func (a *Api) executeRequest(endpoint *Endpoint, method, url string, headers map
 
 	// Set default Content-Type for requests with body
 	if body != "" && req.Header.Get("Content-Type") == "" {
-		req.Header.Set("Content-Type", "application/json")
+		if endpoint.ContentType == "form" {
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		} else {
+			req.Header.Set("Content-Type", "application/json")
+		}
 	}
 
 	// 4. Execute request

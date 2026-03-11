@@ -2,21 +2,22 @@ package builder
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 	"github.com/thinktwiceco/agent-forge/src/tools/api"
 	"github.com/thinktwiceco/agent-forge/src/tools/fs"
 	"github.com/thinktwiceco/agent-forge/src/tools/git"
+	"github.com/thinktwiceco/agent-forge/src/tools/instagram"
 	"github.com/thinktwiceco/agent-forge/src/tools/postgres"
 	"github.com/thinktwiceco/agent-forge/src/tools/update"
 	"github.com/thinktwiceco/agent-forge/src/tools/web"
 	"gopkg.in/yaml.v3"
 )
 
-// Tool represents a tool configuration with its initialization parameters
+// Tool represents a tool configuration entry in config.yaml
 type Tool struct {
 	Name string `yaml:"name"`
 	// Postgres-specific configs
@@ -24,30 +25,17 @@ type Tool struct {
 	Mode           string   `yaml:"mode,omitempty"`
 	AllowedTables  []string `yaml:"allowedTables,omitempty"`
 	AllowedSchemas []string `yaml:"allowedSchemas,omitempty"`
-	// API-specific configs
-	Headers   []string `yaml:"headers,omitempty"` // List of "Key: Value" header strings; values support ${ENV_VAR} expansion
-	Endpoints []struct {
-		Name          string `yaml:"name"`
-		URL           string `yaml:"url"`
-		Method        string `yaml:"method"`
-		Description   string `yaml:"description"`
-		Payload       string `yaml:"payload,omitempty"`
-		QueryParams   string `yaml:"queryParams,omitempty"`
-		URLParameters string `yaml:"urlParameters,omitempty"`
-		Validator     string `yaml:"validator,omitempty"` // Name of registered validator function
-	} `yaml:"endpoints,omitempty"`
+	// API tool: path to folder containing one JSON file per service (relative to working_dir or absolute)
+	ConfigFolder string `yaml:"config_folder,omitempty"`
 }
 
 // UnmarshalYAML implements custom unmarshaling to support both string and object formats
 func (t *Tool) UnmarshalYAML(value *yaml.Node) error {
-	// Try to unmarshal as string (backwards compatibility)
 	var toolName string
 	if err := value.Decode(&toolName); err == nil {
 		t.Name = toolName
 		return nil
 	}
-
-	// Unmarshal as object
 	type toolAlias Tool
 	var tmp toolAlias
 	if err := value.Decode(&tmp); err != nil {
@@ -63,6 +51,7 @@ const (
 	GIT_TOOL         = "git"
 	POSTGRES_TOOL    = "postgres"
 	API_TOOL         = "api"
+	INSTAGRAM_TOOL   = "instagram"
 	UPDATE_TOOL      = "update"
 )
 
@@ -106,46 +95,49 @@ func (t *Tool) getTool(
 			t.AllowedTables,
 			t.AllowedSchemas,
 		), nil
+	case INSTAGRAM_TOOL:
+		token := os.Getenv("INSTAGRAM_ACCESS_TOKEN")
+		return instagram.NewInstagramTool(map[string]string{
+			"Authorization": "Bearer " + token,
+			"Content-Type":  "application/json",
+		}), nil
 	case API_TOOL:
-		if len(t.Endpoints) == 0 {
-			return nil, fmt.Errorf("endpoints are required for api tool")
+		if t.ConfigFolder == "" {
+			return nil, fmt.Errorf("config_folder is required for api tool (path to folder containing <service>.json files)")
 		}
+		folderPath := t.ConfigFolder
+		if !filepath.IsAbs(folderPath) {
+			folderPath = filepath.Join(workingDir, folderPath)
+		}
+		repositoryDir := filepath.Join(workingDir, "repository", "api_configs")
+		_ = os.MkdirAll(repositoryDir, 0755)
 
-		// Convert builder endpoints to api.Endpoint
-		endpoints := make([]api.Endpoint, len(t.Endpoints))
-		for i, e := range t.Endpoints {
-			endpoint := api.Endpoint{
-				Name:          e.Name,
-				URL:           e.URL,
-				Method:        e.Method,
-				Description:   e.Description,
-				Payload:       e.Payload,
-				QueryParams:   e.QueryParams,
-				URLParameters: e.URLParameters,
-			}
-
-			// Attach validator if specified
-			if e.Validator != "" {
-				validator := api.GetValidator(e.Validator)
-				if validator == nil {
-					return nil, fmt.Errorf("validator not found: %s for endpoint: %s", e.Validator, e.Name)
+		services := make(map[string]api.ServiceConfig)
+		for _, dir := range []string{folderPath, repositoryDir} {
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				if os.IsNotExist(err) {
+					continue
 				}
-				endpoint.Validate = validator
+				return nil, fmt.Errorf("failed to read api config folder %q: %w", dir, err)
 			}
-
-			endpoints[i] = endpoint
-		}
-
-		// Parse "Key: Value" header strings
-		headers := make(map[string]string)
-		for _, h := range t.Headers {
-			parts := strings.SplitN(h, ":", 2)
-			if len(parts) == 2 {
-				headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+			for _, entry := range entries {
+				if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+					continue
+				}
+				svcName := entry.Name()[:len(entry.Name())-len(".json")]
+				data, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+				if err != nil {
+					return nil, fmt.Errorf("failed to read api config %q: %w", entry.Name(), err)
+				}
+				svc, err := api.ParseServiceConfig(data)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse api config %q: %w", entry.Name(), err)
+				}
+				services[svcName] = svc
 			}
 		}
-
-		return api.NewApiTool(t.Name, endpoints, headers), nil
+		return api.NewApiTool("api", services, repositoryDir, workingDir), nil
 	case UPDATE_TOOL:
 		if workingDir == "" {
 			return nil, fmt.Errorf("working_dir is required for update tool")

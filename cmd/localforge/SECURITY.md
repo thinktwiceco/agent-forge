@@ -67,23 +67,25 @@ Request
 ### Configuration (env vars, not config.yaml)
 
 ```bash
-AF_AUTH_ENABLED=true
-AF_AUTH_USERNAME=admin
-AF_AUTH_PASSWORD_HASH=$2a$12$...     # bcrypt hash — generate with: localforge auth hash-password
-AF_AUTH_API_KEY_HASH=sha256:abc123.. # SHA-256 hex of API key — generate with: localforge auth gen-api-key
-AF_AUTH_SESSION_TTL=24h
+AUTH_USERNAME=admin
+AUTH_PASSWORD_HASH=$2a$12$...     # bcrypt hash of your password
+AUTH_SESSION_TTL=24h              # optional, default 24h
+AUTH_COOKIE_NAME=localforge_session  # optional
+AUTH_COOKIE_SECURE=true           # optional; auto-detected from TLS/X-Forwarded-Proto
 ```
 
-A helper subcommand produces the values:
+To generate a bcrypt hash for your password:
 
 ```bash
-localforge auth hash-password mysecretpassword
-# outputs: $2a$12$...
-
-localforge auth gen-api-key
-# outputs:
-#   API Key (store safely): lf_abcdef1234567890...
-#   Hash (put in .env):     sha256:deadbeef...
+# Using Go (from the project root):
+go run - <<'GO'
+package main
+import ("fmt"; "golang.org/x/crypto/bcrypt")
+func main() {
+  h, _ := bcrypt.GenerateFromPassword([]byte("your-password"), bcrypt.DefaultCost)
+  fmt.Println(string(h))
+}
+GO
 ```
 
 ### Session Store
@@ -277,30 +279,19 @@ if cfg.AuthEnabled && secret == "" {
 Minimum `.env` for public deployment:
 
 ```bash
-# TLS
-AF_TLS_ENABLED=true
-AF_TLS_CERT_FILE=/etc/letsencrypt/live/myagent.example.com/fullchain.pem
-AF_TLS_KEY_FILE=/etc/letsencrypt/live/myagent.example.com/privkey.pem
+# Auth (required to enable; auth is disabled if either is missing)
+AUTH_USERNAME=admin
+AUTH_PASSWORD_HASH=$2a$12$...    # bcrypt hash of your password
+AUTH_SESSION_TTL=24h             # optional, default 24h
+AUTH_COOKIE_SECURE=true          # set if not behind a TLS-terminating proxy
 
-# Auth
-AF_AUTH_ENABLED=true
-AF_AUTH_USERNAME=admin
-AF_AUTH_PASSWORD_HASH=$2a$12$...         # localforge auth hash-password <pwd>
-AF_AUTH_API_KEY_HASH=sha256:...          # localforge auth gen-api-key
-AF_AUTH_SESSION_TTL=24h
-
-# CORS
-AF_CORS_ORIGINS=https://myagent.example.com
-
-# Upload limits
-AF_UPLOAD_MAX_BYTES=52428800             # 50 MB
-
-# Webhook secrets (per-provider)
+# Webhook secrets (per-provider; optional but strongly recommended)
 WEBHOOK_SECRET_GITHUB=...
 WEBHOOK_SECRET_STRIPE=...
+WEBHOOK_SECRET_TELEGRAM=...
 ```
 
-Local usage: none of these vars set → auth disabled, behavior unchanged.
+Local usage: omit `AUTH_USERNAME` and `AUTH_PASSWORD_HASH` → auth disabled, all routes open.
 
 ---
 

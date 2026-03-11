@@ -18,8 +18,10 @@ func (a *Api) buildURL(endpoint *Endpoint, args map[string]any) (string, error) 
 		}
 	}
 
-	// Validate that all placeholders are replaced
-	if strings.Contains(url, "{") && strings.Contains(url, "}") {
+	// Validate that all {param} placeholders are replaced.
+	// Ignore ${ENV_VAR} patterns — those are resolved later by resolveString.
+	stripped := strings.ReplaceAll(url, "${", "")
+	if strings.Contains(stripped, "{") && strings.Contains(stripped, "}") {
 		return "", fmt.Errorf("missing required URL parameters in URL: %s", url)
 	}
 

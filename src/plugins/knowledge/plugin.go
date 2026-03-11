@@ -1,6 +1,7 @@
 package knowledge
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -18,22 +19,15 @@ const (
 
 // KnowledgePlugin provides a knowledge graph for storing and retrieving user information
 type KnowledgePlugin struct {
-	db           *sql.DB
-	dir          string
-	vectorDB     core.VectorDB
-	embeddingGen core.EmbeddingGenerator
-	querier      *GraphQuerier
-	explorer     *KnowledgeExplorer
+	db      *sql.DB
+	dir     string
+	querier *GraphQuerier
 }
 
 // NewKnowledgePlugin creates a new knowledge graph plugin
-func NewKnowledgePlugin(workingDir string, vectorDB core.VectorDB, embeddingGen core.EmbeddingGenerator) *KnowledgePlugin {
+func NewKnowledgePlugin(workingDir string) *KnowledgePlugin {
 	dir := filepath.Join(workingDir, "knowledge")
-	return &KnowledgePlugin{
-		dir:          dir,
-		vectorDB:     vectorDB,
-		embeddingGen: embeddingGen,
-	}
+	return &KnowledgePlugin{dir: dir}
 }
 
 // Name implements core.Plugin
@@ -79,15 +73,7 @@ func (p *KnowledgePlugin) onInit(a *agents.Agent) error {
 		return fmt.Errorf("failed to ensure knowledge schema: %w", err)
 	}
 
-	if p.vectorDB == nil || p.embeddingGen == nil {
-		agentforge.Debug("🧠 [Knowledge Plugin] Semantic search not available (missing vector DB or embedding generator)")
-	} else {
-		agentforge.Debug("🧠 [Knowledge Plugin] Semantic search enabled")
-	}
-
-	// Initialize querier and explorer
 	p.querier = NewGraphQuerier(p.db)
-	p.explorer = NewKnowledgeExplorer(p.querier)
 
 	// Now that DB is initialized, append the categories section to system prompt
 	categoriesSection := p.buildCategoriesSection()
@@ -101,18 +87,13 @@ func (p *KnowledgePlugin) onInit(a *agents.Agent) error {
 
 // SystemPrompt implements core.PromptProvider
 func (p *KnowledgePlugin) SystemPrompt() string {
-	semanticInfo := ""
-	if p.vectorDB != nil && p.embeddingGen != nil {
-		semanticInfo = " with semantic search"
-	}
-
-	return fmt.Sprintf(`[KNOWLEDGE GRAPH SYSTEM]
-Type: Hierarchical Graph%s
+	return `[KNOWLEDGE GRAPH SYSTEM]
+Type: Hierarchical Graph
 Purpose: Proactive persistent memory
 
 [EXTEND PERSONALITY]
-As an assistant, you are curious about the the user.
-Make sure to save information that are relevant to the user.
+As an assistant, you are curious about the user.
+Make sure to save information that is relevant to the user.
 
 [SCHEMA]
 Nodes:
@@ -122,28 +103,37 @@ Nodes:
   DOCUMENT: File ref. field:path=content field:name=title
 
 Edges:
+  has_category:    root -> Category
   has_subcategory: [Category|Subcategory] -> Subcategory
-  has_fact: [Category|Subcategory] -> Fact
-  has_document: [Category|Fact] -> Document
-  is_relevant_to: [Any] bidirectional [Any]
+  has_fact:        [Category|Subcategory] -> Fact
+  has_document:    [Category|Fact] -> Document
+  is_relevant_to:  [Any] bidirectional [Any]
 
 [TOOL USAGE - RETRIEVAL]
-1. DISCOVERY: Use 'get_categories' to identify top-level nodes.
-2. TRAVERSAL: Use 'explore_category' or 'explore_subcategory'. Yields LIGHT NODES (titles only for brevity).
-3. EXPANSION: Use 'explore_fact' to retrieve full content of facts discovered in step 2. You MUST expand facts to read their content.
-4. RECURSION: Use 'find' for semantic querying when graph descent is insufficient.
+1. DISCOVERY: Call out_nodes with empty node="" to list all top-level categories from the graph root.
+2. TRAVERSAL: Call out_nodes(node) on any node. Returns light nodes (id, type, title, edge_type) — navigate by following edges.
+3. EXPANSION: Call get_node_content(node) to read full content of a Fact or any node.
+4. BACKTRACK: Call in_nodes(node) to see what nodes point to a given node (parents, cross-refs).
+5. SEARCH: Use find for text search when graph descent is insufficient.
 
-[TOOL USAGE - STORAGE AND RELATIONSHIPS]
-1. CLASSIFICATION: When acquiring new knowledge, critically evaluate the correct Category and Subcategory. 
-2. STRUCTURE_CREATION: Use 'add_category' or 'add_subcategory' if the required classification hierarchy does not exist.
-3. INGESTION: Use 'remember' to store the Fact. You MUST provide a short 'title' for optimal light-node retrieval during traversal.
-4. CROSS_REFERENCING: Use 'link_relevant' to connect the new node to other Categories, Subcategories, or Facts to build horizontal relationships.
-5. FILE_ATTACHMENT: Use 'attach_document' to bind file paths to related nodes.
+[TOOL USAGE - WRITE]
+Node creation follows: add_node(parent, edge, type, name, content)
+  parent="" targets the graph root.
+  name is the short label surfaced during traversal (stored as metadata.title).
+  content holds the full body; defaults to name when omitted.
+
+Common patterns:
+  New category:    add_node(parent="",          edge="has_category",    type="Category",    name="Work")
+  New subcategory: add_node(parent="Work",       edge="has_subcategory", type="Subcategory", name="Projects")
+  New fact:        add_node(parent="Projects",   edge="has_fact",        type="Fact",        name="Short label", content="Full fact body")
+  Attach document: add_node(parent="<node>",     edge="has_document",    type="Document",    name="file.pdf",    content="/abs/path")
+  Cross-reference: link_relevant(node_a, node_b) — bidirectional is_relevant_to on existing nodes
+  Delete:          delete_node(identifier) — cascade deletes node and all descendants
 
 [CONSTRAINTS]
 - SILENT_EXECUTION: Execute tools without conversational narration (e.g., do not say "I am checking..."). Formulate responses as innate knowledge.
 - PROACTIVE_RETENTION: Automatically store user preferences, goals, context, findings, and corrections post-response.
-`, semanticInfo)
+`
 }
 
 // buildCategoriesSection creates the CURRENT CATEGORIES section for the system prompt
@@ -163,8 +153,9 @@ func (p *KnowledgePlugin) buildCategoriesSection() string {
 	agentforge.Debug("🧠 [Knowledge Plugin] Found %d top-level categories", len(categories))
 
 	// Limit to first 15 categories to avoid bloating the prompt
-	maxCategories := 15
-	if len(categories) > maxCategories {
+	const maxCategories = 15
+	total := len(categories)
+	if total > maxCategories {
 		categories = categories[:maxCategories]
 	}
 
@@ -175,8 +166,8 @@ func (p *KnowledgePlugin) buildCategoriesSection() string {
 		categoryList += fmt.Sprintf("  - %s\n", cat.Content)
 	}
 
-	if len(categories) >= maxCategories {
-		categoryList += fmt.Sprintf("  ... [%d additional categories muted]\n", len(categories)-maxCategories)
+	if total > maxCategories {
+		categoryList += fmt.Sprintf("  ... [%d additional categories not shown — call out_nodes(\"\") to see all]\n", total-maxCategories)
 	}
 
 	categoryList += "\nInstruction: Evaluate these categories when classifying new knowledge for storage operations.\n"
@@ -186,28 +177,79 @@ func (p *KnowledgePlugin) buildCategoriesSection() string {
 
 // Public API Methods for Knowledge Graph Abstraction
 
-// ExploreCategory finds a category and returns its structured exploration result with light nodes.
-func (p *KnowledgePlugin) ExploreCategory(category string) (*CategoryExploreResult, error) {
-	if p.explorer == nil {
-		return nil, fmt.Errorf("knowledge plugin not fully initialized")
+// resolveNode resolves an identifier to a Node.
+// An empty identifier resolves to the graph root (omnia-nunc-root).
+// Otherwise tries exact ID match, then content/title LIKE search.
+func (p *KnowledgePlugin) resolveNode(identifier string) (*Node, error) {
+	if identifier == "" {
+		return p.getNode(omniaNuncNodeID)
 	}
-	return p.explorer.ExploreCategory(category)
+	node, err := p.getNode(identifier)
+	if err == nil {
+		return node, nil
+	}
+	ctx := context.Background()
+	pattern := "%" + identifier + "%"
+	query := `
+		SELECT id, type, content, embedding_id, metadata, created_at, updated_at
+		FROM knowledge_nodes
+		WHERE id = ? OR content LIKE ?
+		  OR (metadata IS NOT NULL AND json_valid(metadata) AND json_extract(metadata, '$.title') LIKE ?)
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	nodes, err := p.queryNodes(ctx, query, identifier, pattern, pattern)
+	if err != nil || len(nodes) == 0 {
+		return nil, fmt.Errorf("node not found: %s", identifier)
+	}
+	return &nodes[0], nil
 }
 
-// ExploreSubcategory finds a subcategory and returns its structured exploration result with light nodes.
-func (p *KnowledgePlugin) ExploreSubcategory(subcategory string) (*SubcategoryExploreResult, error) {
-	if p.explorer == nil {
+// OutNodes returns all outgoing neighbors of a node (edges FROM the node).
+// An empty identifier starts from the graph root.
+func (p *KnowledgePlugin) OutNodes(identifier string) (*NodeNeighborsResult, error) {
+	if p.querier == nil {
 		return nil, fmt.Errorf("knowledge plugin not fully initialized")
 	}
-	return p.explorer.ExploreSubcategory(subcategory)
+	node, err := p.resolveNode(identifier)
+	if err != nil {
+		return nil, err
+	}
+	neighbors, err := p.querier.getOutNodesWithEdge(node.ID)
+	if err != nil {
+		return nil, err
+	}
+	if neighbors == nil {
+		neighbors = []LightNodeWithEdge{}
+	}
+	return &NodeNeighborsResult{Node: toLightNode(*node), Neighbors: neighbors, Count: len(neighbors)}, nil
 }
 
-// ExploreFact finds a fact and returns its full content plus light-node neighbours.
-func (p *KnowledgePlugin) ExploreFact(fact string) (*FactExploreResult, error) {
-	if p.explorer == nil {
+// InNodes returns all incoming neighbors of a node (edges TO the node).
+func (p *KnowledgePlugin) InNodes(identifier string) (*NodeNeighborsResult, error) {
+	if p.querier == nil {
 		return nil, fmt.Errorf("knowledge plugin not fully initialized")
 	}
-	return p.explorer.ExploreFact(fact)
+	node, err := p.resolveNode(identifier)
+	if err != nil {
+		return nil, err
+	}
+	neighbors, err := p.querier.getInNodesWithEdge(node.ID)
+	if err != nil {
+		return nil, err
+	}
+	if neighbors == nil {
+		neighbors = []LightNodeWithEdge{}
+	}
+	return &NodeNeighborsResult{Node: toLightNode(*node), Neighbors: neighbors, Count: len(neighbors)}, nil
+}
+
+// GetNodeContent returns the full Node for the given identifier.
+func (p *KnowledgePlugin) GetNodeContent(identifier string) (*Node, error) {
+	if p.querier == nil {
+		return nil, fmt.Errorf("knowledge plugin not fully initialized")
+	}
+	return p.resolveNode(identifier)
 }
 
 // Find searches for nodes matching query and returns scored results
@@ -215,36 +257,14 @@ func (p *KnowledgePlugin) Find(query string, limit int) ([]ScoredNode, error) {
 	return p.findScored(query, limit)
 }
 
-// Remember saves a fact under a specific category
-func (p *KnowledgePlugin) Remember(category string, fact string) (string, error) {
-	return p.remember(category, fact, "")
+// AddNode creates a new node and attaches it to a parent via an edge.
+// parentIdentifier resolves via resolveNode: empty string = graph root.
+func (p *KnowledgePlugin) AddNode(parentIdentifier, edgeType, nodeType, name, content string) (string, error) {
+	return p.addNode(parentIdentifier, edgeType, nodeType, name, content)
 }
 
-// RememberWithTitle saves a fact under a category with an explicit short title.
-func (p *KnowledgePlugin) RememberWithTitle(category, title, fact string) (string, error) {
-	return p.remember(category, fact, title)
-}
-func (p *KnowledgePlugin) AddCategory(category string) (string, error) {
-	return p.addCategory(category)
-}
-
-// AddSubcategory creates a new subcategory node under a parent category or subcategory
-func (p *KnowledgePlugin) AddSubcategory(parentIdentifier string, subcategory string) (string, error) {
-	return p.addSubcategory(parentIdentifier, subcategory)
-}
-
-// GetCategories returns all Category nodes
-func (p *KnowledgePlugin) GetCategories() ([]Node, error) {
-	return p.getCategories()
-}
-
-// GetCategoryFacts returns all Fact nodes directly connected to a category
-func (p *KnowledgePlugin) GetCategoryFacts(category string) ([]Node, error) {
-	return p.getCategoryFacts(category)
-}
-
-// Forget deletes a node and all its dependents (cascade delete)
-func (p *KnowledgePlugin) Forget(identifier string) (int, error) {
+// DeleteNode deletes a node and all its dependents (cascade delete).
+func (p *KnowledgePlugin) DeleteNode(identifier string) (int, error) {
 	return p.forgetCascade(identifier)
 }
 
@@ -316,6 +336,6 @@ func (p *KnowledgePlugin) LinkRelevant(identifierA, identifierB string) (string,
 // init registers the plugin factory
 func init() {
 	registry.Register(PLUGIN_NAME, func(workingDir string) core.Plugin {
-		return NewKnowledgePlugin(workingDir, nil, nil)
+		return NewKnowledgePlugin(workingDir)
 	})
 }

@@ -1,285 +1,268 @@
 # API Tool
 
-A generic, reusable tool for making HTTP API calls with configurable endpoints, declarative headers, and parameter validation.
+A unified, configuration-driven HTTP client tool. Add a new API service by dropping a JSON file in a folder — no code changes required.
 
 ## Features
 
-- **Dynamic Endpoint Discovery**: Agent automatically sees all available endpoints with their documentation
-- **URL Parameter Substitution**: Support for path parameters like `/users/{user_id}`
-- **Query Parameters**: Easy query string building (e.g., `?limit=10&offset=0`)
-- **Request Body Support**: Send JSON payloads with POST/PUT/PATCH requests
-- **Custom Validation**: Per-endpoint validation functions to ensure parameter safety
-- **Declarative Headers**: Inject auth tokens and custom headers via config; values support `${ENV_VAR}` expansion
-- **Type Safety**: Built-in parameter validation and type checking
+- **Multi-service**: One tool instance handles any number of API services
+- **Progressive discovery**: Agent lists services, then endpoints, then calls — reducing context noise
+- **URL parameter substitution**: Path parameters like `/users/{user_id}`
+- **Query parameters**: Key-value object → query string automatically
+- **Body serialization**: Key-value object → JSON or form-encoded, based on endpoint config
+- **Basic Auth shorthand**: Provide `basic_auth` and the tool computes the `Authorization: Basic` header
+- **`${ENV_VAR}` expansion**: Works in header values and URLs, resolved at call time
+- **Resolver functions**: Body arguments can be transparently transformed before the request (e.g. local file → base64 data URI)
 
-## Usage
+## Configuration
 
-### Basic Example
-
-```go
-package main
-
-import (
-    "github.com/thinktwiceco/agent-forge/src/tools/api"
-)
-
-func main() {
-    endpoints := []api.Endpoint{
-        {
-            Name:        "get_user",
-            URL:         "https://api.example.com/users/{user_id}",
-            Method:      "GET",
-            Description: "Get user by ID",
-            URLParameters: `- user_id: string - The ID of the user to retrieve`,
-            QueryParams: `- include_posts: boolean - Whether to include user posts
-- limit: int - Maximum number of posts to include`,
-        },
-        {
-            Name:        "create_post",
-            URL:         "https://api.example.com/users/{user_id}/posts",
-            Method:      "POST",
-            Description: "Create a new post for a user",
-            URLParameters: `- user_id: string - The ID of the user`,
-            Payload: `- title: string - The post title
-- content: string - The post content
-- tags: array[string] - Optional tags`,
-        },
-    }
-
-    headers := map[string]string{
-        "Authorization": "Bearer YOUR_API_TOKEN",
-    }
-
-    tool := api.NewApiTool("my_api", endpoints, headers)
-}
-```
-
-### YAML Configuration
+### `config.yaml`
 
 ```yaml
 agent:
-  name: "API Agent"
   tools:
-    - name: "my_api"
-      headers:
-        - "Authorization: Bearer ${API_TOKEN}"
-        - "X-API-Version: v1"
-      endpoints:
-        - name: "get_user"
-          url: "https://api.example.com/users/{user_id}"
-          method: "GET"
-          description: "Get user by ID"
-          urlParameters: |
-            - user_id: string - The ID of the user to retrieve
-          queryParams: |
-            - include_posts: boolean - Whether to include user posts
-            - limit: int - Maximum number of posts to include
-          validator: "validate_positive_user_id"
-        
-        - name: "create_post"
-          url: "https://api.example.com/users/{user_id}/posts"
-          method: "POST"
-          description: "Create a new post for a user"
-          urlParameters: |
-            - user_id: string - The ID of the user
-          payload: |
-            - title: string - The post title
-            - content: string - The post content
-            - tags: array[string] - Optional tags
-          validator: "validate_create_post"
+    - name: api
+      config_folder: "api_config/"
 ```
 
-Header values are expanded at request time using environment variables — `${API_TOKEN}` reads from the process environment, so values like tokens are always fresh.
+### `api_config/<service_name>.json`
 
-## Parameter Validation
-
-Register validators to ensure parameters are safe:
-
-```go
-package main
-
-import (
-    "fmt"
-    "github.com/thinktwiceco/agent-forge/src/tools/api"
-)
-
-func init() {
-    // Validate that user_id is a positive integer
-    api.RegisterValidator("validate_positive_user_id", 
-        api.ValidatePositiveIntParam("user_id"))
-    
-    // Custom validation for post creation
-    api.RegisterValidator("validate_create_post", 
-        func(params api.EndpointValidationParams) error {
-            // Validate body is not empty
-            if params.Body == "" {
-                return fmt.Errorf("post body cannot be empty")
-            }
-            
-            // Validate user_id is positive
-            if userID, ok := params.URLParams["user_id"].(float64); ok {
-                if userID <= 0 {
-                    return fmt.Errorf("user_id must be positive")
-                }
-            }
-            
-            // Validate body size
-            if len(params.Body) > 10000 {
-                return fmt.Errorf("post body exceeds 10KB limit")
-            }
-            
-            return nil
-        })
-}
-```
-
-## Built-in Validators
-
-The tool provides several built-in validator factories:
-
-### ValidatePositiveIntParam
-
-Ensures specified parameters are positive integers:
-
-```go
-api.RegisterValidator("validate_ids", 
-    api.ValidatePositiveIntParam("user_id", "post_id"))
-```
-
-### ValidateRequiredParams
-
-Ensures specified parameters are present and non-empty:
-
-```go
-api.RegisterValidator("validate_required", 
-    api.ValidateRequiredParams("api_key", "user_id"))
-```
-
-### ValidateBodyMaxSize
-
-Ensures request body doesn't exceed a size limit:
-
-```go
-api.RegisterValidator("validate_body_size", 
-    api.ValidateBodyMaxSize(50000)) // 50KB limit
-```
-
-## Agent Usage
-
-Once configured, the agent can call endpoints like this:
+Each file in the folder becomes one service. The filename (without `.json`) is the service name the agent uses.
 
 ```json
 {
-  "endpoint": "get_user",
-  "url_params": {
-    "user_id": "123"
+  "serviceName": "My API",
+  "serviceDescription": "Brief description of what this service does (injected into the agent prompt).",
+  "headers": {
+    "Authorization": "Bearer ${MY_API_TOKEN}"
   },
-  "query_params": {
-    "include_posts": true,
-    "limit": 10
+  "endpoints": [
+    {
+      "name": "get_user",
+      "url": "https://api.example.com/users/{user_id}",
+      "method": "GET",
+      "description": "Get a user by ID",
+      "url_parameters": "user_id: string - The ID of the user to retrieve",
+      "query_params": "include_posts: boolean - Whether to include user posts"
+    },
+    {
+      "name": "create_post",
+      "url": "https://api.example.com/posts",
+      "method": "POST",
+      "description": "Create a new post",
+      "payload": "title: string - Post title. Required.\ncontent: string - Post content. Required."
+    }
+  ]
+}
+```
+
+### Service-level fields
+
+| Field | Required | Description |
+|---|---|---|
+| `serviceName` | no | Display name for the service in prompts (e.g. "Cloudinary"). Falls back to filename if omitted. |
+| `serviceDescription` | no | Human-readable description of the service, injected into the tool prompt. |
+
+### Endpoint fields
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | yes | Identifier the agent uses to call this endpoint |
+| `url` | yes | URL template — supports `{param}` and `${ENV_VAR}` placeholders |
+| `method` | yes | HTTP method: `GET`, `POST`, `PUT`, `PATCH`, `DELETE` |
+| `description` | yes | What the endpoint does (shown in `show_apis`) |
+| `url_parameters` | no | Free-text description of URL path parameters (shown in `show_api`) |
+| `query_params` | no | Free-text description of query string parameters (shown in `show_api`) |
+| `payload` | no | Free-text description of body parameters (shown in `show_api`) |
+| `content_type` | no | `"form"` for `application/x-www-form-urlencoded`; omit for JSON (default) |
+
+### Authentication options
+
+**Bearer token** (via header):
+```json
+{
+  "headers": {
+    "Authorization": "Bearer ${API_TOKEN}"
   }
 }
 ```
 
+**Basic Auth** (auto base64-encoded):
 ```json
 {
-  "endpoint": "create_post",
-  "url_params": {
-    "user_id": "123"
-  },
-  "body": "{\"title\": \"My Post\", \"content\": \"Hello world!\", \"tags\": [\"test\"]}"
+  "basic_auth": "${API_KEY}:${API_SECRET}"
 }
 ```
 
-## Response Format
+Both values are resolved from environment variables at call time.
 
-The tool returns formatted responses:
+## Agent workflow
+
+The tool exposes three actions:
+
+### 1. `show_apis` — list endpoints
+
+```json
+{
+  "action": "show_apis",
+  "service": "my_api"
+}
+```
+
+Response:
+```
+Service: my_api
+Endpoints:
+  - get_user: Get a user by ID
+  - create_post: Create a new post
+```
+
+### 2. `show_api` — endpoint details
+
+```json
+{
+  "action": "show_api",
+  "service": "my_api",
+  "endpoint": "get_user"
+}
+```
+
+Response:
+```
+Service: my_api
+Endpoint: get_user
+Method: GET https://api.example.com/users/{user_id}
+Description: Get a user by ID
+URL Parameters:
+  user_id: string - The ID of the user to retrieve
+Query Parameters:
+  include_posts: boolean - Whether to include user posts
+```
+
+### 3. Call an endpoint
+
+```json
+{
+  "action": "get_user",
+  "service": "my_api",
+  "url_params": { "user_id": "123" },
+  "query_params": { "include_posts": true }
+}
+```
+
+```json
+{
+  "action": "create_post",
+  "service": "my_api",
+  "body": { "title": "Hello", "content": "World" }
+}
+```
+
+## Resolver functions
+
+Body arguments whose key matches `<resolver>_$<param_name>` are transformed before the HTTP request is sent. The resolved value replaces the entry under `<param_name>`.
+
+### Convention
+
+In the service JSON, annotate a payload parameter with the resolver prefix:
+
+```
+"payload": "resolve_to_base64_$file: local file path to upload. Required."
+```
+
+The agent passes:
+
+```json
+{
+  "action": "upload_image",
+  "service": "cloudinary",
+  "body": {
+    "resolve_to_base64_$file": "/home/user/photo.jpg",
+    "upload_preset": "my_preset"
+  }
+}
+```
+
+The tool splits `resolve_to_base64_$file` → resolver `resolve_to_base64`, param `file`, reads the file, and sends `file=data:image/jpeg;base64,...` in the request body.
+
+### Built-in resolvers
+
+| Resolver | Input | Output |
+|---|---|---|
+| `resolve_to_base64` | Local file path (relative paths are resolved from `working_dir`) | `data:<mime>;base64,<encoded>` data URI |
+
+Supported MIME types for `resolve_to_base64`: `.jpg`/`.jpeg` → `image/jpeg`, `.png` → `image/png`, `.gif` → `image/gif`, `.webp` → `image/webp`, other → `application/octet-stream`.
+
+### Adding a resolver
+
+Add one entry to `resolverRegistry` in `src/tools/api/resolvers.go`:
+
+```go
+var resolverRegistry = map[string]ResolverFunc{
+    "resolve_to_base64": resolveToBase64,
+    "my_resolver":       myResolverFunc,  // add here
+}
+```
+
+## Response format
 
 ```
 API Response
+Service: my_api
 Endpoint: get_user
 Method: GET
-URL: https://api.example.com/users/123?include_posts=true&limit=10
+URL: https://api.example.com/users/123?include_posts=true
 Status: 200
 
 Response Headers:
   Content-Type: application/json
-  X-RateLimit-Remaining: 999
 
 Response Body:
-{"id": "123", "name": "John Doe", "email": "john@example.com", ...}
+{"id": "123", "name": "Jane Doe", ...}
 ```
 
-## Error Handling
+## Adding a new service
 
-The tool provides clear error messages:
+1. Create `api_config/<service_name>.json` with headers and endpoints
+2. Add any required env vars to `.env`
+3. Restart the agent
 
-- **Parameter validation failed**: Custom validation rules were not satisfied
-- **Missing required URL parameters**: Not all URL placeholders were filled
-- **HTTP 4xx/5xx**: API returned an error status code
+No code changes needed.
 
-## Security Best Practices
+## Programmatic usage
 
-1. **Use environment variables for secrets**: Reference tokens as `${MY_TOKEN}` in header values, never hardcode them
-2. **Register Validators**: Always validate user IDs, size limits, and required fields
-3. **Limit Endpoints**: Only expose endpoints that the agent needs
-4. **Monitor API Calls**: Log all API calls for audit purposes
-5. **Use HTTPS**: Always use secure connections for API calls
+```go
+import "github.com/thinktwiceco/agent-forge/src/tools/api"
 
-## Advanced Example
+services := map[string]api.ServiceConfig{
+    "my_api": {
+        Headers: map[string]string{
+            "Authorization": "Bearer ${MY_TOKEN}",
+        },
+        Endpoints: []api.Endpoint{
+            {
+                Name:        "get_user",
+                URL:         "https://api.example.com/users/{user_id}",
+                Method:      "GET",
+                Description: "Get a user by ID",
+                URLParameters: "user_id: string - The user ID",
+            },
+        },
+    },
+}
 
-Complete example with multiple endpoints, validation, and authentication:
-
-```yaml
-agent:
-  name: "GitHub Agent"
-  model: "gpt-4"
-  tools:
-    - name: "github_api"
-      headers:
-        - "Authorization: Bearer ${GITHUB_TOKEN}"
-        - "Accept: application/vnd.github.v3+json"
-      endpoints:
-        - name: "list_issues"
-          url: "https://api.github.com/repos/{owner}/{repo}/issues"
-          method: "GET"
-          description: "List issues for a repository"
-          urlParameters: |
-            - owner: string - Repository owner
-            - repo: string - Repository name
-          queryParams: |
-            - state: string - Issue state (open, closed, all)
-            - per_page: int - Results per page (max 100)
-          validator: "validate_repo_params"
-        
-        - name: "get_issue"
-          url: "https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"
-          method: "GET"
-          description: "Get a specific issue"
-          urlParameters: |
-            - owner: string - Repository owner
-            - repo: string - Repository name
-            - issue_number: int - Issue number
-          validator: "validate_issue_number"
+repositoryDir := ""   // path to repository/api_configs for install_api_config; empty disables
+workingDir := "/path/to/agent/working/dir"  // base path for resolving relative file paths in resolvers
+tool := api.NewApiTool("api", services, repositoryDir, workingDir)
 ```
-
-Set `GITHUB_TOKEN` in your environment or `.env` file — it is expanded at request time.
 
 ## Architecture
 
-The API tool consists of several components:
-
-- **types.go**: Core data structures (Endpoint, Api, apiResponse)
-- **validate.go**: Validation functions and registry
-- **url_builder.go**: URL parameter substitution and query string building
-- **request.go**: HTTP client and request execution
-- **handler.go**: Main tool handler; resolves `${ENV_VAR}` in headers at request time
-- **tool.go**: Tool constructor and description generation
-
-## Integration
-
-The tool integrates with the agent builder system and can be configured via:
-
-1. **Direct instantiation**: `api.NewApiTool()`
-2. **YAML configuration**: Via agent config files
-3. **Builder API**: Using `AgentBuilder.AddTools()`
+| File | Responsibility |
+|---|---|
+| `types.go` | `Endpoint`, `ServiceConfig`, `Api`, `apiResponse` structs |
+| `validate.go` | Internal helpers: `findService`, `findEndpoint`, `validateService` |
+| `handler.go` | Action dispatch (`show_apis`, `show_api`, call); env var resolution; body serialization |
+| `resolvers.go` | `ResolverFunc` type, `resolverRegistry`, `resolveBodyArgs`, `resolveToBase64` |
+| `url_builder.go` | `{param}` substitution and query string building |
+| `request.go` | HTTP client execution; `Content-Type` selection based on `content_type` field |
+| `tool.go` | Constructor `NewApiTool`; parameter and description generation |

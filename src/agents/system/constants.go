@@ -16,6 +16,8 @@ const (
 	AgentNameSystemWeb = "system-web"
 	// AgentNameSystemVision is the name of the system vision agent
 	AgentNameSystemVision = "system-vision"
+	// AgentNameSystemKnowledge is the name of the system knowledge agent
+	AgentNameSystemKnowledge = "system-knowledge"
 	// SystemAgentPrefix is the prefix used for all system-defined agents
 	SystemAgentPrefix = "system-"
 )
@@ -36,6 +38,8 @@ const (
 	TraceWeb = "web"
 	// TraceVision is the trace identifier for vision agent operations
 	TraceVision = "vision"
+	// TraceKnowledge is the trace identifier for knowledge agent operations
+	TraceKnowledge = "knowledge"
 )
 
 // ToneSystemAgent instructs the agent to provide detailed responses for system agents

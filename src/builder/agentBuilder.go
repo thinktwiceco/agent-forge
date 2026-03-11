@@ -181,13 +181,12 @@ func (b *AgentBuilder) Build() (*agents.Agent, error) {
 		return nil, err
 	}
 
-	subagents, err := b.buildSubagents()
-
+	tools, err := b.buildTools()
 	if err != nil {
 		return nil, err
 	}
 
-	tools, err := b.buildTools()
+	subagents, err := b.buildSubagents(tools)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +241,16 @@ func (b *AgentBuilder) createLLMEngine(l LLM) (llms.LLMEngine, error) {
 	return mmEngine.MainModel(), nil
 }
 
-func (b *AgentBuilder) buildSubagents() ([]core.SubAgent, error) {
+func (b *AgentBuilder) buildSubagents(builtTools []llms.Tool) ([]core.SubAgent, error) {
+	// Collect tools that should be forwarded to specific subagents.
+	// The API tool is given to the web agent so it can make API calls during browsing tasks.
+	var apiTools []llms.Tool
+	for _, t := range builtTools {
+		if t.GetName() == API_TOOL {
+			apiTools = append(apiTools, t)
+		}
+	}
+
 	subagents := []core.SubAgent{}
 	for subagent, llm := range b.Subagents {
 		llmEngine, err := b.createLLMEngine(llm)
@@ -250,8 +258,12 @@ func (b *AgentBuilder) buildSubagents() ([]core.SubAgent, error) {
 			return nil, err
 		}
 
-		subagentInstance, err := subagent.getSubagent(llmEngine, b.vectorDB, b.embeddingGenerator, b.workingDir)
+		var extra []llms.Tool
+		if subagent == WEB_AGENT {
+			extra = apiTools
+		}
 
+		subagentInstance, err := subagent.getSubagent(llmEngine, b.vectorDB, b.embeddingGenerator, b.workingDir, extra...)
 		if err != nil {
 			return nil, err
 		}
@@ -275,11 +287,11 @@ func (b *AgentBuilder) buildTools() ([]llms.Tool, error) {
 func (b *AgentBuilder) buildPlugins() ([]core.Plugin, error) {
 	plugins := []core.Plugin{}
 	for _, plugin := range b.plugins {
-		plugin, err := getPlugin(plugin, b.workingDir)
+		p, err := getPlugin(plugin, b.workingDir)
 		if err != nil {
 			return nil, err
 		}
-		plugins = append(plugins, plugin)
+		plugins = append(plugins, p)
 	}
 	return plugins, nil
 }

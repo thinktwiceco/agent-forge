@@ -13,28 +13,30 @@ const PROCEDURE_TOOL = "procedure"
 func newProcedureTool(plugin *ProceduresPlugin) llms.Tool {
 	return &core.Tool{
 		Name:        PROCEDURE_TOOL,
-		Description: `Execute structured multi-step procedures. start_procedure: begin named procedure (requires name). next_step: advance to next step. goto_step: jump to a specific step (requires stepNumber). installable_procedures: list procedures available on GitHub. install_procedure: download a procedure from GitHub (requires procedureSlug).`,
+		Description: `Execute structured multi-step procedures. start_procedure: begin named procedure (requires name). next_step: advance to next step. goto_step: jump to a specific step (requires stepNumber). installable_procedures: list procedures available on GitHub. install_procedure: download a procedure from GitHub into repository/procedures/ (requires procedureSlug).`,
 		AdvanceDesc: `[ACTIONS]
 - start_procedure: Begin from step 0. Required: name
 - next_step: Advance to next step of active procedure
 - goto_step: Jump to a specific step by number. Required: stepNumber (0-based)
 - installable_procedures: List all procedures available for installation from the remote GitHub repository
-- install_procedure: Download a procedure from GitHub into the local procedures/ folder. Required: procedureSlug (directory name in the remote repo, e.g. 'gmail-login')
+- install_procedure: Download a procedure from GitHub into the local repository/procedures/ folder. Required: procedureSlug (directory name in the remote repo, e.g. 'gmail-login')
 
 [STEP CONTENT]
 - Each action returns step folder files. Read for instructions.
 - Procedure names in manifest.yaml. System prompt lists available procedures.
 
 [CREATING PROCEDURES]
-- New procedures MUST be created inside procedures/ (e.g. procedures/my-procedure/manifest.yaml, procedures/my-procedure/0/instructions.md). Never create at working dir root.`,
+- New procedures MUST be created inside procedures/ (e.g. procedures/my-procedure/manifest.yaml, procedures/my-procedure/0/instructions.md). Never create at working dir root.
+- Procedures installed from the repository are stored in repository/procedures/ and must not be edited directly.`,
 		TroubleshootingInfo: `Troubleshooting:
 - Ensure 'action' is 'start_procedure', 'next_step', 'goto_step', 'installable_procedures', or 'install_procedure'.
 - 'name' is required for start_procedure and must match a known procedure name exactly.
 - 'stepNumber' is required for goto_step (0-based index).
-- 'procedureSlug' is required for install_procedure and must match a directory name in the remote repo's procedures/ folder.
+- 'procedureSlug' is required for install_procedure and must match a directory name in the remote repo's repository/procedures/ folder.
 - Call start_procedure before next_step or goto_step; there is no active procedure otherwise.
 - next_step returns an error when the last step has already been reached.
-- install_procedure requires internet access to reach the GitHub API.`,
+- install_procedure requires internet access to reach the GitHub API.
+- Installed procedures land in repository/procedures/, not procedures/.`,
 		Parameters: []core.Parameter{
 			{
 				Name:        "action",
@@ -191,7 +193,7 @@ func (p *ProceduresPlugin) handleInstallProcedure(args map[string]any) llms.Tool
 		return core.NewErrorResponse("procedureSlug parameter is required for install_procedure")
 	}
 
-	count, err := installProcedure(slug, p.dir)
+	count, err := installProcedure(slug, p.repositoryDir)
 	if err != nil {
 		return core.NewErrorResponse(fmt.Sprintf("failed to install procedure '%s': %v", slug, err))
 	}

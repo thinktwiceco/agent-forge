@@ -78,11 +78,11 @@ func githubGet(path string, out any) error {
 }
 
 // fetchInstallableProcedures lists all procedures available in the remote
-// GitHub repo's procedures/ folder, including their name and description from
+// GitHub repo's repository/procedures/ folder, including their name and description from
 // each manifest.yaml.
 func fetchInstallableProcedures() ([]remoteProcedure, error) {
 	var entries []ghContentsEntry
-	if err := githubGet(fmt.Sprintf("repos/%s/contents/procedures", githubRepo), &entries); err != nil {
+	if err := githubGet(fmt.Sprintf("repos/%s/contents/repository/procedures", githubRepo), &entries); err != nil {
 		return nil, fmt.Errorf("failed to list remote procedures: %w", err)
 	}
 
@@ -138,7 +138,7 @@ func installProcedure(slug, destDir string) (int, error) {
 		return 0, fmt.Errorf("failed to fetch repo tree: %w", err)
 	}
 
-	prefix := fmt.Sprintf("procedures/%s/", slug)
+	prefix := fmt.Sprintf("repository/procedures/%s/", slug)
 	var blobs []ghTreeEntry
 	for _, entry := range treeResp.Tree {
 		if entry.Type == "blob" && strings.HasPrefix(entry.Path, prefix) {
@@ -147,12 +147,12 @@ func installProcedure(slug, destDir string) (int, error) {
 	}
 
 	if len(blobs) == 0 {
-		return 0, fmt.Errorf("procedure '%s' not found in remote repo (no files under procedures/%s/)", slug, slug)
+		return 0, fmt.Errorf("procedure '%s' not found in remote repo (no files under repository/procedures/%s/)", slug, slug)
 	}
 
 	written := 0
 	for _, blob := range blobs {
-		relPath := strings.TrimPrefix(blob.Path, "procedures/")
+		relPath := strings.TrimPrefix(blob.Path, "repository/procedures/")
 		destPath := filepath.Join(destDir, relPath)
 
 		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {

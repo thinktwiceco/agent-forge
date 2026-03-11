@@ -17,7 +17,7 @@ func setupTestPlugin(t *testing.T) (*KnowledgePlugin, func()) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
-	plugin := NewKnowledgePlugin(tmpDir, nil, nil)
+	plugin := NewKnowledgePlugin(tmpDir)
 
 	// Initialize database
 	if err := plugin.openDB(); err != nil {
@@ -32,7 +32,6 @@ func setupTestPlugin(t *testing.T) (*KnowledgePlugin, func()) {
 	}
 
 	plugin.querier = NewGraphQuerier(plugin.db)
-	plugin.explorer = NewKnowledgeExplorer(plugin.querier)
 
 	// Return cleanup function
 	cleanup := func() {
@@ -512,7 +511,7 @@ func TestDatabaseLocation(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	plugin := NewKnowledgePlugin(tmpDir, nil, nil)
+	plugin := NewKnowledgePlugin(tmpDir)
 
 	// Open DB
 	if err := plugin.openDB(); err != nil {
@@ -965,7 +964,7 @@ func TestAddCategory(t *testing.T) {
 	defer cleanup()
 
 	// Add a category
-	categoryID, err := plugin.AddCategory("Programming")
+	categoryID, err := plugin.AddNode("", "has_category", "Category", "Programming", "")
 	if err != nil {
 		t.Fatalf("Failed to add category: %v", err)
 	}
@@ -1011,40 +1010,39 @@ func TestGetCategories(t *testing.T) {
 	plugin, cleanup := setupTestPlugin(t)
 	defer cleanup()
 
-	// Initially should have just the Omnia Nunc Node
-	categories, err := plugin.GetCategories()
+	// Initially root should have no category neighbors
+	root, err := plugin.OutNodes("")
 	if err != nil {
-		t.Fatalf("Failed to get categories: %v", err)
+		t.Fatalf("Failed to get root out nodes: %v", err)
 	}
-
-	initialCount := len(categories)
+	initialCount := root.Count
 
 	// Add some categories
-	_, err = plugin.AddCategory("Work")
+	_, err = plugin.AddNode("", "has_category", "Category", "Work", "")
 	if err != nil {
 		t.Fatalf("Failed to add category: %v", err)
 	}
 
-	_, err = plugin.AddCategory("Personal")
+	_, err = plugin.AddNode("", "has_category", "Category", "Personal", "")
 	if err != nil {
 		t.Fatalf("Failed to add category: %v", err)
 	}
 
-	// Get categories again
-	categories, err = plugin.GetCategories()
+	// Get categories again via out_nodes from root
+	root, err = plugin.OutNodes("")
 	if err != nil {
-		t.Fatalf("Failed to get categories: %v", err)
+		t.Fatalf("Failed to get root out nodes: %v", err)
 	}
 
-	if len(categories) != initialCount+2 {
-		t.Errorf("Expected %d categories, got %d", initialCount+2, len(categories))
+	if root.Count != initialCount+2 {
+		t.Errorf("Expected %d categories, got %d", initialCount+2, root.Count)
 	}
 
 	// Verify content
 	found := map[string]bool{"Work": false, "Personal": false}
-	for _, cat := range categories {
-		if cat.Content == "Work" || cat.Content == "Personal" {
-			found[cat.Content] = true
+	for _, n := range root.Neighbors {
+		if n.Title == "Work" || n.Title == "Personal" {
+			found[n.Title] = true
 		}
 	}
 
@@ -1060,13 +1058,13 @@ func TestRemember(t *testing.T) {
 	defer cleanup()
 
 	// Create a category first
-	categoryID, err := plugin.AddCategory("Preferences")
+	categoryID, err := plugin.AddNode("", "has_category", "Category", "Preferences", "")
 	if err != nil {
 		t.Fatalf("Failed to add category: %v", err)
 	}
 
 	// Remember a fact under this category
-	factID, err := plugin.Remember("Preferences", "User prefers dark mode")
+	factID, err := plugin.AddNode("Preferences", "has_fact", "Fact", "User prefers dark mode", "User prefers dark mode")
 	if err != nil {
 		t.Fatalf("Failed to remember fact: %v", err)
 	}
@@ -1113,7 +1111,7 @@ func TestRememberNonExistentCategory(t *testing.T) {
 	defer cleanup()
 
 	// Try to remember a fact under a non-existent category
-	_, err := plugin.Remember("NonExistent", "Some fact")
+	_, err := plugin.AddNode("NonExistent", "has_fact", "Fact", "Some fact", "Some fact")
 	if err == nil {
 		t.Fatal("Expected error when remembering under non-existent category")
 	}
@@ -1124,37 +1122,40 @@ func TestGetCategoryFacts(t *testing.T) {
 	defer cleanup()
 
 	// Create a category
-	_, err := plugin.AddCategory("Skills")
+	_, err := plugin.AddNode("", "has_category", "Category", "Skills", "")
 	if err != nil {
 		t.Fatalf("Failed to add category: %v", err)
 	}
 
 	// Add facts
-	_, err = plugin.Remember("Skills", "Knows Go programming")
+	_, err = plugin.AddNode("Skills", "has_fact", "Fact", "Knows Go programming", "Knows Go programming")
 	if err != nil {
 		t.Fatalf("Failed to remember fact 1: %v", err)
 	}
 
-	_, err = plugin.Remember("Skills", "Knows Python programming")
+	_, err = plugin.AddNode("Skills", "has_fact", "Fact", "Knows Python programming", "Knows Python programming")
 	if err != nil {
 		t.Fatalf("Failed to remember fact 2: %v", err)
 	}
 
-	// Get category facts
-	facts, err := plugin.GetCategoryFacts("Skills")
+	// Get category facts via out_nodes filtered to has_fact edges
+	result, err := plugin.OutNodes("Skills")
 	if err != nil {
-		t.Fatalf("Failed to get category facts: %v", err)
+		t.Fatalf("Failed to get out nodes: %v", err)
 	}
 
-	if len(facts) != 2 {
-		t.Errorf("Expected 2 facts, got %d", len(facts))
-	}
-
-	// Verify all are facts
-	for _, fact := range facts {
-		if fact.Type != "Fact" {
-			t.Errorf("Expected type 'Fact', got '%s'", fact.Type)
+	factCount := 0
+	for _, n := range result.Neighbors {
+		if n.EdgeType == "has_fact" {
+			if n.Type != "Fact" {
+				t.Errorf("Expected type 'Fact', got '%s'", n.Type)
+			}
+			factCount++
 		}
+	}
+
+	if factCount != 2 {
+		t.Errorf("Expected 2 facts, got %d", factCount)
 	}
 }
 
@@ -1162,38 +1163,39 @@ func TestExploreCategory(t *testing.T) {
 	plugin, cleanup := setupTestPlugin(t)
 	defer cleanup()
 
-	// Create a category with sub-category and facts
-	_, err := plugin.AddCategory("Technology")
+	// Create a category with a fact
+	_, err := plugin.AddNode("", "has_category", "Category", "Technology", "")
 	if err != nil {
 		t.Fatalf("Failed to add category: %v", err)
 	}
 
-	_, err = plugin.Remember("Technology", "AI is advancing rapidly")
+	_, err = plugin.AddNode("Technology", "has_fact", "Fact", "AI is advancing rapidly", "AI is advancing rapidly")
 	if err != nil {
 		t.Fatalf("Failed to remember fact: %v", err)
 	}
 
-	// Explore the category
-	result, err := plugin.ExploreCategory("Technology")
+	// Explore via out_nodes
+	result, err := plugin.OutNodes("Technology")
 	if err != nil {
-		t.Fatalf("Failed to explore category: %v", err)
+		t.Fatalf("Failed to get out nodes: %v", err)
 	}
 
-	if result.Category.ID == "" {
-		t.Error("Expected category in exploration result")
+	if result.Node.ID == "" {
+		t.Error("Expected resolved node in result")
 	}
 
-	// Should contain the category node
-	hasCategory := result.Category.Type == "Category" && result.Category.Content == "Technology"
-	// Should have the fact as a light node
-	hasFact := len(result.Facts) > 0
-
-	if !hasCategory {
-		t.Errorf("Expected to find Technology category, got type=%s content=%s", result.Category.Type, result.Category.Content)
+	if result.Node.Type != "Category" {
+		t.Errorf("Expected type Category, got %s", result.Node.Type)
 	}
 
+	hasFact := false
+	for _, n := range result.Neighbors {
+		if n.EdgeType == "has_fact" {
+			hasFact = true
+		}
+	}
 	if !hasFact {
-		t.Error("Expected to find facts in category exploration")
+		t.Error("Expected to find facts in category out_nodes")
 	}
 }
 
@@ -1202,42 +1204,43 @@ func TestExploreFact(t *testing.T) {
 	defer cleanup()
 
 	// Create a category and fact
-	_, err := plugin.AddCategory("Health")
+	_, err := plugin.AddNode("", "has_category", "Category", "Health", "")
 	if err != nil {
 		t.Fatalf("Failed to add category: %v", err)
 	}
 
-	_, err = plugin.Remember("Health", "Exercise daily")
+	_, err = plugin.AddNode("Health", "has_fact", "Fact", "Exercise daily", "Exercise daily")
 	if err != nil {
 		t.Fatalf("Failed to remember fact: %v", err)
 	}
 
-	// Explore the fact
-	result, err := plugin.ExploreFact("Exercise daily")
+	// Get full content via get_node_content
+	node, err := plugin.GetNodeContent("Exercise daily")
 	if err != nil {
-		t.Fatalf("Failed to explore fact: %v", err)
+		t.Fatalf("Failed to get node content: %v", err)
 	}
 
-	if result.Fact.ID == "" {
-		t.Error("Expected fact in exploration result")
+	if node.ID == "" {
+		t.Error("Expected fact node in result")
+	}
+	if node.Type != "Fact" || node.Content != "Exercise daily" {
+		t.Errorf("Expected Fact 'Exercise daily', got type=%s content=%s", node.Type, node.Content)
 	}
 
-	// The fact itself should be the full node
-	hasFact := result.Fact.Type == "Fact" && result.Fact.Content == "Exercise daily"
-	// Parent categories are returned as light nodes
+	// Get parent categories via in_nodes
+	parents, err := plugin.InNodes(node.ID)
+	if err != nil {
+		t.Fatalf("Failed to get in nodes: %v", err)
+	}
+
 	hasCategory := false
-	for _, light := range result.ParentCategories {
-		if light.Title == "Health" || light.Type == "Category" {
+	for _, n := range parents.Neighbors {
+		if n.Type == "Category" {
 			hasCategory = true
 		}
 	}
-
-	if !hasFact {
-		t.Errorf("Expected to find fact, got type=%s content=%s", result.Fact.Type, result.Fact.Content)
-	}
-
 	if !hasCategory {
-		t.Error("Expected to find parent category in fact exploration")
+		t.Error("Expected to find parent category via in_nodes")
 	}
 }
 
@@ -1246,12 +1249,12 @@ func TestFind(t *testing.T) {
 	defer cleanup()
 
 	// Add some data
-	_, err := plugin.AddCategory("Science")
+	_, err := plugin.AddNode("", "has_category", "Category", "Science", "")
 	if err != nil {
 		t.Fatalf("Failed to add category: %v", err)
 	}
 
-	_, err = plugin.Remember("Science", "Physics studies matter and energy")
+	_, err = plugin.AddNode("Science", "has_fact", "Fact", "Physics studies matter and energy", "Physics studies matter and energy")
 	if err != nil {
 		t.Fatalf("Failed to remember fact: %v", err)
 	}
@@ -1287,23 +1290,23 @@ func TestForgetCascade(t *testing.T) {
 	defer cleanup()
 
 	// Create a category with facts
-	catID, err := plugin.AddCategory("ToDelete")
+	catID, err := plugin.AddNode("", "has_category", "Category", "ToDelete", "")
 	if err != nil {
 		t.Fatalf("Failed to add category: %v", err)
 	}
 
-	_, err = plugin.Remember("ToDelete", "Fact 1")
+	_, err = plugin.AddNode("ToDelete", "has_fact", "Fact", "Fact 1", "Fact 1")
 	if err != nil {
 		t.Fatalf("Failed to remember fact 1: %v", err)
 	}
 
-	_, err = plugin.Remember("ToDelete", "Fact 2")
+	_, err = plugin.AddNode("ToDelete", "has_fact", "Fact", "Fact 2", "Fact 2")
 	if err != nil {
 		t.Fatalf("Failed to remember fact 2: %v", err)
 	}
 
 	// Delete the category (should cascade to facts)
-	deletedCount, err := plugin.Forget(catID)
+	deletedCount, err := plugin.DeleteNode(catID)
 	if err != nil {
 		t.Fatalf("Failed to forget: %v", err)
 	}
@@ -1318,13 +1321,10 @@ func TestForgetCascade(t *testing.T) {
 		t.Error("Expected category to be deleted")
 	}
 
-	// Verify facts are also gone
-	facts, err := plugin.GetCategoryFacts("ToDelete")
+	// Verify facts are also gone — out_nodes on deleted category should error
+	_, err = plugin.OutNodes("ToDelete")
 	if err == nil {
-		t.Error("Expected error when getting facts from deleted category")
-	}
-	if len(facts) != 0 {
-		t.Errorf("Expected 0 facts after cascade delete, got %d", len(facts))
+		t.Error("Expected error when navigating deleted category")
 	}
 }
 
@@ -1333,7 +1333,7 @@ func TestForgetOmniaNuncNode(t *testing.T) {
 	defer cleanup()
 
 	// Try to delete Omnia Nunc Node (should fail)
-	_, err := plugin.Forget(omniaNuncNodeID)
+	_, err := plugin.DeleteNode(omniaNuncNodeID)
 	if err == nil {
 		t.Fatal("Expected error when trying to delete Omnia Nunc Node")
 	}

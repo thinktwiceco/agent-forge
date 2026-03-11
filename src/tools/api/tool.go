@@ -8,154 +8,159 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
-// NewApiTool creates a new API tool that allows making HTTP requests to configured endpoints.
-//
-// Parameters:
-//   - name: The name of the tool (e.g., "github_api", "stripe_api")
-//   - endpoints: List of endpoint configurations
-//   - headers: Static headers sent with every request; values support ${ENV_VAR} expansion
-//
-// The tool provides a generic interface for making API calls with:
-//   - Dynamic endpoint discovery (agent sees all available endpoints)
-//   - URL parameter substitution (e.g., /users/{user_id})
-//   - Query parameter support (e.g., ?limit=10&offset=0)
-//   - Request body support (JSON strings)
-//   - Custom validation per endpoint
-//   - Authentication via declarative headers
-func NewApiTool(
-	name string,
-	endpoints []Endpoint,
-	headers map[string]string,
-) llms.Tool {
-	if headers == nil {
-		headers = map[string]string{}
-	}
+// ServiceProvider is implemented by the API tool. It lets callers (e.g. sub-agent
+// constructors) discover which services are configured without reflection.
+type ServiceProvider interface {
+	llms.Tool
+	// ServiceNames returns the names of all configured API services.
+	ServiceNames() []string
+}
 
-	api := &Api{
-		name:      name,
-		endpoints: endpoints,
-		headers:   headers,
-	}
+// apiToolWrapper wraps *core.Tool and exposes the service registry.
+type apiToolWrapper struct {
+	*core.Tool
+	a *Api
+}
 
-	return &core.Tool{
+// ServiceNames returns the configured service names for this API tool.
+func (w *apiToolWrapper) ServiceNames() []string {
+	return w.a.getServiceNames()
+}
+
+// NewApiTool creates a unified API tool from a map of service configurations.
+// name is the tool name visible to the agent (typically "api").
+// services maps service names to their endpoint + header configurations.
+// repositoryDir is the local directory for remotely installed configs (empty = no repository).
+// workingDir is the base path for resolving relative file paths in resolvers (e.g. resolve_to_base64).
+// The returned value also implements ServiceProvider for service discovery.
+func NewApiTool(name string, services map[string]ServiceConfig, repositoryDir, workingDir string) ServiceProvider {
+	a := &Api{name: name, services: services, repositoryDir: repositoryDir, workingDir: workingDir}
+	t := &core.Tool{
 		Name:                name,
-		Description:         api.generateDescription(),
-		AdvanceDesc:         api.generateAdvancedDescription(),
-		TroubleshootingInfo: api.generateTroubleshootingInfo(),
-		DetailsAboutFunc:    api.detailsAbout,
-		Parameters:          api.generateParameters(),
-		Handler:             api.handler,
+		Description:         a.generateDescription(),
+		AdvanceDesc:         a.generateAdvancedDescription(),
+		TroubleshootingInfo: a.generateTroubleshootingInfo(),
+		Parameters:          a.generateParameters(),
+		Handler:             a.handler,
 	}
+	return &apiToolWrapper{Tool: t, a: a}
 }
 
-// generateDescription generates a brief description of the tool
 func (a *Api) generateDescription() string {
-	endpointNames := a.getEndpointNames()
-	return fmt.Sprintf("Make API calls to configured endpoints. Available endpoints: %s",
-		strings.Join(endpointNames, ", "))
-}
-
-// generateAdvancedDescription generates a high-level overview of the tool and its endpoints.
-func (a *Api) generateAdvancedDescription() string {
-	var builder strings.Builder
-
-	builder.WriteString("Advanced Details:\n")
-	fmt.Fprintf(&builder, "- Tool: %s\n", a.name)
-	fmt.Fprintf(&builder, "- Total Endpoints: %d\n\n", len(a.endpoints))
-
-	builder.WriteString("Available Endpoints:\n")
-	for i, endpoint := range a.endpoints {
-		fmt.Fprintf(&builder, "  %d. %s — %s [%s %s]\n", i+1, endpoint.Name, endpoint.Description, endpoint.Method, endpoint.URL)
-	}
-
-	builder.WriteString("\nUse expand tool with details_about=\"<endpoint>\" for full parameter details on any endpoint.\n")
-	builder.WriteString("\n- Usage:\n")
-	builder.WriteString("  * Specify the endpoint name in the 'endpoint' parameter\n")
-	builder.WriteString("  * Provide URL parameters in 'url_params' as an object (e.g., {\"user_id\": \"123\"})\n")
-	builder.WriteString("  * Provide query parameters in 'query_params' as an object (e.g., {\"limit\": 10, \"offset\": 0})\n")
-	builder.WriteString("  * Provide request body in 'body' as a JSON string\n")
-	builder.WriteString("  * Authentication headers are injected automatically from tool configuration\n")
-
-	return builder.String()
-}
-
-// detailsAbout returns detailed documentation for a specific endpoint.
-func (a *Api) detailsAbout(item string) string {
-	for _, endpoint := range a.endpoints {
-		if endpoint.Name == item {
-			var builder strings.Builder
-			fmt.Fprintf(&builder, "Endpoint: %s\n", endpoint.Name)
-			fmt.Fprintf(&builder, "Description: %s\n", endpoint.Description)
-			fmt.Fprintf(&builder, "Method: %s\n", endpoint.Method)
-			fmt.Fprintf(&builder, "URL: %s\n", endpoint.URL)
-
-			if endpoint.URLParameters != "" {
-				builder.WriteString("URL Parameters:\n")
-				for _, line := range strings.Split(strings.TrimSpace(endpoint.URLParameters), "\n") {
-					fmt.Fprintf(&builder, "  %s\n", strings.TrimSpace(line))
+	names := a.getServiceNames()
+	desc := "HTTP API client for configured services"
+	if len(names) > 0 {
+		hasAnyDesc := false
+		var parts []string
+		for _, key := range names {
+			svc := a.services[key]
+			if svc.ServiceDescription != "" {
+				hasAnyDesc = true
+				if svc.ServiceName != "" {
+					parts = append(parts, fmt.Sprintf("%s (%s): %s", key, svc.ServiceName, svc.ServiceDescription))
+				} else {
+					parts = append(parts, fmt.Sprintf("%s: %s", key, svc.ServiceDescription))
 				}
+			} else {
+				parts = append(parts, key)
 			}
-
-			if endpoint.QueryParams != "" {
-				builder.WriteString("Query Parameters:\n")
-				for _, line := range strings.Split(strings.TrimSpace(endpoint.QueryParams), "\n") {
-					fmt.Fprintf(&builder, "  %s\n", strings.TrimSpace(line))
-				}
-			}
-
-			if endpoint.Payload != "" {
-				builder.WriteString("Request Body:\n")
-				for _, line := range strings.Split(strings.TrimSpace(endpoint.Payload), "\n") {
-					fmt.Fprintf(&builder, "  %s\n", strings.TrimSpace(line))
-				}
-			}
-
-			return builder.String()
+		}
+		if hasAnyDesc {
+			desc += " — " + strings.Join(parts, "; ")
+		} else {
+			desc += fmt.Sprintf(" (%s)", strings.Join(names, ", "))
 		}
 	}
-	return fmt.Sprintf("Nothing to add about %s", item)
+	desc += ". Use show_apis to list endpoints, show_api for details, call an endpoint by name, list_api_configs to browse the repository, or install_api_config to add a new service."
+	return desc
 }
 
-// generateTroubleshootingInfo generates troubleshooting information
+func (a *Api) generateAdvancedDescription() string {
+	var b strings.Builder
+	b.WriteString("API Tool — unified HTTP client\n\n")
+	b.WriteString("Available services:\n")
+	for _, key := range a.getServiceNames() {
+		svc := a.services[key]
+		display := key
+		if svc.ServiceName != "" {
+			display = fmt.Sprintf("%s (%s)", key, svc.ServiceName)
+		}
+		if svc.ServiceDescription != "" {
+			fmt.Fprintf(&b, "  %s: %s (%d endpoints)\n", display, svc.ServiceDescription, len(svc.Endpoints))
+		} else {
+			fmt.Fprintf(&b, "  %s (%d endpoints)\n", display, len(svc.Endpoints))
+		}
+	}
+	b.WriteString("\nWorkflow:\n")
+	b.WriteString("  1. action=\"show_apis\", service=<name>                                    → list endpoint names + descriptions\n")
+	b.WriteString("  2. action=\"show_api\",  service=<name>, endpoint=<name>                   → full parameter docs for one endpoint\n")
+	b.WriteString("  3. action=<endpoint>,  service=<name>, [url_params, query_params, body]   → execute the call\n")
+	b.WriteString("\nRepository:\n")
+	b.WriteString("  4. action=\"list_api_configs\"                                              → list service configs available to install from GitHub\n")
+	b.WriteString("  5. action=\"install_api_config\", configName=<name>                        → download and hot-load a service config from GitHub\n")
+	return b.String()
+}
+
 func (a *Api) generateTroubleshootingInfo() string {
 	return `Troubleshooting:
-- "endpoint not found": Ensure you're using one of the available endpoint names listed in the tool description
-- "missing required URL parameters": Check that all URL parameters in the URL template (e.g., {user_id}) are provided in url_params
-- "parameter validation failed": The endpoint has custom validation rules that were not satisfied. Check the error message for details
-- "authentication hook failed": The authentication hook returned an error. This typically means credentials are invalid or expired
-- "failed to execute request": Network error or invalid URL. Check network connectivity and URL format
-- HTTP 4xx errors: Client error (bad request, unauthorized, not found, etc.). Check your parameters and authentication
-- HTTP 5xx errors: Server error. The API endpoint is experiencing issues, try again later`
+- "unknown service": use one of the service names listed in the tool description
+- "unknown endpoint": call show_apis first to see available endpoint names
+- "endpoint parameter is required": provide the endpoint field when using show_api
+- "URL resolution failed": an ${ENV_VAR} referenced in the endpoint URL is unset
+- "basic_auth resolution failed": CLOUDINARY_API_KEY or CLOUDINARY_API_SECRET env vars are unset
+- "configName is required": provide configName for install_api_config
+- "repository not configured": this tool instance does not support repository actions
+- HTTP 4xx: client error — check parameters and authentication
+- HTTP 5xx: server error — try again later`
 }
 
-// generateParameters generates the tool parameters definition
 func (a *Api) generateParameters() []core.Parameter {
-	endpointNames := a.getEndpointNames()
-
+	serviceNames := a.getServiceNames()
+	serviceDesc := "The API service to target (required for show_apis, show_api, and endpoint calls)"
+	if len(serviceNames) > 0 {
+		serviceDesc += fmt.Sprintf(". Available: %s", strings.Join(serviceNames, ", "))
+	}
 	return []core.Parameter{
+		{
+			Name:        "action",
+			Type:        "string",
+			Description: `"show_apis", "show_api", an endpoint name to execute a call, "list_api_configs", or "install_api_config"`,
+			Required:    true,
+		},
+		{
+			Name:        "service",
+			Type:        "string",
+			Description: serviceDesc,
+			Required:    false,
+		},
 		{
 			Name:        "endpoint",
 			Type:        "string",
-			Description: fmt.Sprintf("The endpoint to call. Available: %s", strings.Join(endpointNames, ", ")),
-			Required:    true,
-			Validator:   a.validateEndpoint,
+			Description: "Endpoint name — required for show_api and when executing a call",
+			Required:    false,
+		},
+		{
+			Name:        "configName",
+			Type:        "string",
+			Description: "Service config name to install (filename without .json from the remote repository/api_configs/ folder) — required for install_api_config",
+			Required:    false,
 		},
 		{
 			Name:        "url_params",
 			Type:        "object",
-			Description: "URL path parameters (e.g., {\"user_id\": \"123\"} for /users/{user_id})",
+			Description: `URL path parameters, e.g. {"media_id": "123"} for a URL containing /{media_id}`,
 			Required:    false,
 		},
 		{
 			Name:        "query_params",
 			Type:        "object",
-			Description: "Query string parameters (e.g., {\"limit\": 10, \"offset\": 0} for ?limit=10&offset=0)",
+			Description: "Query string parameters as a key-value object",
 			Required:    false,
 		},
 		{
 			Name:        "body",
-			Type:        "string",
-			Description: "Request body as a JSON string (for POST, PUT, PATCH requests)",
+			Type:        "object",
+			Description: "Request body as a key-value object — serialized to JSON or form-encoded automatically based on the endpoint",
 			Required:    false,
 		},
 	}

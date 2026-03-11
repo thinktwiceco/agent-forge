@@ -925,141 +925,33 @@ func (p *KnowledgePlugin) getTopLevelCategories() ([]Node, error) {
 	return nodes, nil
 }
 
-// remember saves a fact under a specific category.
-// If title is non-empty it is stored in metadata so navigation can show a short label.
-func (p *KnowledgePlugin) remember(category string, fact string, title string) (string, error) {
-	// Find the category node
-	categoryNodes, err := p.querier.findNodesByTypeAndContent("Category", category, 10, 0)
+// addNode creates a new node of the given type and attaches it to a parent via an edge.
+// parentIdentifier resolves via resolveNode: empty string targets the graph root.
+// name is stored as metadata.title for light-node navigation.
+// If content is empty it defaults to name.
+func (p *KnowledgePlugin) addNode(parentIdentifier, edgeType, nodeType, name, content string) (string, error) {
+	parent, err := p.resolveNode(parentIdentifier)
 	if err != nil {
-		return "", fmt.Errorf("failed to search for category: %w", err)
+		return "", fmt.Errorf("parent not found: %w", err)
 	}
 
-	if len(categoryNodes) == 0 {
-		return "", fmt.Errorf("category not found: %s", category)
+	if content == "" {
+		content = name
 	}
 
-	categoryNode := categoryNodes[0]
-
-	// Build metadata with optional title
-	var metadata map[string]any
-	if title != "" {
-		metadata = map[string]any{"title": title}
-	}
-
-	// Create the fact node with embedding
-	factID, err := p.saveWithEmbedding("Fact", fact, metadata)
+	metadata := map[string]any{"title": name}
+	nodeID, err := p.saveNode(nodeType, content, "", metadata)
 	if err != nil {
-		return "", fmt.Errorf("failed to save fact: %w", err)
+		return "", fmt.Errorf("failed to save node: %w", err)
 	}
 
-	// Create has_fact edge from category to fact
-	_, err = p.saveEdge(categoryNode.ID, factID, "has_fact", 1.0, nil)
+	_, err = p.saveEdge(parent.ID, nodeID, edgeType, 1.0, nil)
 	if err != nil {
-		// Clean up the fact node if edge creation fails
-		_ = p.deleteNode(factID)
-		return "", fmt.Errorf("failed to create relationship: %w", err)
+		_ = p.deleteNode(nodeID)
+		return "", fmt.Errorf("failed to create edge: %w", err)
 	}
 
-	return factID, nil
-}
-
-// addCategory creates a new category node, storing the category name as its title in metadata.
-func (p *KnowledgePlugin) addCategory(category string) (string, error) {
-	// Store category name as title so light-node browsing shows it
-	metadata := map[string]any{"title": category}
-
-	// Create the category node with embedding
-	categoryID, err := p.saveWithEmbedding("Category", category, metadata)
-	if err != nil {
-		return "", fmt.Errorf("failed to save category: %w", err)
-	}
-
-	// Check if category has any incoming edges
-	edges, err := p.getNodeEdges(categoryID)
-	if err != nil {
-		return categoryID, nil // Return the ID even if edge check fails
-	}
-
-	// If no incoming edges, link to Omnia Nunc Node
-	hasIncoming := false
-	for _, edge := range edges {
-		if edge.ToNodeID == categoryID {
-			hasIncoming = true
-			break
-		}
-	}
-
-	if !hasIncoming {
-		_, err = p.saveEdge(omniaNuncNodeID, categoryID, "has_category", 1.0, nil)
-		if err != nil {
-			// Log but don't fail - the category is already created
-			return categoryID, nil
-		}
-	}
-
-	return categoryID, nil
-}
-
-// addSubcategory creates a new subcategory node under a parent category or subcategory
-func (p *KnowledgePlugin) addSubcategory(parentIdentifier string, subcategory string) (string, error) {
-	node, err := p.getNode(parentIdentifier)
-	if err != nil {
-		nodes, err2 := p.findNodesByContent(parentIdentifier, false)
-		if err2 != nil || len(nodes) == 0 {
-			return "", fmt.Errorf("parent node not found: %s", parentIdentifier)
-		}
-		node = &nodes[0]
-	}
-
-	metadata := map[string]any{"title": subcategory}
-	subID, err := p.saveWithEmbedding("Subcategory", subcategory, metadata)
-	if err != nil {
-		return "", fmt.Errorf("failed to save subcategory: %w", err)
-	}
-
-	_, err = p.saveEdge(node.ID, subID, "has_subcategory", 1.0, nil)
-	if err != nil {
-		_ = p.deleteNode(subID)
-		return "", fmt.Errorf("failed to link subcategory to parent: %w", err)
-	}
-
-	return subID, nil
-}
-
-// getCategories returns all Category nodes
-func (p *KnowledgePlugin) getCategories() ([]Node, error) {
-	nodes, err := p.findNodesByType("Category", 0, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get categories: %w", err)
-	}
-	return nodes, nil
-}
-
-// getCategoryFacts returns all Fact nodes directly connected to a category
-func (p *KnowledgePlugin) getCategoryFacts(category string) ([]Node, error) {
-	// Find the category node
-	categoryNodes, err := p.querier.findNodesByTypeAndContent("Category", category, 10, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to search for category: %w", err)
-	}
-
-	if len(categoryNodes) == 0 {
-		return nil, fmt.Errorf("category not found: %s", category)
-	}
-
-	categoryNode := categoryNodes[0]
-
-	// Query all facts connected via has_fact edge
-	ctx := context.Background()
-	query := `
-		SELECT n.id, n.type, n.content, n.embedding_id, n.metadata, n.created_at, n.updated_at
-		FROM knowledge_nodes n
-		JOIN knowledge_edges e ON e.to_node_id = n.id
-		WHERE e.from_node_id = ? AND e.relation_type = ? AND n.type = ?
-		ORDER BY n.created_at DESC
-	`
-
-	return p.queryNodes(ctx, query, categoryNode.ID, "has_fact", "Fact")
+	return nodeID, nil
 }
 
 // forgetCascade deletes a node and all its dependents (cascade delete)

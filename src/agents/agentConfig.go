@@ -79,6 +79,9 @@ type AgentConfig struct {
 	// SubAgents is the list of sub-agents available for delegation
 	SubAgents []core.SubAgent
 
+	// DetailsAboutFunc optionally provides per-item discovery. If nil, DetailsAbout returns "Nothing to add about <item>".
+	DetailsAboutFunc func(item string) string
+
 	// Plugins is the list of plugins to use for the agent
 	Plugins []core.Plugin
 
