@@ -259,6 +259,10 @@ func (b *AgentBuilder) buildSubagents(builtTools []llms.Tool) ([]core.SubAgent, 
 		}
 
 		var extra []llms.Tool
+
+		// This should become a configuration
+		// in the subagent template where we can
+		// specify what tools a subagent should have.
 		if subagent == WEB_AGENT {
 			extra = apiTools
 		}

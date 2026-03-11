@@ -45,7 +45,7 @@ func (s Subagent) getSubagent(
 	case VISION_AGENT:
 		return agents.VisionAgent(llmEngine, workingDir), nil
 	case KNOWLEDGE_AGENT:
-		return newKnowledgeAgent(llmEngine, workingDir, vectorDB, embeddingGenerator), nil
+		return newKnowledgeAgent(llmEngine, workingDir), nil
 	}
 	return nil, fmt.Errorf("invalid subagent: %s", s)
 }
@@ -86,8 +86,6 @@ Use delete_node to remove any node; "forget" is the conceptual action for Facts.
 func newKnowledgeAgent(
 	llmEngine llms.LLMEngine,
 	workingDir string,
-	vectorDB core.VectorDB,
-	embeddingGen core.EmbeddingGenerator,
 ) core.SubAgent {
 	template := system.CreateKnowledgeAgentTemplate()
 	config := agents.AgentConfig{
