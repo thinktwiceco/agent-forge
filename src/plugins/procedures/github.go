@@ -108,7 +108,7 @@ func fetchInstallableProcedures() ([]remoteProcedure, error) {
 // fetchRemoteManifest fetches and parses the manifest.yaml for a remote procedure slug.
 func fetchRemoteManifest(slug string) (name, description string, err error) {
 	var entry ghContentsEntry
-	path := fmt.Sprintf("repos/%s/contents/procedures/%s/manifest.yaml", githubRepo, slug)
+	path := fmt.Sprintf("repos/%s/contents/repository/procedures/%s/manifest.yaml", githubRepo, slug)
 	if err := githubGet(path, &entry); err != nil {
 		return "", "", err
 	}
