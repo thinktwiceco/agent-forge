@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [0.6.2] - 2026-03-11
+- [2b300a2](http://github.com/thinktwiceco/agent-forge/commit/2b300a26c03d09b062e54d7ebbe9a9ac01b34b7b) - chore(release): prepare release v0.6.2 (#46)
+- [25622c1](http://github.com/thinktwiceco/agent-forge/commit/25622c177acfe3f114e826f09966b7091eb9f889) - fix: flatten repository/procedures so remote lists gmail-login, fix manifest fetch path
+- [c9f6e20](http://github.com/thinktwiceco/agent-forge/commit/c9f6e20a68771a6943e8a211d9af26f26e730815) - refactor(builder): remove unused vectorDB and embeddingGen from knowledge agent
+- [236dc7f](http://github.com/thinktwiceco/agent-forge/commit/236dc7f061f84d2ad444c24a32e19322664d465f) - refactor(agents): move knowledge and reasoning prompts to markdown
+- [c793357](http://github.com/thinktwiceco/agent-forge/commit/c7933575eb39fb79fe52c3c37a7e9021fdca4da0) - refactor(plugins,tools): simplify knowledge graph, add multi-service API and Instagram
+
+
+## [Unreleased]
 ## [0.6.0] - 2026-03-07
 - [3ed2764](http://github.com/thinktwiceco/agent-forge/commit/3ed276486c13872649373f751ec2302d87a4eef4) - feat(agents!): parallel tool execution, context truncation, ModelInfo
 
