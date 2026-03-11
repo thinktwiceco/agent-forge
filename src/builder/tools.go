@@ -109,7 +109,7 @@ func (t *Tool) getTool(
 		if !filepath.IsAbs(folderPath) {
 			folderPath = filepath.Join(workingDir, folderPath)
 		}
-		repositoryDir := filepath.Join(workingDir, "repository", "api_configs")
+		repositoryDir := filepath.Join(workingDir, "api_config")
 		_ = os.MkdirAll(repositoryDir, 0755)
 
 		services := make(map[string]api.ServiceConfig)

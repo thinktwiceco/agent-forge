@@ -1,0 +1,37 @@
+{
+  "serviceName": "Cloudinary",
+  "serviceDescription": "Image upload and CDN management. Upload images, list/delete resources, get secure URLs for Instagram and other integrations.",
+  "basic_auth": "${CLOUDINARY_API_KEY}:${CLOUDINARY_API_SECRET}",
+  "endpoints": [
+    {
+      "name": "upload_image",
+      "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload",
+      "method": "POST",
+      "content_type": "form",
+      "description": "Upload an image to Cloudinary using Basic Auth (API Key + Secret). Returns secure_url — the public HTTPS URL to use with Instagram.",
+      "payload": "resolve_to_base64_$file: local file path to upload (e.g. /home/user/photo.jpg). Required.\npublic_id: string - Optional identifier for the asset (used in delivery URLs).\nfolder: string - Optional folder path to organise assets (e.g. \"instagram/posts\").\ntags: string - Optional comma-separated tags."
+    },
+    {
+      "name": "get_resource",
+      "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/resources/image/upload/{public_id}",
+      "method": "GET",
+      "description": "Get details of an uploaded image by its public ID, including its secure_url.",
+      "url_parameters": "public_id: string - The public ID of the image."
+    },
+    {
+      "name": "list_resources",
+      "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/resources/image/upload",
+      "method": "GET",
+      "description": "List uploaded images in the Cloudinary account.",
+      "query_params": "max_results: integer - Maximum number of resources to return (default: 10, max: 500).\nnext_cursor: string - Pagination cursor from a previous response."
+    },
+    {
+      "name": "delete_resource",
+      "url": "https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/destroy",
+      "method": "POST",
+      "content_type": "form",
+      "description": "Delete an uploaded image by its public ID.",
+      "payload": "public_id: string - The public ID of the image to delete. Required.\ninvalidate: boolean - Whether to invalidate the CDN cache (default: false)."
+    }
+  ]
+}
