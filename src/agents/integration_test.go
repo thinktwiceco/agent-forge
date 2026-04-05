@@ -26,6 +26,8 @@ func hasAPIKey(provider string) bool {
 		return config.AFDeepSeekAPIKey != ""
 	case "openai":
 		return config.AFOpenAIAPIKey != ""
+	case "openrouter":
+		return config.APOpenRouterAPIKey != ""
 	default:
 		return false
 	}

@@ -52,7 +52,7 @@ troubleshooting := agent.Troubleshooting() // Returns Troubleshooting field
 Tools implement the `Discoverable` interface through the `core.Tool` struct:
 
 ```go
-tool := &core.Tool{
+tool := core.NewTool(core.ToolConfig{
     Name:                "tool-name",
     Description:         "Basic one-line description",
     AdvanceDesc:         "Advanced description with detailed parameters and usage",
@@ -61,7 +61,7 @@ tool := &core.Tool{
         {Name: "param1", Type: "string", Required: true},
     },
     Handler: handlerFunc,
-}
+})
 
 // Access descriptions
 basic := tool.BasicDescription()       // Returns basic description
@@ -71,23 +71,11 @@ troubleshooting := tool.Troubleshooting() // Returns troubleshooting info
 
 ## System Prompt Integration
 
-**Important**: Only `BasicDescription()` is injected into the system prompt for both sub-agents and tools.
-
-### Sub-Agents in System Prompt
-
-When a main agent has sub-agents, only their basic descriptions are included:
-
-```
-=== SUB AGENTS ===
-📌 reasoning-agent: Breaks down complex problems into logical steps
-📌 calculator-agent: Performs mathematical calculations
-```
-
-The advanced descriptions and troubleshooting information are **not** included in the system prompt to keep it concise.
+**Important**: Tool metadata is sent primarily through native function definitions. The system prompt may include concise generic tool-use guidance, but it should not carry a full per-tool catalog.
 
 ### Tools in Function Definitions
 
-When tools are sent to the LLM via the OpenAI API, only the basic description is included in the function definition:
+When tools are sent to the LLM via the provider API, only the basic description is included in the function definition:
 
 ```json
 {
@@ -96,6 +84,8 @@ When tools are sent to the LLM via the OpenAI API, only the basic description is
   "parameters": { ... }
 }
 ```
+
+The advanced descriptions and troubleshooting information stay out of the always-on system prompt so prompts remain concise.
 
 ## Progressive Discovery Pattern
 
@@ -144,7 +134,7 @@ config := agents.AgentConfig{
 ### Example Tool with All Descriptions
 
 ```go
-calculatorTool := &core.Tool{
+calculatorTool := core.NewTool(core.ToolConfig{
     Name:        "calculate",
     Description: "Performs mathematical calculations",
     AdvanceDesc: `Advanced Details:
@@ -160,7 +150,7 @@ calculatorTool := &core.Tool{
         {Name: "expression", Type: "string", Required: true},
     },
     Handler: calculatorHandler,
-}
+})
 ```
 
 ## System Agent Templates

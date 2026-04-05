@@ -15,7 +15,6 @@ type Config struct {
 	Trace              string
 	Model              string
 	Tools              []llms.Tool
-	SubAgents          []core.SubAgent
 	TokenCounter       llms.TokenCounter  // Optional: for token counting
 	TruncationStrategy TruncationStrategy // Optional: for history truncation
 	MaxContextTokens   int                // Maximum tokens allowed in context
@@ -59,7 +58,7 @@ func (m *Manager) Context() *core.AgentContext {
 }
 
 // UpdateConfig updates the manager configuration and rebuilds context.
-// Call when tools or sub-agents change.
+// Call when tools change.
 func (m *Manager) UpdateConfig(cfg interface{}) {
 	if config, ok := cfg.(Config); ok {
 		m.config = config
@@ -131,13 +130,6 @@ func (m *Manager) UpdateTools(tools []llms.Tool) {
 	m.initAgentContext()
 }
 
-// UpdateSubAgents updates the sub-agents in the context.
-// This is a convenience method that updates just the sub-agents without rebuilding entire config.
-func (m *Manager) UpdateSubAgents(agents []core.SubAgent) {
-	m.config.SubAgents = agents
-	m.initAgentContext()
-}
-
 func (m *Manager) initAgentContext() {
 	var existingSessionStorage map[string]any
 	if m.agentContext != nil && m.agentContext.SessionStorage != nil {
@@ -159,7 +151,6 @@ func (m *Manager) initAgentContext() {
 		Model:          m.config.Model,
 		Tools:          m.config.Tools,
 		WorkingDir:     m.config.WorkingDir,
-		SubAgents:      m.config.SubAgents,
 		SessionStorage: existingSessionStorage,
 		PluginFields:   existingPluginFields,
 	}

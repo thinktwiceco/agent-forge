@@ -1,10 +1,45 @@
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-05
+
+Summary: working tree vs `HEAD` (v0.6.2) — ~192 files, large net deletion from removed plugins/subagent stack; new spawn, Telegram, heartbeat, and web automation pieces.
+
+### Breaking changes
+
+- Removed built-in **knowledge** plugin (`src/plugins/knowledge`) and dependent Localforge knowledge wiring; install template and examples drop `knowledge` and invalid postgres-without-URL blocks.
+- Removed YAML **`subagents`**, **`delegate`** tool, **`meta` get_subagents**, and **`expand`** subagent discovery; ephemeral work is **`spawn_subagent`** with an explicit parent tool subset (`src/tools/spawn`).
+- Removed markdown-loaded **system agents** implementation (`src/agents/system/*`, per-agent prompt files, `sub-agents-header.md`) and related constructors/tests; agent init, prompts, and handlers refactored.
+- **Postgres** tool: removed discrete schema/table/CRUD action files; single validated **`query`** path remains (read/write mode, table and schema allowlists).
+- Removed `cmd/localforge/SECURITY.md`.
+
+### Added
+
+- **`spawn_subagent`** tool: synchronous ephemeral subagent with configurable tools from the parent (`src/tools/spawn`).
+- **`telegram`** tool for Localforge (ngrok, webhook secret, register/health); Telegram **`/new_conversation`** and **`telegram_thread_map.json`** via `telegram_thread_store`; provider/webhook updates and tests.
+- **`heartbeat`** plugin and **`heartbeatack`**: interval synthetic inbox turns; executor and tests updated.
+- **Web** tool: fetch and snapshot-style actions, accessibility snapshot helpers (`ax_snapshot`), `network_idle.js`, `stealth_patch.js`; browser session and search/navigation updates.
+- **Procedures** plugin: **`adapt_skill`** (`adapt_skill.go` + tests); vault **`fill_secret_args`** tests; agent prompt-injection and prompts-builder tests; executor heartbeat test; Localforge Telegram command tests.
+
+### Changed
+
+- Agents: merged chat/subagent paths (`agentChat.go`, `agentSubagent.go` removed), executor, context manager, history, interfaces, builder, system handlers, mocks, and integration tests.
+- **Expand** / **meta** tools simplified; **api**, **fs**, **git**, **image**, **instagram**, **update** touch-ups; **queue** and **`src/utils.go`** adjustments.
+- **Core** / **persistence**: `agentContext`, tool hooks, JSON persistence.
+- **LLMs**: factory, models, OpenAI and tool-call tests.
+- **Localforge**: config, server, push and provider registry, static UI (HTML/CSS/JS).
+- **Plugins**: logger, procedures, scheduler, todo, vault; **`src/plugins/README.md`**.
+- **Scripts** (`install.sh`, `install-release.sh`), **`.gitignore`**, **`go.mod`** / **`go.sum`**.
+
+### Docs
+
+- Telegram threads and **`/new_conversation`** in [`docs/TOOLS.md`](docs/TOOLS.md#telegram-webhook-threads), [`README.md`](README.md), [`src/builder/README.md`](src/builder/README.md), [`cmd/localforge/config.example.yaml`](cmd/localforge/config.example.yaml).
+- Tools/plugins tables and Quick Start (`ChatStream(ctx, …)`); removed stale `PUT /api/config/subagents` and YAML `subagents`; webhook links to Telegram tool; [`docs/agents/how-to-system-agents.md`](docs/agents/how-to-system-agents.md) no longer claims YAML `spawn_subagent` for Localforge; [`research.md`](research.md), [`plan.telegram-tool.md`](plan.telegram-tool.md), and install template aligned with removals.
+- Brain / dreaming aligned with code ([`docs/agents/configuration.md`](docs/agents/configuration.md), [`src/plugins/README.md`](src/plugins/README.md), [`memorySpec.md`](memorySpec.md)); stale migration body removed from `memorySpec.md`.
+- Wider refresh: `docs/AGENT_BUILDER.md`, `docs/CONFIG.md`, `docs/DISCOVERABLE.md`, `docs/EXPAND_TOOL.md`, `docs/FILE_STRUCTURE.md`, `docs/INTERFACES.md`, `docs/LOGGER.md`, `docs/TOOLS.md`, `docs/agents/*`, [`AGENTS.md`](AGENTS.md).
+
 ## [0.6.0] - 2026-03-07
 - [3ed2764](http://github.com/thinktwiceco/agent-forge/commit/3ed276486c13872649373f751ec2302d87a4eef4) - feat(agents!): parallel tool execution, context truncation, ModelInfo
 
-
-## [Unreleased]
 ## [0.4.14] - 2026-03-04
 - [94495fe](http://github.com/thinktwiceco/agent-forge/commit/94495feb91cd2f90dc093b930e096ef7822c60f6) - chore(release): prepare release v0.4.14 (#38)
 - [ac67d85](http://github.com/thinktwiceco/agent-forge/commit/ac67d85724e2a6bbf59a4f8ea6eabf6fe9b592dd) - feat(plugins): add retention hook, bracket prompts, install templates, interactive_tree

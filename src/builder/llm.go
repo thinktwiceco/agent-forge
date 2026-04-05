@@ -16,7 +16,7 @@ const (
 	InvalidProviderError LLMValidateError = "Invalid provider. Expected one of %s got %s"
 )
 
-var validProviders = []string{"openai", "deepseek", "togetherai"}
+var validProviders = []string{"openai", "deepseek", "togetherai", "openrouter"}
 
 func fromString(model string) LLM {
 	return LLM(model)

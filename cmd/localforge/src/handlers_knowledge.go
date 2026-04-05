@@ -9,17 +9,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type KnowledgeNode struct {
-	ID          string         `json:"id"`
-	Type        string         `json:"type"`
-	Content     string         `json:"content"`
-	EmbeddingID string         `json:"embedding_id,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	CreatedAt   string         `json:"created_at"`
-	UpdatedAt   string         `json:"updated_at"`
+type BrainNode struct {
+	ID                 string         `json:"id"`
+	Type               string         `json:"type"`
+	Content            string         `json:"content"`
+	Title              string         `json:"title,omitempty"`
+	Description        string         `json:"description,omitempty"`
+	DistillationReason string         `json:"distillation_reason,omitempty"`
+	SearchText         string         `json:"search_text,omitempty"`
+	Metadata           map[string]any `json:"metadata,omitempty"`
+	CreatedAt          string         `json:"created_at"`
+	UpdatedAt          string         `json:"updated_at"`
 }
 
-type KnowledgeEdge struct {
+type BrainEdge struct {
 	ID           string         `json:"id"`
 	FromNodeID   string         `json:"from_node_id"`
 	ToNodeID     string         `json:"to_node_id"`
@@ -29,7 +32,7 @@ type KnowledgeEdge struct {
 	CreatedAt    string         `json:"created_at"`
 }
 
-type KnowledgeType struct {
+type BrainType struct {
 	ID          string         `json:"id"`
 	Category    string         `json:"category"`
 	Name        string         `json:"name"`
@@ -39,10 +42,10 @@ type KnowledgeType struct {
 }
 
 type GraphResponse struct {
-	Nodes []KnowledgeNode `json:"nodes"`
-	Edges []KnowledgeEdge `json:"edges"`
-	Stats GraphStats      `json:"stats"`
-	Types []KnowledgeType `json:"types"`
+	Nodes []BrainNode `json:"nodes"`
+	Edges []BrainEdge `json:"edges"`
+	Stats GraphStats  `json:"stats"`
+	Types []BrainType `json:"types"`
 }
 
 type GraphStats struct {
@@ -52,22 +55,22 @@ type GraphStats struct {
 }
 
 type NodeDetailResponse struct {
-	Node      KnowledgeNode `json:"node"`
+	Node      BrainNode     `json:"node"`
 	Neighbors GraphResponse `json:"neighbors"`
 }
 
-// knowledgeDB returns the shared DB connection or an error if it was never opened.
-func (s *Server) knowledgeDBConn() (*sql.DB, error) {
-	if s.knowledgeDB != nil {
-		return s.knowledgeDB, nil
+// brainDBConn returns the shared DB connection or an error if it was never opened.
+func (s *Server) brainDBConn() (*sql.DB, error) {
+	if s.brainDB != nil {
+		return s.brainDB, nil
 	}
-	return nil, fmt.Errorf("knowledge database is not available")
+	return nil, fmt.Errorf("brain database is not available")
 }
 
 func (s *Server) handleGetKnowledgeGraph(c *gin.Context) {
-	db, err := s.knowledgeDBConn()
+	db, err := s.brainDBConn()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "knowledge database not available"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "brain database not available"})
 		return
 	}
 
@@ -109,9 +112,9 @@ func (s *Server) handleGetKnowledgeGraph(c *gin.Context) {
 }
 
 func (s *Server) handleGetKnowledgeStats(c *gin.Context) {
-	db, err := s.knowledgeDBConn()
+	db, err := s.brainDBConn()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "knowledge database not available"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "brain database not available"})
 		return
 	}
 
@@ -131,9 +134,9 @@ func (s *Server) handleGetKnowledgeNode(c *gin.Context) {
 		return
 	}
 
-	db, err := s.knowledgeDBConn()
+	db, err := s.brainDBConn()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "knowledge database not available"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "brain database not available"})
 		return
 	}
 
@@ -168,11 +171,12 @@ func (s *Server) handleGetKnowledgeNode(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-func (s *Server) queryNodes(db *sql.DB, typeFilter, limit string) ([]KnowledgeNode, error) {
+func (s *Server) queryNodes(db *sql.DB, typeFilter, limit string) ([]BrainNode, error) {
 	query := `
-		SELECT id, type, content, COALESCE(embedding_id, ''), COALESCE(metadata, '{}'), 
+		SELECT id, type, content, COALESCE(metadata, '{}'),
+		       title, description, distillation_reason, COALESCE(search_text, ''),
 		       created_at, updated_at
-		FROM knowledge_nodes
+		FROM brain_nodes
 	`
 
 	args := []interface{}{}
@@ -190,14 +194,16 @@ func (s *Server) queryNodes(db *sql.DB, typeFilter, limit string) ([]KnowledgeNo
 	}
 	defer func() { _ = rows.Close() }()
 
-	var nodes []KnowledgeNode
+	var nodes []BrainNode
 	for rows.Next() {
-		var node KnowledgeNode
+		var node BrainNode
 		var metadataJSON string
+		var title, description, distillationReason, searchText sql.NullString
 
 		err := rows.Scan(
-			&node.ID, &node.Type, &node.Content, &node.EmbeddingID,
-			&metadataJSON, &node.CreatedAt, &node.UpdatedAt,
+			&node.ID, &node.Type, &node.Content,
+			&metadataJSON, &title, &description, &distillationReason, &searchText,
+			&node.CreatedAt, &node.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -206,6 +212,18 @@ func (s *Server) queryNodes(db *sql.DB, typeFilter, limit string) ([]KnowledgeNo
 		if metadataJSON != "" && metadataJSON != "{}" {
 			_ = json.Unmarshal([]byte(metadataJSON), &node.Metadata)
 		}
+		if title.Valid {
+			node.Title = title.String
+		}
+		if description.Valid {
+			node.Description = description.String
+		}
+		if distillationReason.Valid {
+			node.DistillationReason = distillationReason.String
+		}
+		if searchText.Valid {
+			node.SearchText = searchText.String
+		}
 
 		nodes = append(nodes, node)
 	}
@@ -213,11 +231,11 @@ func (s *Server) queryNodes(db *sql.DB, typeFilter, limit string) ([]KnowledgeNo
 	return nodes, rows.Err()
 }
 
-func (s *Server) queryEdges(db *sql.DB, nodeIDFilter string) ([]KnowledgeEdge, error) {
+func (s *Server) queryEdges(db *sql.DB, nodeIDFilter string) ([]BrainEdge, error) {
 	query := `
 		SELECT id, from_node_id, to_node_id, relation_type, weight, 
 		       COALESCE(metadata, '{}'), created_at
-		FROM knowledge_edges
+		FROM brain_edges
 	`
 
 	args := []interface{}{}
@@ -232,9 +250,9 @@ func (s *Server) queryEdges(db *sql.DB, nodeIDFilter string) ([]KnowledgeEdge, e
 	}
 	defer func() { _ = rows.Close() }()
 
-	var edges []KnowledgeEdge
+	var edges []BrainEdge
 	for rows.Next() {
-		var edge KnowledgeEdge
+		var edge BrainEdge
 		var metadataJSON string
 
 		err := rows.Scan(
@@ -255,10 +273,10 @@ func (s *Server) queryEdges(db *sql.DB, nodeIDFilter string) ([]KnowledgeEdge, e
 	return edges, rows.Err()
 }
 
-func (s *Server) queryTypes(db *sql.DB) ([]KnowledgeType, error) {
+func (s *Server) queryTypes(db *sql.DB) ([]BrainType, error) {
 	query := `
 		SELECT id, category, name, description, COALESCE(metadata, '{}'), created_at
-		FROM knowledge_types
+		FROM brain_types
 		ORDER BY category, name
 	`
 
@@ -268,9 +286,9 @@ func (s *Server) queryTypes(db *sql.DB) ([]KnowledgeType, error) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var types []KnowledgeType
+	var types []BrainType
 	for rows.Next() {
-		var t KnowledgeType
+		var t BrainType
 		var metadataJSON string
 
 		err := rows.Scan(
@@ -294,19 +312,19 @@ func (s *Server) queryTypes(db *sql.DB) ([]KnowledgeType, error) {
 func (s *Server) getGraphStats(db *sql.DB) (GraphStats, error) {
 	var stats GraphStats
 
-	err := db.QueryRow("SELECT COUNT(*) FROM knowledge_nodes").Scan(&stats.TotalNodes)
+	err := db.QueryRow("SELECT COUNT(*) FROM brain_nodes").Scan(&stats.TotalNodes)
 	if err != nil {
 		return stats, err
 	}
 
-	err = db.QueryRow("SELECT COUNT(*) FROM knowledge_edges").Scan(&stats.TotalEdges)
+	err = db.QueryRow("SELECT COUNT(*) FROM brain_edges").Scan(&stats.TotalEdges)
 	if err != nil {
 		return stats, err
 	}
 
 	rows, err := db.Query(`
 		SELECT type, COUNT(*) as count
-		FROM knowledge_nodes
+		FROM brain_nodes
 		GROUP BY type
 	`)
 	if err != nil {
@@ -327,20 +345,23 @@ func (s *Server) getGraphStats(db *sql.DB) (GraphStats, error) {
 	return stats, rows.Err()
 }
 
-func (s *Server) getNodeByID(db *sql.DB, nodeID string) (*KnowledgeNode, error) {
+func (s *Server) getNodeByID(db *sql.DB, nodeID string) (*BrainNode, error) {
 	query := `
-		SELECT id, type, content, COALESCE(embedding_id, ''), COALESCE(metadata, '{}'),
+		SELECT id, type, content, COALESCE(metadata, '{}'),
+		       title, description, distillation_reason, COALESCE(search_text, ''),
 		       created_at, updated_at
-		FROM knowledge_nodes
+		FROM brain_nodes
 		WHERE id = ?
 	`
 
-	var node KnowledgeNode
+	var node BrainNode
 	var metadataJSON string
+	var title, description, distillationReason, searchText sql.NullString
 
 	err := db.QueryRow(query, nodeID).Scan(
-		&node.ID, &node.Type, &node.Content, &node.EmbeddingID,
-		&metadataJSON, &node.CreatedAt, &node.UpdatedAt,
+		&node.ID, &node.Type, &node.Content,
+		&metadataJSON, &title, &description, &distillationReason, &searchText,
+		&node.CreatedAt, &node.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -349,33 +370,43 @@ func (s *Server) getNodeByID(db *sql.DB, nodeID string) (*KnowledgeNode, error) 
 	if metadataJSON != "" && metadataJSON != "{}" {
 		_ = json.Unmarshal([]byte(metadataJSON), &node.Metadata)
 	}
+	if title.Valid {
+		node.Title = title.String
+	}
+	if description.Valid {
+		node.Description = description.String
+	}
+	if distillationReason.Valid {
+		node.DistillationReason = distillationReason.String
+	}
+	if searchText.Valid {
+		node.SearchText = searchText.String
+	}
 
 	return &node, nil
 }
 
-func (s *Server) getNodeNeighborhood(db *sql.DB, nodeID string, depth int) ([]KnowledgeNode, []KnowledgeEdge, error) {
+func (s *Server) getNodeNeighborhood(db *sql.DB, nodeID string, depth int) ([]BrainNode, []BrainEdge, error) {
 	query := `
-		WITH RECURSIVE related(id, type, content, embedding_id, metadata, depth, path, created_at, updated_at) AS (
-			SELECT id, type, content, embedding_id, metadata, 0 as depth, 
-			       ',' || id || ',' as path, created_at, updated_at
-			FROM knowledge_nodes
+		WITH RECURSIVE related(id, depth, path) AS (
+			SELECT id, 0, ',' || id || ','
+			FROM brain_nodes
 			WHERE id = ?
-			
 			UNION ALL
-			
-			SELECT n.id, n.type, n.content, n.embedding_id, n.metadata, r.depth + 1,
-			       r.path || n.id || ',', n.created_at, n.updated_at
-			FROM knowledge_nodes n
-			JOIN knowledge_edges e ON (e.to_node_id = n.id OR e.from_node_id = n.id)
+			SELECT n.id, r.depth + 1, r.path || n.id || ','
+			FROM brain_nodes n
+			JOIN brain_edges e ON (e.to_node_id = n.id OR e.from_node_id = n.id)
 			JOIN related r ON (e.from_node_id = r.id OR e.to_node_id = r.id)
-			WHERE r.depth < ? 
+			WHERE r.depth < ?
 				AND NOT instr(r.path, ',' || n.id || ',')
 		)
-		SELECT id, type, content, COALESCE(embedding_id, ''), COALESCE(metadata, '{}'), 
-		       MIN(depth) as depth, created_at, updated_at
-		FROM related
-		GROUP BY id
-		ORDER BY depth, type, content
+		SELECT n.id, n.type, n.content, COALESCE(n.metadata, '{}'),
+		       n.title, n.description, n.distillation_reason, COALESCE(n.search_text, ''),
+		       MIN(r.depth), n.created_at, n.updated_at
+		FROM related r
+		JOIN brain_nodes n ON n.id = r.id
+		GROUP BY n.id
+		ORDER BY MIN(r.depth), n.type, n.content
 	`
 
 	rows, err := db.Query(query, nodeID, depth)
@@ -384,17 +415,19 @@ func (s *Server) getNodeNeighborhood(db *sql.DB, nodeID string, depth int) ([]Kn
 	}
 	defer func() { _ = rows.Close() }()
 
-	var nodes []KnowledgeNode
+	var nodes []BrainNode
 	nodeIDs := make(map[string]bool)
 
 	for rows.Next() {
-		var node KnowledgeNode
+		var node BrainNode
 		var metadataJSON string
+		var title, description, distillationReason, searchText sql.NullString
 		var nodeDepth int
 
 		err := rows.Scan(
-			&node.ID, &node.Type, &node.Content, &node.EmbeddingID,
-			&metadataJSON, &nodeDepth, &node.CreatedAt, &node.UpdatedAt,
+			&node.ID, &node.Type, &node.Content,
+			&metadataJSON, &title, &description, &distillationReason, &searchText,
+			&nodeDepth, &node.CreatedAt, &node.UpdatedAt,
 		)
 		if err != nil {
 			return nil, nil, err
@@ -403,9 +436,24 @@ func (s *Server) getNodeNeighborhood(db *sql.DB, nodeID string, depth int) ([]Kn
 		if metadataJSON != "" && metadataJSON != "{}" {
 			_ = json.Unmarshal([]byte(metadataJSON), &node.Metadata)
 		}
+		if title.Valid {
+			node.Title = title.String
+		}
+		if description.Valid {
+			node.Description = description.String
+		}
+		if distillationReason.Valid {
+			node.DistillationReason = distillationReason.String
+		}
+		if searchText.Valid {
+			node.SearchText = searchText.String
+		}
 
 		nodes = append(nodes, node)
 		nodeIDs[node.ID] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
 	}
 
 	edges, err := s.queryEdgesBetweenNodes(db, nodeIDs)
@@ -416,9 +464,9 @@ func (s *Server) getNodeNeighborhood(db *sql.DB, nodeID string, depth int) ([]Kn
 	return nodes, edges, nil
 }
 
-func (s *Server) queryEdgesBetweenNodes(db *sql.DB, nodeIDs map[string]bool) ([]KnowledgeEdge, error) {
+func (s *Server) queryEdgesBetweenNodes(db *sql.DB, nodeIDs map[string]bool) ([]BrainEdge, error) {
 	if len(nodeIDs) == 0 {
-		return []KnowledgeEdge{}, nil
+		return []BrainEdge{}, nil
 	}
 
 	placeholders := ""
@@ -439,7 +487,7 @@ func (s *Server) queryEdgesBetweenNodes(db *sql.DB, nodeIDs map[string]bool) ([]
 	query := `
 		SELECT id, from_node_id, to_node_id, relation_type, weight, 
 		       COALESCE(metadata, '{}'), created_at
-		FROM knowledge_edges
+		FROM brain_edges
 		WHERE from_node_id IN (` + placeholders + `) AND to_node_id IN (` + placeholders + `)
 	`
 
@@ -449,9 +497,9 @@ func (s *Server) queryEdgesBetweenNodes(db *sql.DB, nodeIDs map[string]bool) ([]
 	}
 	defer func() { _ = rows.Close() }()
 
-	var edges []KnowledgeEdge
+	var edges []BrainEdge
 	for rows.Next() {
-		var edge KnowledgeEdge
+		var edge BrainEdge
 		var metadataJSON string
 
 		err := rows.Scan(

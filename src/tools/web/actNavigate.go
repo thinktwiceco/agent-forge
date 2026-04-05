@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/chromedp/chromedp"
 	agentforge "github.com/thinktwiceco/agent-forge/src"
@@ -27,7 +28,7 @@ func (w *WebBrowser) navigate(agentContext map[string]any, args map[string]any) 
 	}
 
 	// Get or create browser context using the configured default headless mode.
-	ctx, err := getOrCreateBrowser(agentContext)
+	ctx, err := w.getOrCreateBrowser(agentContext)
 	if err != nil {
 		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to initialize browser: %v", err))
@@ -37,15 +38,43 @@ func (w *WebBrowser) navigate(agentContext map[string]any, args map[string]any) 
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, defaultTimeout)
 	defer timeoutCancel()
 
+	settleDelay := defaultSettleDelay
+	if sm, ok := args["settle_ms"]; ok {
+		var ms float64
+		switch v := sm.(type) {
+		case float64:
+			ms = v
+		case int:
+			ms = float64(v)
+		case int64:
+			ms = float64(v)
+		default:
+			w.sessionManager.RecordOperation(false)
+			return core.NewErrorResponse("settle_ms parameter must be a number")
+		}
+		if ms < 0 {
+			w.sessionManager.RecordOperation(false)
+			return core.NewErrorResponse("settle_ms must be >= 0")
+		}
+		settleDelay = time.Duration(ms) * time.Millisecond
+	}
+
 	var currentURL, pageTitle string
 
-	// Navigate and get page info
+	// Inject network counter before navigation so initial XHR/fetch are tracked.
 	err = chromedp.Run(timeoutCtx,
+		chromedp.Evaluate(getScript("network_idle"), nil),
 		chromedp.Navigate(normalizedURL),
-		chromedp.WaitVisible("body", chromedp.ByQuery),
-		chromedp.Location(&currentURL),
-		chromedp.Title(&pageTitle),
 	)
+	if err == nil {
+		err = waitForPageReady(timeoutCtx, settleDelay)
+	}
+	if err == nil {
+		err = chromedp.Run(timeoutCtx,
+			chromedp.Location(&currentURL),
+			chromedp.Title(&pageTitle),
+		)
+	}
 
 	if err != nil {
 		w.sessionManager.RecordOperation(false)

@@ -10,6 +10,7 @@ import (
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/core"
+	"github.com/thinktwiceco/agent-forge/src/heartbeatack"
 	"github.com/thinktwiceco/agent-forge/src/history"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 	"github.com/thinktwiceco/agent-forge/src/telemetry"
@@ -24,9 +25,16 @@ type Config struct {
 	MaxToolIterations int
 	AgentName         string
 	Tracer            telemetry.Tracer
+	// HeartbeatAckMaxChars mirrors heartbeat plugin ack_max_chars (0 = default 300).
+	HeartbeatAckMaxChars int
 	// TruncateHistory is called before each LLM call to keep accumulated history
 	// within the model's context window. Nil means no mid-turn truncation.
 	TruncateHistory func([]*llms.UnifiedMessage) []*llms.UnifiedMessage
+}
+
+// ExecuteResult reports execution outcomes for one ChatStream turn.
+type ExecuteResult struct {
+	HeartbeatAckSuppressed bool
 }
 
 // Executor handles tool and chat execution.
@@ -38,7 +46,7 @@ type Executor struct {
 	hooks        *HooksRunner
 }
 
-// UpdateTools updates the tools slice. Call when tools are added or modified (e.g. AddTools, loadDelegateTool).
+// UpdateTools updates the tools slice. Call when tools are added or modified (e.g. AddTools).
 func (e *Executor) UpdateTools(tools []llms.Tool) {
 	e.tools = tools
 }
@@ -66,7 +74,7 @@ func NewExecutor(
 }
 
 // ExecuteChatWithTools executes the chat loop with automatic tool execution.
-func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager, responseCh *core.ResponseCh) (err error) {
+func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager, responseCh *core.ResponseCh) (result ExecuteResult, err error) {
 	start := time.Now()
 	if e.config.Tracer != nil {
 		e.config.Tracer.TraceAgentStart(ctx, e.config.AgentName)
@@ -77,7 +85,7 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 		}
 	}()
 
-	// Per-call snapshot: mutable fields (SessionStorage, PluginFields, LastSubagentMessage)
+	// Per-call snapshot: mutable fields (SessionStorage, PluginFields)
 	// are isolated to this call so concurrent ChatStream invocations cannot bleed state.
 	callCtx := e.agentContext.Snapshot()
 
@@ -88,12 +96,14 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 		select {
 		case <-ctx.Done():
 			agentforge.Debug("Context cancelled, stopping execution")
-			return fmt.Errorf("execution cancelled: %w", ctx.Err())
+			return result, fmt.Errorf("execution cancelled: %w", ctx.Err())
 		default:
 		}
 
 		iteration++
-		messages := hm.Messages()
+		rawMessages := hm.Messages()
+		heartbeatTurn := heartbeatack.IsHeartbeatTickUserContent(lastUserContent(rawMessages))
+		messages := rawMessages
 		if e.config.TruncateHistory != nil {
 			messages = e.config.TruncateHistory(messages)
 		}
@@ -101,190 +111,139 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 
 		llmResponseCh := e.llmEngine.ChatStream(messages, e.tools)
 
-		var fullContent string
-		var fullReasoningContent string
-		var toolCalls []llms.ToolCall
-		var hasToolCalls bool
-		var completedChunkBytes []byte
-		var promptTokens, completionTokens, totalTokens int
-
-		llmErrorCh := llmResponseCh.Error
-
-		agentforge.Debug("Waiting for LLM response chunks...")
-		for {
-			select {
-			case <-ctx.Done():
-				agentforge.Debug("Context cancelled during LLM response streaming")
-				return fmt.Errorf("execution cancelled: %w", ctx.Err())
-			case chunkBytes, ok := <-llmResponseCh.Response:
-				if !ok {
-					agentforge.Debug("LLM response channel closed, processing tool calls")
-					goto processToolCalls
-				}
-
-				agentforge.Debug("Received chunk from LLM (size: %d bytes)", len(chunkBytes))
-				var chunk llms.ChunkResponse
-				if err := json.Unmarshal(chunkBytes, &chunk); err != nil {
-					agentforge.Debug("Error deserializing chunk: %v", err)
-					return fmt.Errorf("failed to deserialize chunk: %w", err)
-				}
-				agentforge.Debug("Chunk deserialized: Status=%s, Type=%s", chunk.Status, chunk.Type)
-
-				if chunk.Content != "" {
-					fullContent += chunk.Content
-				} else if chunk.Delta != "" {
-					fullContent += chunk.Delta
-				}
-
-				chunk.Iteration = iteration
-
-				chunkBytes, err := json.Marshal(chunk)
-				if err != nil {
-					agentforge.Debug("Error re-serializing chunk with iteration: %v", err)
-					return fmt.Errorf("failed to re-serialize chunk: %w", err)
-				}
-
-				if chunk.Status == llms.StatusToolCall && len(chunk.ToolCalls) > 0 {
-					toolCalls = chunk.ToolCalls
-					hasToolCalls = true
-					fullReasoningContent = chunk.ReasoningContent
-					agentforge.Debug("Tool calls detected: %d tool calls", len(toolCalls))
-					if !responseCh.TrySend(chunkBytes) {
-						return nil
-					}
-				}
-
-				if chunk.Status == llms.StatusCompleted {
-					completedChunkBytes = chunkBytes
-					promptTokens = chunk.PromptTokens
-					completionTokens = chunk.CompletionTokens
-					totalTokens = chunk.TotalTokens
-					if chunk.FullContent != "" {
-						fullContent = chunk.FullContent
-					}
-					agentforge.Debug("Received completed chunk, going to processToolCalls")
-					goto processToolCalls
-				}
-
-				if !responseCh.TrySend(chunkBytes) {
-					return nil
-				}
-
-			case err, ok := <-llmErrorCh:
-				if !ok {
-					llmErrorCh = nil
-					continue
-				}
-				if err != nil {
-					agentforge.Debug("LLM stream error received: %v", err)
-					return fmt.Errorf("llm stream error: %w", err)
-				}
+		res, err := e.streamLLMResponse(ctx, iteration, heartbeatTurn, llmResponseCh, responseCh)
+		if err != nil {
+			if err.Error() == "channel closed" {
+				return result, nil
 			}
+			return result, err
 		}
 
-	processToolCalls:
-		agentforge.Debug("Processing tool calls: hasToolCalls=%v, toolCalls count=%d", hasToolCalls, len(toolCalls))
+		agentforge.Debug("Processing tool calls: hasToolCalls=%v, toolCalls count=%d", res.HasToolCalls, len(res.ToolCalls))
 
-		if !hasToolCalls {
-			if completedChunkBytes == nil {
-				if fullContent == "" {
-					return fmt.Errorf("LLM stream ended without content and without StatusCompleted chunk")
+		ackMax := e.config.HeartbeatAckMaxChars
+		if ackMax == 0 {
+			ackMax = 300
+		}
+
+		if !res.HasToolCalls {
+			if res.CompletedChunkBytes == nil {
+				if res.FullContent == "" {
+					return result, fmt.Errorf("LLM stream ended without content and without StatusCompleted chunk")
 				}
 				agentforge.Debug("WARNING: Stream ended without StatusCompleted chunk, creating one")
 				completionChunk := llms.ChunkResponse{
 					Content:          "",
 					Delta:            "",
-					FullContent:      fullContent,
+					FullContent:      res.FullContent,
 					Status:           llms.StatusCompleted,
 					Type:             llms.TypeCompletion,
-					PromptTokens:     promptTokens,
-					CompletionTokens: completionTokens,
-					TotalTokens:      totalTokens,
+					PromptTokens:     res.PromptTokens,
+					CompletionTokens: res.CompletionTokens,
+					TotalTokens:      res.TotalTokens,
 					Iteration:        iteration,
 				}
-				var err error
-				completedChunkBytes, err = json.Marshal(completionChunk)
-				if err != nil {
-					return fmt.Errorf("failed to marshal completion chunk: %w", err)
+				var marshalErr error
+				res.CompletedChunkBytes, marshalErr = json.Marshal(completionChunk)
+				if marshalErr != nil {
+					return result, fmt.Errorf("failed to marshal completion chunk: %w", marshalErr)
 				}
 			}
 
-			if !responseCh.TrySend(completedChunkBytes) {
-				return nil
+			if heartbeatTurn && res.FullContent != "" && heartbeatack.ShouldSuppressAckReply(res.FullContent, ackMax) {
+				agentforge.Debug("[heartbeat] HEARTBEAT_OK suppressed (no stream, no persistence)")
+				result.HeartbeatAckSuppressed = true
+				return result, nil
 			}
 
-			if fullContent == "" {
+			if heartbeatTurn {
+				for _, b := range res.StreamBuf {
+					if !responseCh.TrySend(b) {
+						return result, nil
+					}
+				}
+				res.StreamBuf = nil
+			}
+
+			if !responseCh.TrySend(res.CompletedChunkBytes) {
+				return result, nil
+			}
+
+			if res.FullContent == "" {
 				agentforge.Debug("LLM returned empty completion; skipping history save")
-				return nil
+				return result, nil
 			}
 
-			hm.AddAssistantMessage(fullContent, history.TokenUsage{
-				PromptTokens:     promptTokens,
-				CompletionTokens: completionTokens,
-				TotalTokens:      totalTokens,
+			hm.AddAssistantMessage(res.FullContent, history.TokenUsage{
+				PromptTokens:     res.PromptTokens,
+				CompletionTokens: res.CompletionTokens,
+				TotalTokens:      res.TotalTokens,
 			})
 			if e.config.Tracer != nil {
 				e.config.Tracer.TraceTokenUsage(ctx, telemetry.TokenUsageEvent{
 					AgentName:        e.config.AgentName,
-					PromptTokens:     promptTokens,
-					CompletionTokens: completionTokens,
-					TotalTokens:      totalTokens,
+					PromptTokens:     res.PromptTokens,
+					CompletionTokens: res.CompletionTokens,
+					TotalTokens:      res.TotalTokens,
 					Iteration:        iteration,
 					HadToolCalls:     false,
 				})
 			}
 			if e.hooks != nil && e.hooks.OnNewAssistantMessage != nil {
-				errs := e.hooks.OnNewAssistantMessage(fullContent, promptTokens, completionTokens, totalTokens)
+				errs := e.hooks.OnNewAssistantMessage(res.FullContent, res.PromptTokens, res.CompletionTokens, res.TotalTokens)
 				if e.hooks.LogHookErrors != nil {
 					e.hooks.LogHookErrors(errs)
 				}
 			}
-			return nil
+			return result, nil
 		}
 
-		if completedChunkBytes != nil {
+		if res.CompletedChunkBytes != nil {
 			var completedChunk llms.ChunkResponse
-			if err := json.Unmarshal(completedChunkBytes, &completedChunk); err == nil && completedChunk.FullContent != "" {
-				fullContent = completedChunk.FullContent
+			if err := json.Unmarshal(res.CompletedChunkBytes, &completedChunk); err == nil && completedChunk.FullContent != "" {
+				res.FullContent = completedChunk.FullContent
 			}
+		}
+		for i := range res.ToolCalls {
+			res.ToolCalls[i].Name = llms.ResolveToolNameForTools(res.ToolCalls[i].Name, e.tools)
 		}
 		if e.config.Tracer != nil {
 			e.config.Tracer.TraceTokenUsage(ctx, telemetry.TokenUsageEvent{
 				AgentName:        e.config.AgentName,
-				PromptTokens:     promptTokens,
-				CompletionTokens: completionTokens,
-				TotalTokens:      totalTokens,
+				PromptTokens:     res.PromptTokens,
+				CompletionTokens: res.CompletionTokens,
+				TotalTokens:      res.TotalTokens,
 				Iteration:        iteration,
 				HadToolCalls:     true,
 			})
 		}
 		if e.hooks != nil && e.hooks.OnNewAssistantMessageWithTools != nil {
-			errs := e.hooks.OnNewAssistantMessageWithTools(fullContent, toolCalls, promptTokens, completionTokens, totalTokens)
+			errs := e.hooks.OnNewAssistantMessageWithTools(res.FullContent, res.ToolCalls, res.PromptTokens, res.CompletionTokens, res.TotalTokens)
 			if e.hooks.LogHookErrors != nil {
 				e.hooks.LogHookErrors(errs)
 			}
 		}
 
-		hm.AddAssistantMessageWithToolCalls(fullContent, fullReasoningContent, toolCalls, history.TokenUsage{
-			PromptTokens:     promptTokens,
-			CompletionTokens: completionTokens,
-			TotalTokens:      totalTokens,
+		hm.AddAssistantMessageWithToolCalls(res.FullContent, res.FullReasoningContent, res.ToolCalls, history.TokenUsage{
+			PromptTokens:     res.PromptTokens,
+			CompletionTokens: res.CompletionTokens,
+			TotalTokens:      res.TotalTokens,
 		})
 
-		agentforge.Debug("Detected %d tool calls, executing tools in parallel", len(toolCalls))
+		agentforge.Debug("Detected %d tool calls, executing tools in parallel", len(res.ToolCalls))
 
 		type iterResult struct {
 			result   llms.ToolResult
 			duration time.Duration
 			localCtx *core.AgentContext
 		}
-		iterResults := make([]iterResult, len(toolCalls))
-		hookErrsList := make([][]error, len(toolCalls))
+		iterResults := make([]iterResult, len(res.ToolCalls))
+		hookErrsList := make([][]error, len(res.ToolCalls))
 
 		// Pre-phase (serial): deep-copy args, send StatusToolExecuting, run OnBeforeToolExecution.
 		// Hooks that mutate arguments (e.g. vault secret decryption) must run before goroutines start.
-		for i := range toolCalls {
-			tc := &toolCalls[i]
+		for i := range res.ToolCalls {
+			tc := &res.ToolCalls[i]
 			if tc.Arguments != nil {
 				argsCopy := make(map[string]any, len(tc.Arguments))
 				for k, v := range tc.Arguments {
@@ -302,10 +261,10 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 			}
 			executingBytes, err := json.Marshal(executingChunk)
 			if err != nil {
-				return fmt.Errorf("failed to serialize tool-executing chunk: %w", err)
+				return result, fmt.Errorf("failed to serialize tool-executing chunk: %w", err)
 			}
 			if !responseCh.TrySend(executingBytes) {
-				return nil
+				return result, nil
 			}
 
 			if e.hooks != nil && e.hooks.OnBeforeToolExecution != nil {
@@ -319,7 +278,7 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 		// Parallel phase: each tool runs in its own goroutine with an isolated context snapshot.
 		// Writing to iterResults[i] is safe without a mutex since each goroutine owns a unique index.
 		var wg sync.WaitGroup
-		for i, toolCall := range toolCalls {
+		for i, toolCall := range res.ToolCalls {
 			wg.Add(1)
 			go func(idx int, tc llms.ToolCall, hookErrs []error) {
 				defer wg.Done()
@@ -348,7 +307,7 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 		// Post-phase (serial): merge context snapshots, run post-execution hooks,
 		// send result chunks, and write to history — all in original tool call order.
 		const maxToolResultLen = 50_000
-		for i, toolCall := range toolCalls {
+		for i, toolCall := range res.ToolCalls {
 			r := iterResults[i]
 
 			// Merge mutable state from the goroutine's isolated snapshot back into callCtx.
@@ -387,11 +346,11 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 			}
 			resultBytes, err := json.Marshal(resultChunk)
 			if err != nil {
-				return fmt.Errorf("failed to serialize tool-result chunk: %w", err)
+				return result, fmt.Errorf("failed to serialize tool-result chunk: %w", err)
 			}
 			if !responseCh.TrySend(resultBytes) {
 				agentforge.Debug("Channel closed when trying to send tool-result chunk for tool %s", toolCall.Name)
-				return nil
+				return result, nil
 			}
 
 			content := r.result.Result
@@ -427,7 +386,16 @@ func (e *Executor) ExecuteChatWithTools(ctx context.Context, hm history.Manager,
 	}
 
 	agentforge.Debug("Reached maximum tool iterations (%d)", e.config.MaxToolIterations)
-	return fmt.Errorf("reached maximum tool iterations (%d)", e.config.MaxToolIterations)
+	return result, fmt.Errorf("reached maximum tool iterations (%d)", e.config.MaxToolIterations)
+}
+
+func lastUserContent(messages []*llms.UnifiedMessage) string {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role() == llms.MessageRoleUser {
+			return messages[i].Content()
+		}
+	}
+	return ""
 }
 
 // ExecuteTool finds and executes a tool by name using the shared agentContext.
@@ -449,9 +417,10 @@ func (e *Executor) executeToolWithContext(toolCall llms.ToolCall, responseCh *co
 
 	agentContext := callCtx.BuildContext(responseCh)
 
+	resolved := llms.ResolveToolNameForTools(toolCall.Name, e.tools)
 	var tool llms.Tool
 	for _, t := range e.tools {
-		if t.GetName() == toolCall.Name {
+		if t.GetName() == resolved {
 			tool = t
 			break
 		}
@@ -475,11 +444,130 @@ func (e *Executor) executeToolWithContext(toolCall llms.ToolCall, responseCh *co
 
 	return llms.ToolResult{
 		ToolCallID: toolCall.ID,
-		ToolName:   toolCall.Name,
+		ToolName:   resolved,
 		Success:    result.Success(),
 		Result:     result.Data(),
 		Error:      result.Error(),
 		Ephemeral:  result.Ephemeral(),
 		Cleanup:    result.Cleanup(),
+	}
+}
+
+// streamResult holds the result of streaming LLM response chunks.
+type streamResult struct {
+	FullContent          string
+	FullReasoningContent string
+	ToolCalls            []llms.ToolCall
+	HasToolCalls         bool
+	CompletedChunkBytes  []byte
+	PromptTokens         int
+	CompletionTokens     int
+	TotalTokens          int
+	StreamBuf            [][]byte
+}
+
+func (e *Executor) streamLLMResponse(
+	ctx context.Context,
+	iteration int,
+	heartbeatTurn bool,
+	llmResponseCh *llms.ResponseCh,
+	responseCh *core.ResponseCh,
+) (streamResult, error) {
+	var res streamResult
+	llmErrorCh := llmResponseCh.Error
+
+	flushStreamBuf := func() bool {
+		for _, b := range res.StreamBuf {
+			if !responseCh.TrySend(b) {
+				return false
+			}
+		}
+		res.StreamBuf = nil
+		return true
+	}
+
+	sendOrBuffer := func(chunkBytes []byte) bool {
+		if heartbeatTurn {
+			res.StreamBuf = append(res.StreamBuf, chunkBytes)
+			return true
+		}
+		return responseCh.TrySend(chunkBytes)
+	}
+
+	agentforge.Debug("Waiting for LLM response chunks...")
+	for {
+		select {
+		case <-ctx.Done():
+			agentforge.Debug("Context cancelled during LLM response streaming")
+			return res, fmt.Errorf("execution cancelled: %w", ctx.Err())
+		case chunkBytes, ok := <-llmResponseCh.Response:
+			if !ok {
+				agentforge.Debug("LLM response channel closed, processing tool calls")
+				return res, nil
+			}
+
+			agentforge.Debug("Received chunk from LLM (size: %d bytes)", len(chunkBytes))
+			var chunk llms.ChunkResponse
+			if err := json.Unmarshal(chunkBytes, &chunk); err != nil {
+				agentforge.Debug("Error deserializing chunk: %v", err)
+				return res, fmt.Errorf("failed to deserialize chunk: %w", err)
+			}
+
+			if chunk.Content != "" {
+				res.FullContent += chunk.Content
+			} else if chunk.Delta != "" {
+				res.FullContent += chunk.Delta
+			}
+
+			chunk.Iteration = iteration
+
+			chunkBytes, err := json.Marshal(chunk)
+			if err != nil {
+				agentforge.Debug("Error re-serializing chunk with iteration: %v", err)
+				return res, fmt.Errorf("failed to re-serialize chunk: %w", err)
+			}
+
+			if chunk.Status == llms.StatusToolCall && len(chunk.ToolCalls) > 0 {
+				res.ToolCalls = chunk.ToolCalls
+				res.HasToolCalls = true
+				res.FullReasoningContent = chunk.ReasoningContent
+				agentforge.Debug("Tool calls detected: %d tool calls", len(res.ToolCalls))
+				if heartbeatTurn {
+					if !flushStreamBuf() {
+						return res, fmt.Errorf("channel closed")
+					}
+				}
+				if !responseCh.TrySend(chunkBytes) {
+					return res, fmt.Errorf("channel closed")
+				}
+				continue
+			}
+
+			if chunk.Status == llms.StatusCompleted {
+				res.CompletedChunkBytes = chunkBytes
+				res.PromptTokens = chunk.PromptTokens
+				res.CompletionTokens = chunk.CompletionTokens
+				res.TotalTokens = chunk.TotalTokens
+				if chunk.FullContent != "" {
+					res.FullContent = chunk.FullContent
+				}
+				agentforge.Debug("Received completed chunk, returning to processToolCalls")
+				return res, nil
+			}
+
+			if !sendOrBuffer(chunkBytes) {
+				return res, fmt.Errorf("channel closed")
+			}
+
+		case err, ok := <-llmErrorCh:
+			if !ok {
+				llmErrorCh = nil
+				continue
+			}
+			if err != nil {
+				agentforge.Debug("LLM stream error received: %v", err)
+				return res, fmt.Errorf("llm stream error: %w", err)
+			}
+		}
 	}
 }

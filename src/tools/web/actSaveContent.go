@@ -54,7 +54,7 @@ func (w *WebBrowser) saveContent(agentContext map[string]any, args map[string]an
 	}
 
 	// Get or create browser context
-	ctx, err := getOrCreateBrowser(agentContext)
+	ctx, err := w.getOrCreateBrowser(agentContext)
 	if err != nil {
 		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get browser context: %v", err))

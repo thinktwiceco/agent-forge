@@ -28,10 +28,11 @@ import (
 )
 
 type AgentManager struct {
-	mu          sync.RWMutex
-	agent       *agents.Agent
-	configMgr   *ConfigManager
-	chunkRouter func(chatId string, chunk core.ExtendedChunkResponse)
+	mu                 sync.RWMutex
+	agent              *agents.Agent
+	configMgr          *ConfigManager
+	chunkRouter        func(chatId string, chunk core.ExtendedChunkResponse)
+	turnCompleteRouter func(chatId string, fullContent string)
 }
 
 func NewAgentManager(configMgr *ConfigManager) (*AgentManager, error) {
@@ -64,6 +65,18 @@ func (am *AgentManager) SetChunkRouter(fn func(chatId string, chunk core.Extende
 	}
 }
 
+// SetTurnCompleteRouter sets the callback invoked after each background drain turn completes.
+// The router is preserved across Reload calls so it is applied to newly built agents.
+func (am *AgentManager) SetTurnCompleteRouter(fn func(chatId string, fullContent string)) {
+	am.mu.Lock()
+	am.turnCompleteRouter = fn
+	agent := am.agent
+	am.mu.Unlock()
+	if agent != nil {
+		agent.SetTurnCompleteRouter(fn)
+	}
+}
+
 func (am *AgentManager) GetAgentName() string {
 	cfg := am.configMgr.GetConfig()
 	if cfg.Agent.Name != "" {
@@ -86,6 +99,9 @@ func (am *AgentManager) Reload() error {
 	if am.chunkRouter != nil {
 		agent.SetChunkRouter(am.chunkRouter)
 	}
+	if am.turnCompleteRouter != nil {
+		agent.SetTurnCompleteRouter(am.turnCompleteRouter)
+	}
 	am.mu.Unlock()
 	return nil
 }
@@ -94,7 +110,7 @@ func (am *AgentManager) buildAgent() (*agents.Agent, error) {
 	// Use the already-loaded config with interpolated environment variables
 	cfg := am.configMgr.GetConfig()
 
-	agentBuilder, err := builder.NewAgentBuilderFromConfigStruct(cfg)
+	agentFactory, err := builder.NewAgentFactoryFromConfigStruct(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create agent builder: %w", err)
 	}
@@ -108,13 +124,13 @@ func (am *AgentManager) buildAgent() (*agents.Agent, error) {
 
 		// Only build and set vector components if they're configured
 		if err := vectorBuilder.Build(); err == nil {
-			agentBuilder.SetVectorDB(vectorBuilder.GetVectorDB())
-			agentBuilder.SetEmbeddingGenerator(vectorBuilder.GetEmbeddingGenerator())
+			agentFactory.SetVectorDB(vectorBuilder.GetVectorDB())
+			agentFactory.SetEmbeddingGenerator(vectorBuilder.GetEmbeddingGenerator())
 		}
 		// Silently ignore vector build errors - vector DB is optional
 	}
 
-	agent, err := agentBuilder.Build()
+	agent, err := agentFactory.Build()
 	if err != nil {
 		return nil, fmt.Errorf("build agent: %w", err)
 	}

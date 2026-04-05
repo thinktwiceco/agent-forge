@@ -26,6 +26,10 @@ fi
 
 mkdir -p "$BIN_DIR"
 
+if [ -f "$PROJECT_ROOT/README.md" ]; then
+  cp "$PROJECT_ROOT/README.md" "$INSTALL_DIR/README.md"
+fi
+
 # Generate config.yaml
 cat > "$INSTALL_DIR/config.yaml" << EOF
 # Copy to config.yaml and fill in your values.
@@ -66,6 +70,7 @@ chmod +x "$INSTALL_DIR/start.sh"
 
 echo ""
 echo "Install complete: $INSTALL_DIR"
+echo "  README.md      - framework capabilities (workspace docs for the agent)"
 echo "  bin/localforge  - binary"
 echo "  config.yaml    - agent config (edit model, prompt, etc.)"
 echo "  start.sh       - run ./start.sh to start the agent"

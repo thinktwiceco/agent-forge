@@ -51,13 +51,6 @@ func NewAgent(config *AgentConfig) *Agent { ... }
 func NewBuilder(llm llms.LLMEngine, name string) *Builder { ... }
 ```
 
-**System Agent Constructors:**
-```go
-// Pattern: {Name}Agent()
-func ReasoningAgent(llm llms.LLMEngine) core.SubAgent { ... }
-func CodingAgent(llm llms.LLMEngine, root string) core.SubAgent { ... }
-```
-
 ## Interface Design Principles
 
 **Interface Segregation:**

@@ -55,7 +55,7 @@ func TestAgent_ExecuteTool(t *testing.T) {
 	}
 
 	mockTool := &MockTool{Name: "test_tool", ReturnResult: "success"}
-	agent.tools = []llms.Tool{mockTool}
+	agent.AddTools([]llms.Tool{mockTool})
 
 	// Test successful execution
 	call := llms.ToolCall{
@@ -64,7 +64,7 @@ func TestAgent_ExecuteTool(t *testing.T) {
 		Arguments: map[string]any{"arg": "value"},
 	}
 
-	result := agent.executeTool(call)
+	result := agent.executor.ExecuteTool(call, agent.responseCh)
 
 	if !mockTool.Called {
 		t.Error("Tool should have been called")
@@ -81,7 +81,7 @@ func TestAgent_ExecuteTool(t *testing.T) {
 		ID:   "call-2",
 		Name: "unknown_tool",
 	}
-	resultNotFound := agent.executeTool(callNotFound)
+	resultNotFound := agent.executor.ExecuteTool(callNotFound, agent.responseCh)
 	if resultNotFound.Success {
 		t.Error("Should fail for unknown tool")
 	}
@@ -97,7 +97,7 @@ func TestAgent_ChatWithTools(t *testing.T) {
 	})
 
 	mockTool := &MockTool{Name: "test_tool", ReturnResult: "tool_output"}
-	agent.tools = []llms.Tool{mockTool}
+	agent.AddTools([]llms.Tool{mockTool})
 
 	// Initialize context and response channel manually
 	agent.responseCh = core.NewResponseCh("TestAgent", "test", "chat-id", nil)
@@ -145,7 +145,7 @@ func TestAgent_ChatWithTools(t *testing.T) {
 	}()
 
 	// Trigger the chat with the history instance
-	err := agent.executeChatWithTools(context.Background(), hm)
+	_, err := agent.executor.ExecuteChatWithTools(context.Background(), hm, agent.responseCh)
 
 	_ = err // Ignore error in this test context as we consume output in goroutine
 

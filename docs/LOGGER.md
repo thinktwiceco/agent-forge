@@ -369,7 +369,7 @@ func processItems(items []Item) {
 The logger has been integrated into the Agent Forge codebase:
 
 - **Agent**: Uses `Debug` level for message logging
-- **DelegateTool**: Uses `Info` level for delegation events
+- **spawn_subagent** (when enabled): runs inside the normal tool loop; use agent/tool logging hooks or tracer for observability
 - **Tests**: Keep using `fmt.Print` for test output (not filtered by log level)
 
 ## Thread Safety

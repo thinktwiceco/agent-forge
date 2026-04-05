@@ -63,6 +63,7 @@ docs(readme): update install instructions
 AF_TOGETHERAI_API_KEY=your_key
 AF_OPENAI_API_KEY=your_key
 AF_DEEPSEEK_API_KEY=your_key
+AP_OPENROUTER_API_KEY=your_key
 
 # Logging
 AF_LOG_LEVEL=INFO              # DEBUG, INFO, WARN, ERROR

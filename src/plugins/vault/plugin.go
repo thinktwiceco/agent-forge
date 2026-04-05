@@ -76,31 +76,9 @@ func (p *VaultPlugin) Tools() []llms.Tool {
 func (p *VaultPlugin) SystemPrompt() string {
 	return `
 [VAULT]
-- Encrypted secret storage for sensitive values (passwords, API keys, tokens).
-- saveSecret(key, value): Encrypt and persist a secret. key = short identifier, value = plaintext secret.
-- listSecrets(): List stored key identifiers only — never the values.
-- deleteSecret(key): Permanently remove a secret from the vault.
-
-[USING SECRETS IN TOOLS — fill_secret]
-To type a secret into a web form without exposing the plaintext:
-  1. Call listSecrets() to find the vault key name (e.g. "github-password").
-  2. Use action "fill_secret" with the vault key as resolveSecretValue — NOT the actual secret.
-     Example:
-       action: "fill_secret"
-       selector: "#password"
-       resolveSecretValue: "github-password"
-  3. The runtime decrypts it automatically before the tool runs. You never handle the plaintext.
-
-IMPORTANT:
-- resolveSecretVaultKey must be a vault KEY NAME (from listSecrets), NOT the actual password/token.
-- Never put plaintext secrets into any tool argument. Use fill_secret instead of fill for passwords.
-- Any tool argument whose name starts with "resolveSecret" is auto-decrypted the same way.
-
-COMMON MISTAKE — do not do this:
-  WRONG: resolveSecretVaultKey: "user@example.com"   ← plaintext email, not a vault key
-  WRONG: resolveSecretVaultKey: "mysecretpassword"   ← plaintext password, not a vault key
-  RIGHT: resolveSecretVaultKey: "gmail-username"     ← key name returned by listSecrets()
-  RIGHT: resolveSecretVaultKey: "gmail-password"     ← key name returned by listSecrets()
+- saveSecret stores encrypted values, listSecrets returns key names only, and deleteSecret removes a stored key.
+- Never put plaintext secrets into tool arguments.
+- For web passwords, use fill_secret with resolveSecretVaultKey set to a vault key from listSecrets(), not the plaintext secret.
 `
 }
 
@@ -168,9 +146,34 @@ func (p *VaultPlugin) onContextBuild(a *agents.Agent, agentContext *core.AgentCo
 	return nil
 }
 
+// normalizeWebBrowserFillSecretVaultArg maps snake_case tool output to the canonical
+// resolveSecretVaultKey before validation and vault decryption. core.Tool only forwards
+// declared parameter names; models often emit resolve_secret_vault_key instead.
+func normalizeWebBrowserFillSecretVaultArg(toolCall *llms.ToolCall) {
+	if toolCall == nil || toolCall.Arguments == nil {
+		return
+	}
+	if toolCall.Name != "web_browser" {
+		return
+	}
+	action, _ := toolCall.Arguments["action"].(string)
+	if action != "fill_secret" {
+		return
+	}
+	if _, has := toolCall.Arguments["resolveSecretVaultKey"]; has {
+		return
+	}
+	if v, ok := toolCall.Arguments["resolve_secret_vault_key"]; ok {
+		toolCall.Arguments["resolveSecretVaultKey"] = v
+		delete(toolCall.Arguments, "resolve_secret_vault_key")
+	}
+}
+
 // onBeforeToolExecution scans tool arguments for keys starting with "resolveSecret"
 // and replaces their values with the decrypted secret in-place.
 func (p *VaultPlugin) onBeforeToolExecution(a *agents.Agent, toolCall *llms.ToolCall) error {
+	normalizeWebBrowserFillSecretVaultArg(toolCall)
+
 	for k, v := range toolCall.Arguments {
 		if !strings.HasPrefix(k, "resolveSecret") {
 			continue

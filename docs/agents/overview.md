@@ -5,7 +5,7 @@
 ## Key Technologies
 
 - **Language:** Go 1.21+
-- **LLM Providers:** OpenAI, TogetherAI, DeepSeek, OpenAI-compatible APIs
+- **LLM Providers:** OpenAI, TogetherAI, DeepSeek, OpenRouter (OpenAI-compatible), and other OpenAI-compatible APIs
 - **Architecture:** Interface-based design, separation of concerns, modular packages
 
 ## Core Principles

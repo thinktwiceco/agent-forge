@@ -9,7 +9,7 @@ import (
 )
 
 func newTodoHandlerTool(plugin *TodoPlugin) llms.Tool {
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name: TODO_HANDLER_TOOL,
 		Description: `
 A tool that allows you to add, get, update, and clear todo items. Use this tool to keep track of tasks and make sure you complete everything that has been requested
@@ -190,5 +190,5 @@ of the todo items.
 				return core.NewErrorResponse(fmt.Sprintf("unknown action: %s. Valid actions are: 'addTodo', 'addBulkTodos', 'getTodos', 'updateTodo', or 'clearTodos'", action))
 			}
 		},
-	}
+	})
 }

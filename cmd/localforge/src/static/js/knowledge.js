@@ -479,11 +479,39 @@ class KnowledgeGraph {
           ${node.type}
         </div>
       </div>
+    `;
 
+    const distillFields = [
+      ['Title', node.title],
+      ['Description', node.description],
+      ['Distillation reason', node.distillation_reason],
+    ];
+    distillFields.forEach(([label, val]) => {
+      if (val != null && String(val).trim() !== '') {
+        html += `
+      <div class="detail-section">
+        <div class="detail-label">${label}</div>
+        <div class="detail-value">${this.escapeHtml(String(val))}</div>
+      </div>`;
+      }
+    });
+
+    html += `
       <div class="detail-section">
         <div class="detail-label">Content</div>
         <div class="detail-value">${this.escapeHtml(node.content)}</div>
       </div>
+    `;
+
+    if (node.search_text != null && String(node.search_text).trim() !== '') {
+      html += `
+      <div class="detail-section">
+        <div class="detail-label">Search text</div>
+        <pre class="detail-metadata">${this.escapeHtml(String(node.search_text))}</pre>
+      </div>`;
+    }
+
+    html += `
 
       <div class="detail-section">
         <div class="detail-label">ID</div>

@@ -1,56 +1,40 @@
 package agentforge
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"sync"
+
+	"github.com/joho/godotenv"
 )
 
-// loadEnvFile reads environment variables from a .env file.
-//
-// This function reads key=value pairs from a .env file and returns them as a map.
-// Lines starting with # are treated as comments and ignored.
-// Empty lines are ignored.
-func loadEnvFile(filePath string) (map[string]string, error) {
-	env := make(map[string]string)
+var (
+	envCache map[string]string
+	envOnce  sync.Once
+)
 
-	file, err := os.Open(filePath)
+func initEnvCache() {
+	envCache = make(map[string]string)
+	dir, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		dir = "."
 	}
-	defer func() {
-		_ = file.Close()
-	}()
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		// Parse key=value pairs
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-			// Remove quotes if present
-			if len(value) >= 2 && ((value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'')) {
-				value = value[1 : len(value)-1]
+	for i := 0; i < 5; i++ {
+		envPath := filepath.Join(dir, ".env")
+		if env, err := godotenv.Read(envPath); err == nil {
+			for k, v := range env {
+				envCache[k] = v
 			}
-			env[key] = value
+			break // Found and loaded
 		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
 	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return env, nil
 }
 
 // GetEnvVar retrieves an environment variable with fallback priority:
@@ -70,27 +54,10 @@ func GetEnvVar(key string) (string, error) {
 		return value, nil
 	}
 
-	// Try to find .env file starting from current directory
-	// Search up directories until we find .env file or reach filesystem root
-	dir, err := os.Getwd()
-	if err != nil {
-		dir = "."
-	}
-
-	// Search up to 5 levels to handle deep test directory structures
-	for i := 0; i < 5; i++ {
-		envPath := filepath.Join(dir, ".env")
-		if env, err := loadEnvFile(envPath); err == nil {
-			if value, ok := env[key]; ok && value != "" {
-				return value, nil
-			}
-		}
-		// Move up one directory
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break // Reached root
-		}
-		dir = parent
+	// Read from cached .env
+	envOnce.Do(initEnvCache)
+	if value, ok := envCache[key]; ok && value != "" {
+		return value, nil
 	}
 
 	// Not found anywhere

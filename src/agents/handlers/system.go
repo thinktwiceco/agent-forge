@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 
-	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
@@ -17,13 +16,10 @@ import (
 // The interface only exposes the specific operations that system handlers require,
 // following the Interface Segregation Principle.
 type AgentOperations interface {
-	// LoadDelegateTool rebuilds the delegate tool when sub-agents change
-	LoadDelegateTool()
-
 	// EnsureSystemPrompt rebuilds the system prompt when configuration changes
 	EnsureSystemPrompt()
 
-	// InitAgentContext rebuilds the agent context when tools or sub-agents change
+	// InitAgentContext rebuilds the agent context when tools change
 	InitAgentContext()
 }
 
@@ -34,7 +30,6 @@ type AgentOperations interface {
 // handlers are methods on this struct that can be injected with dependencies.
 //
 // System handlers respond to key agent lifecycle events:
-// - New system agents being added
 // - New tools being registered
 // - Agent initialization and plugin setup
 type SystemHandlers struct {
@@ -66,13 +61,10 @@ func NewSystemHandlers() *SystemHandlers {
 // Agent type.
 //
 // Parameters:
-//   - registerSystemAgentHook: Adapter function for registering the system agent added hook
 //   - registerToolsHook: Adapter function for registering the tools added hook
 func (h *SystemHandlers) RegisterWith(
-	registerSystemAgentHook func(handler func(AgentOperations, core.SubAgent) error),
 	registerToolsHook func(handler func(AgentOperations, []llms.Tool) error),
 ) {
-	registerSystemAgentHook(h.handleSystemAgentAdded)
 	registerToolsHook(h.handleToolsAdded)
 }
 
@@ -80,27 +72,6 @@ func (h *SystemHandlers) RegisterWith(
 //
 // These methods implement the actual handler logic using the AgentOperations interface.
 // This enables easy unit testing with mock implementations.
-
-// handleSystemAgentAdded handles the addition of a new system agent.
-//
-// When a new system agent is added, this handler:
-// 1. Reloads the delegate tool to include the new sub-agent
-// 2. Rebuilds the system prompt to document the new sub-agent
-// 3. Rebuilds the agent context with updated sub-agent information
-func (h *SystemHandlers) handleSystemAgentAdded(a AgentOperations, subAgent core.SubAgent) error {
-	if subAgent == nil {
-		return errors.New("sub agent is nil")
-	}
-
-	// A new system agent will trigger a reload of the delegate tool
-	a.LoadDelegateTool()
-	// A rebuild of the system prompt
-	a.EnsureSystemPrompt()
-	// A rebuild of the agent context
-	a.InitAgentContext()
-
-	return nil
-}
 
 // handleToolsAdded handles the addition of new tools.
 //

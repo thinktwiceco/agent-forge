@@ -45,7 +45,7 @@ func NewPostgresTool(postgresURL, mode string, allowedTables, allowedSchemas []s
 `, allowedSchemas)
 	}
 
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        "postgres",
 		Description: desc,
 		AdvanceDesc: fmt.Sprintf(`Advanced Details:
@@ -132,5 +132,5 @@ func NewPostgresTool(postgresURL, mode string, allowedTables, allowedSchemas []s
 
 			return core.NewSuccessResponse(result)
 		},
-	}
+	})
 }

@@ -151,6 +151,34 @@ mkdir -p "$INSTALL_DIR/data"
 
 echo "Created folder structure."
 
+# ─── README (workspace docs; primary entrypoint for the agent via fs tool) ───
+
+README_DEST="$INSTALL_DIR/README.md"
+if [ -f "$README_DEST" ]; then
+  echo "README.md already exists — skipping."
+else
+  README_OK=false
+  if [ -n "${BASH_SOURCE[0]:-}" ]; then
+    _INSTALL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "$_INSTALL_SCRIPT_DIR/../README.md" ]; then
+      cp "$_INSTALL_SCRIPT_DIR/../README.md" "$README_DEST"
+      README_OK=true
+    fi
+  fi
+  if [ "$README_OK" = false ]; then
+    RAW_README="https://raw.githubusercontent.com/${REPO}/main/README.md"
+    if curl -fsSL "$RAW_README" -o "$README_DEST"; then
+      README_OK=true
+    else
+      rm -f "$README_DEST"
+      echo "WARNING: Could not download README.md into workspace (skipped)."
+    fi
+  fi
+  if [ "$README_OK" = true ]; then
+    echo "README.md placed in workspace."
+  fi
+fi
+
 # ─── download binary ─────────────────────────────────────────────────────────
 
 echo "Downloading $ASSET_NAME..."
@@ -276,6 +304,7 @@ fi
 echo ""
 echo "Install complete ($TAG):"
 echo "  $BINARY_PATH"
+echo "  $INSTALL_DIR/README.md     — framework capabilities (agent workspace entrypoint)"
 echo "  $INSTALL_DIR/config.yaml  — edit model, system_prompt, tools"
 echo "  $INSTALL_DIR/.env         — add your API keys"
 echo "  $UPDATE_SCRIPT            — run to update to latest version"

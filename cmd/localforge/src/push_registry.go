@@ -53,3 +53,16 @@ func (r *PushRegistry) Push(chatId string, chunk core.ExtendedChunkResponse) {
 	default:
 	}
 }
+
+// Broadcast sends a chunk to all registered push channels.
+// Non-blocking per channel: drops if a channel's buffer is full.
+func (r *PushRegistry) Broadcast(chunk core.ExtendedChunkResponse) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, ch := range r.chans {
+		select {
+		case ch <- chunk:
+		default:
+		}
+	}
+}

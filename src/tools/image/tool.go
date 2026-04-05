@@ -31,7 +31,7 @@ func NewImageTool(dir string) llms.Tool {
 		}
 	}
 
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        "image",
 		Description: "Load an image file and return it as a base64 data URI for vision-capable LLMs.",
 		AdvanceDesc: `Advanced Details:
@@ -78,5 +78,5 @@ func NewImageTool(dir string) llms.Tool {
 
 			return t.loadImage(path)
 		},
-	}
+	})
 }

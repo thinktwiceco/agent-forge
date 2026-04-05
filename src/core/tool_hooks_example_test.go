@@ -34,7 +34,7 @@ func (m *mockHooks) IsSafeCommand(cmd string) bool {
 
 func TestTool_SetHooks(t *testing.T) {
 	// Create a tool
-	tool := &core.Tool{
+	tool := core.NewTool(core.ToolConfig{
 		Name:                "test-tool",
 		Description:         "A test tool",
 		AdvanceDesc:         "Advanced test tool",
@@ -43,7 +43,7 @@ func TestTool_SetHooks(t *testing.T) {
 		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 			return core.NewSuccessResponse("success")
 		},
-	}
+	})
 
 	// tool is already *core.Tool, no cast needed
 	concreteTool := tool
@@ -84,7 +84,7 @@ func TestTool_SetHooks(t *testing.T) {
 }
 
 func TestTool_HooksNilByDefault(t *testing.T) {
-	tool := &core.Tool{
+	tool := core.NewTool(core.ToolConfig{
 		Name:                "test-tool",
 		Description:         "A test tool",
 		AdvanceDesc:         "Advanced test tool",
@@ -93,7 +93,7 @@ func TestTool_HooksNilByDefault(t *testing.T) {
 		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 			return core.NewSuccessResponse("success")
 		},
-	}
+	})
 
 	if tool.GetHooks() != nil {
 		t.Error("Hooks should be nil by default")

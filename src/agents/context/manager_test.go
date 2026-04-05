@@ -1,8 +1,6 @@
 package context
 
 import (
-	"context"
-	"fmt"
 	"testing"
 
 	agentcore "github.com/thinktwiceco/agent-forge/src/core"
@@ -15,7 +13,6 @@ func TestNewManager(t *testing.T) {
 		Trace:     "test-trace",
 		Model:     "gpt-4",
 		Tools:     []llms.Tool{},
-		SubAgents: []agentcore.SubAgent{},
 	}
 
 	manager := NewManager(config)
@@ -97,8 +94,6 @@ func TestManager_SyncFromMap(t *testing.T) {
 	// Build initial context
 	contextMap := manager.BuildContext(responseCh)
 
-	// Modify context map
-	contextMap["lastSubagentMessage"] = "test message"
 	pluginFields := contextMap["pluginFields"].(map[string]any)
 	pluginFields["customField"] = "customValue"
 
@@ -108,12 +103,7 @@ func TestManager_SyncFromMap(t *testing.T) {
 		t.Fatalf("SyncFromMap failed: %v", err)
 	}
 
-	// Verify changes were synced
 	ctx := manager.Context()
-	if ctx.LastSubagentMessage != "test message" {
-		t.Errorf("Expected LastSubagentMessage to be 'test message', got '%s'", ctx.LastSubagentMessage)
-	}
-
 	if ctx.PluginFields["customField"] != "customValue" {
 		t.Errorf("Expected PluginFields['customField'] to be 'customValue', got '%v'", ctx.PluginFields["customField"])
 	}
@@ -219,30 +209,6 @@ func TestManager_UpdateTools(t *testing.T) {
 	}
 }
 
-func TestManager_UpdateSubAgents(t *testing.T) {
-	config := Config{
-		AgentName: "test-agent",
-		SubAgents: []agentcore.SubAgent{},
-	}
-
-	manager := NewManager(config)
-
-	// Create a mock sub-agent
-	mockSubAgent := &mockSubAgent{name: "test-subagent"}
-	subAgents := []agentcore.SubAgent{mockSubAgent}
-
-	manager.UpdateSubAgents(subAgents)
-
-	ctx := manager.Context()
-	if len(ctx.SubAgents) != 1 {
-		t.Errorf("Expected 1 sub-agent, got %d", len(ctx.SubAgents))
-	}
-
-	if ctx.SubAgents[0].Name() != "test-subagent" {
-		t.Errorf("Expected sub-agent name to be 'test-subagent', got '%s'", ctx.SubAgents[0].Name())
-	}
-}
-
 func TestManager_PreservesSessionStorage(t *testing.T) {
 	config := Config{
 		AgentName: "test-agent",
@@ -312,36 +278,4 @@ func (m *mockTool) GetFunctionDefinition() llms.FunctionDefinition {
 
 func (m *mockTool) Call(contextMap map[string]any, arguments map[string]any) llms.ToolReturn {
 	return agentcore.NewSuccessResponse("success")
-}
-
-type mockSubAgent struct {
-	name string
-}
-
-func (m *mockSubAgent) Name() string {
-	return m.name
-}
-
-func (m *mockSubAgent) Description() string {
-	return "mock subagent"
-}
-
-func (m *mockSubAgent) BasicDescription() string {
-	return "mock subagent"
-}
-
-func (m *mockSubAgent) AdvanceDescription() string {
-	return "mock subagent advanced"
-}
-
-func (m *mockSubAgent) Troubleshooting() string {
-	return "mock troubleshooting"
-}
-
-func (m *mockSubAgent) DetailsAbout(item string) string {
-	return fmt.Sprintf("Nothing to add about %s", item)
-}
-
-func (m *mockSubAgent) ChatStream(ctx context.Context, message string, chatId string) *agentcore.ResponseCh {
-	return nil
 }

@@ -64,7 +64,7 @@ func NewGitTool(dir string) llms.Tool {
 		}
 	}
 
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        "git",
 		Description: "Perform git operations (init, status, add, commit, push, pull, branch, checkout, log, diff, clone) within a restricted directory.",
 		AdvanceDesc: `Advanced Details:
@@ -291,5 +291,5 @@ func NewGitTool(dir string) llms.Tool {
 			// This should never be reached due to validation, but included for completeness
 			return core.NewErrorResponse(fmt.Sprintf("unhandled operation: %s", operation))
 		},
-	}
+	})
 }

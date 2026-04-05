@@ -130,7 +130,8 @@ func TestConfigManagerLoadWithInterpolation(t *testing.T) {
 	}
 
 	postgresTool := cfg.Agent.Tools[0]
-	if postgresTool.PostgresURL != testDBURL {
-		t.Errorf("PostgresURL = %v, want %v", postgresTool.PostgresURL, testDBURL)
+	postgresURL, _ := postgresTool.Params["postgresURL"].(string)
+	if postgresURL != testDBURL {
+		t.Errorf("PostgresURL = %v, want %v", postgresURL, testDBURL)
 	}
 }

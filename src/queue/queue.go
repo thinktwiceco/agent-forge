@@ -44,6 +44,12 @@ func (q *Queue) C() <-chan Message {
 	return q.ch
 }
 
+// Len returns the number of messages currently buffered in the queue.
+// It is safe to call concurrently and does not block.
+func (q *Queue) Len() int {
+	return len(q.ch)
+}
+
 // Close closes the underlying channel, signalling the drain loop to stop
 // after processing remaining messages.
 // Close must be called exactly once.

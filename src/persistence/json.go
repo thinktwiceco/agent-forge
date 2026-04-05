@@ -26,8 +26,8 @@ func NewJSONPersistence(baseDir string) *JSONPersistence {
 
 // SaveHistory saves the conversation history to a JSON file
 // If chatId is empty, a new UUID is generated
-// Returns the chatId (newly generated or the one provided)
-func (jp *JSONPersistence) SaveHistory(chatId string, history []*llms.UnifiedMessage) string {
+// Returns the chatId (newly generated or the one provided) and an error if any occurred.
+func (jp *JSONPersistence) SaveHistory(chatId string, history []*llms.UnifiedMessage) (string, error) {
 	// Generate chatId if not provided
 	if chatId == "" {
 		chatId = uuid.New().String()
@@ -41,23 +41,23 @@ func (jp *JSONPersistence) SaveHistory(chatId string, history []*llms.UnifiedMes
 	data, err := json.MarshalIndent(history, "", "  ")
 	if err != nil {
 		agentforge.Error("Failed to marshal history to JSON: %v", err)
-		return chatId
+		return chatId, err
 	}
 
 	// Ensure directory exists
 	if err := os.MkdirAll(jp.baseDir, 0755); err != nil {
 		agentforge.Error("Failed to create directory for history file: %v", err)
-		return chatId
+		return chatId, err
 	}
 
 	// Write to file
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		agentforge.Error("Failed to write history to file: %v", err)
-		return chatId
+		return chatId, err
 	}
 
 	agentforge.Debug("Successfully saved history to %s", filePath)
-	return chatId
+	return chatId, nil
 }
 
 // GetHistory retrieves the conversation history from the JSON file for a specific chatId

@@ -1,10 +1,10 @@
 # Agent Builder Configuration Guide
 
-The builder module provides a YAML-based configuration system for creating agents, tools, subagents, plugins, and vector storage components. This guide documents all available configuration options.
+The builder module provides a YAML-based configuration system for creating agents, tools, plugins, and vector storage components. This guide documents all available configuration options.
 
 ## Overview
 
-Agents can be created from YAML configuration files using `NewAgentBuilderFromConfig()`. The configuration file defines the agent's capabilities, tools, subagents, plugins, and optional vector storage setup.
+Agents can be created from YAML configuration files using `NewAgentBuilderFromConfig()`. The configuration file defines the agent's capabilities, tools, plugins, and optional vector storage setup.
 
 ## Configuration File Structure
 
@@ -17,16 +17,12 @@ agent:
   persistence: "json"
   tools:
     - name: fs
-      root: "/path/to/sandbox"
     - name: git
-      root: "/path/to/repo"
     - name: postgres
       postgresURL: "postgresql://user:password@localhost:5432/mydb"
       mode: "read"
       allowedTables: ["users", "orders"]
       allowedSchemas: ["public"]
-  subagents:
-    reasoning: "deepseek::deepseek-chat"
   plugins:
     - "logger"
     - "todo"
@@ -55,7 +51,6 @@ The `agent` section defines the main agent configuration.
 | `working_dir` | string | No | Working directory for file operations | Absolute or relative path |
 | `persistence` | string | No | Conversation history persistence type | `"json"` or `""` (empty) |
 | `tools` | array | No | List of tool names to enable | See [Tools Configuration](#tools-configuration) |
-| `subagents` | map | No | Map of subagent names to their models | See [Subagents Configuration](#subagents-configuration) |
 | `plugins` | array | No | List of plugin names to enable | See [Plugins Configuration](#plugins-configuration) |
 
 ### Agent Configuration Details
@@ -70,7 +65,6 @@ The `agent` section defines the main agent configuration.
 - **tools**: Array of tool configurations. Tools can be specified as:
   - **Object format** (recommended): `{name: "fs", root: "/path"}` - Allows per-tool configuration
   - **String format** (legacy): `"fs"` - Uses global `working_dir` as fallback
-- **subagents**: Map where keys are subagent names and values are their model specifications.
 - **plugins**: Array of plugin identifiers that extend agent functionality.
 
 ## Tools Configuration
@@ -101,41 +95,57 @@ tools:
 
 ### Available Tools
 
-| Tool Name | Identifier | Description | Configuration Parameters |
-|-----------|------------|-------------|--------------------------|
-| File System Tool | `fs` | File and directory operations (read, write, list, delete) | `root` (required): Root directory path |
-| Git Tool | `git` | Git repository operations (add, commit, push, pull, status, log) | `root` (required): Repository directory path |
-| Web Browser Tool | `web` | Web navigation, automation, and content extraction | `root` (required): Working directory path |
-| Vector DB Tool | `vector` | Semantic search and document indexing | No parameters (requires `vector-storage` section) |
-| PostgreSQL Tool | `postgres` | Secure database operations with parameterized queries | See [PostgreSQL Tool Configuration](#postgresql-tool-configuration) |
+Most tools use `agent.working_dir` as their sandbox (fs roots at `working_dir`, git at `working_dir/repos`, web at `working_dir/web`, etc.). Set `working_dir` in YAML; do not rely on per-tool `root` fields (they are not part of the current `Tool` schema).
+
+| Tool Name | Identifier | Description | YAML parameters |
+|-----------|------------|-------------|-----------------|
+| File System Tool | `fs` | File and directory operations | None (needs `working_dir`) |
+| Git Tool | `git` | Git repository operations | None (needs `working_dir`) |
+| Web Browser Tool | `web` | Web navigation, automation, content extraction | `headless` (optional bool) |
+| API Tool | `api` | REST calls from JSON service definitions | `config_folder` (required): folder of `*.json` configs |
+| Instagram Tool | `instagram` | Instagram Graph API (flat actions) | None; set `INSTAGRAM_ACCESS_TOKEN` in environment |
+| Update Tool | `update` | Runs `update-release.sh` in agent root | None (needs `working_dir`) |
+| Telegram Tool | `telegram` | Bot token registration + ngrok tunnel + `setWebhook` for Localforge | `port` (optional, default `8080`) |
+| Vector DB Tool | `vector` | Semantic search and indexing | None (requires `vector-storage` section) |
+| PostgreSQL Tool | `postgres` | Parameterized SQL | See [PostgreSQL Tool Configuration](#postgresql-tool-configuration) |
+
+Full behaviour and env vars: [docs/TOOLS.md](../../docs/TOOLS.md).
 
 ### Tool Configuration Examples
 
-**File System Tool:**
+**File System / Git / Web (working_dir only):**
 ```yaml
-tools:
-  - name: fs
-    root: "/home/user/sandbox"  # Required: root directory for file operations
+agent:
+  working_dir: "/home/user/agent-data"
+  tools:
+    - name: fs
+    - name: git
+    - name: web
+      # headless: false
 ```
 
-**Git Tool:**
+**API Tool:**
 ```yaml
-tools:
-  - name: git
-    root: "/home/user/my-repo"  # Required: git repository directory
+agent:
+  working_dir: "/home/user/agent-data"
+  tools:
+    - name: api
+      config_folder: "api_specs"   # relative to working_dir or absolute
 ```
 
-**Web Browser Tool:**
+**Telegram dev helper:**
 ```yaml
 tools:
-  - name: web
-    root: "/home/user/downloads"  # Required: working directory for downloads/screenshots
+  - name: telegram
+    port: "8080"
 ```
+
+At runtime, Localforge can receive Telegram webhooks when `TELEGRAM_BOT_TOKEN` is set; **`/new_conversation`** starts a new JSON thread (see [docs/TOOLS.md](../../docs/TOOLS.md#telegram-webhook-threads)).
 
 **Vector DB Tool:**
 ```yaml
 tools:
-  - name: vector  # No additional parameters, requires vector-storage section
+  - name: vector  # requires vector-storage section
 ```
 
 ### PostgreSQL Tool Configuration
@@ -172,37 +182,27 @@ tools:
 - UPDATE operations
 - INSERT operations
 
-## Subagents Configuration
-
-Subagents are specialized agents that can be delegated tasks by the main agent.
-
-| Subagent Name | Identifier | Description | Requirements |
-|---------------|------------|-------------|--------------|
-| Reasoning Agent | `reasoning` | Analyzes questions for ambiguities and assumptions | Model specification required |
-| OS Agent | `os` | Handles OS-level operations and file system tasks | Model specification and `working_dir` required |
-| Git Agent | `git` | Specialized Git repository management | Model specification and `working_dir` required |
-| Web Agent | `web` | Web automation and browser operations | Model specification and `working_dir` required |
-
-### Subagents Details
-
-- **Reasoning Agent**: Analyzes user questions before the main agent responds, helping identify ambiguities, detect assumptions, and guide objective responses.
-- **OS Agent**: Handles file system operations and OS-related tasks within a restricted directory. All paths are validated for security.
-- **Git Agent**: Provides specialized Git repository operations including branch management, commit history, and version control workflows.
-- **Web Agent**: Manages browser sessions for web navigation, form interaction, content extraction, and JavaScript execution.
-
 ## Plugins Configuration
 
 Plugins extend agent functionality with additional features and behaviors.
 
-| Plugin Name | Identifier | Description | Features |
-|-------------|------------|-------------|----------|
-| Logger Plugin | `"logger"` | Configurable output formatting for agent responses | Color-coded output, trace labels, formatted tool execution |
-| Todo Plugin | `"todo"` | Task management and todo list functionality | Create, update, and manage todo items |
+| Identifier | Notes |
+|------------|--------|
+| `logger` | Formatted, color-coded CLI output for responses and tool traces |
+| `todo` | Task list CRUD for the agent |
+| `vault` | Encrypted secret storage under the working directory |
+| `scheduler` | Scheduled jobs |
+| `procedures` | Procedure / checklist manifests |
+| `heartbeat` | Proactive timed agent turns; optional `agent.heartbeat` YAML |
+| `brain` | Memory graph + optional dreaming; omit `brain: false` to keep default on |
+
+See [src/plugins/README.md](../plugins/README.md) and [docs/agents/configuration.md](../../docs/agents/configuration.md).
 
 ### Plugins Details
 
-- **Logger Plugin**: Provides formatted, color-coded output for agent responses, tool executions, and trace information. Enhances readability of agent interactions.
-- **Todo Plugin**: Adds task management capabilities, allowing agents to create, track, and manage todo lists during conversations.
+- **Logger**: Readable terminal output for agent and tool activity.
+- **Todo**: In-conversation task tracking.
+- **Brain**: Loads by default unless `brain: false`; optional `brain_plugin` for dreaming. See configuration docs.
 
 ## Vector Storage Configuration
 
@@ -249,6 +249,7 @@ Models are specified in the format: `provider::model-name`
 | OpenAI | `openai` | `AF_OPENAI_API_KEY` | OpenAI API models |
 | DeepSeek | `deepseek` | `AF_DEEPSEEK_API_KEY` | DeepSeek API models |
 | TogetherAI | `togetherai` | `AF_TOGETHERAI_API_KEY` | TogetherAI API models |
+| OpenRouter | `openrouter` | `AP_OPENROUTER_API_KEY` | OpenAI-compatible chat via [OpenRouter](https://openrouter.ai/) |
 
 ### Example Models
 
@@ -266,6 +267,10 @@ Models are specified in the format: `provider::model-name`
 - `togetherai::Qwen/Qwen2.5-7B-Instruct-Turbo`
 - `togetherai::zai-org/GLM-4.7`
 - `togetherai::moonshotai/Kimi-K2.5`
+
+**OpenRouter** (model id is the OpenRouter slug, e.g. from their model directory):
+- `openrouter::openai/gpt-4o`
+- `openrouter::openai/gpt-4o-mini`
 
 ### Embedding Models
 
@@ -296,17 +301,6 @@ agent:
   tools:
     - "fs"
     - "git"
-```
-
-### Agent with Subagents
-
-```yaml
-agent:
-  name: "reasoning-agent"
-  model: "deepseek::deepseek-chat"
-  subagents:
-    reasoning: "deepseek::deepseek-chat"
-    os: "deepseek::deepseek-chat"
 ```
 
 ### Agent with Vector Storage
@@ -436,11 +430,6 @@ agent:
     - "web"
     - "vector"
     - "postgres"
-  subagents:
-    reasoning: "deepseek::deepseek-chat"
-    os: "deepseek::deepseek-chat"
-    git: "deepseek::deepseek-chat"
-    web: "deepseek::deepseek-chat"
   plugins:
     - "logger"
     - "todo"
@@ -480,6 +469,7 @@ The following environment variables are required for LLM providers:
 - `AF_OPENAI_API_KEY`: OpenAI API key
 - `AF_DEEPSEEK_API_KEY`: DeepSeek API key
 - `AF_TOGETHERAI_API_KEY`: TogetherAI API key
+- `AP_OPENROUTER_API_KEY`: OpenRouter API key (uses the `AP_` prefix; required for `openrouter::...` models)
 
 Set these in your `.env` file or as system environment variables.
 
@@ -490,7 +480,7 @@ The builder validates configuration files and will return errors for:
 - Missing required fields (`name`, `model`)
 - Invalid model format (must be `provider::model-name`)
 - Invalid persistence type (must be `"json"` or empty)
-- Missing requirements for tools/subagents (e.g., `working_dir` for file system tools)
+- Missing requirements for tools (e.g., `working_dir` for file system tools)
 - Invalid vector storage configuration
 
 ## See Also

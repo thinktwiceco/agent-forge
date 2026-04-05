@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"strings"
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/history"
@@ -69,8 +70,22 @@ func (a *Agent) createHistory(chatId string) history.Manager {
 	return a.historyFactory(chatId)
 }
 
-// injectSystemPrompt adds the system prompt to the history.
+// injectSystemPrompt adds the system prompt to the history, optionally prepending
+// memoryPrefixProvider output (e.g. MEMORY.md). If history already has a system
+// message (resumed chat), it is replaced so the prefix stays fresh each turn.
 func (a *Agent) injectSystemPrompt(hm history.Manager) []*llms.UnifiedMessage {
-	hm.AddSystemMessage(a.systemPrompt)
+	full := a.systemPrompt
+	if a.memoryPrefixProvider != nil {
+		if prefix := strings.TrimSpace(a.memoryPrefixProvider()); prefix != "" {
+			full = "[SHORT_TERM_MEMORY]\n" + prefix + "\n\n" + full
+		}
+	}
+	messages := hm.Messages()
+	if len(messages) > 0 && messages[0].Role() == llms.MessageRoleSystem {
+		newMsgs := append([]*llms.UnifiedMessage{llms.SystemMessage(full)}, messages[1:]...)
+		hm.SetMessages(newMsgs)
+	} else {
+		hm.AddSystemMessage(full)
+	}
 	return hm.Messages()
 }

@@ -17,6 +17,7 @@ var knownProviders = []ProviderConfig{
 	{EnvKey: "AF_OPENAI_API_KEY", Label: "OpenAI", Group: "llm"},
 	{EnvKey: "AF_TOGETHERAI_API_KEY", Label: "TogetherAI", Group: "llm"},
 	{EnvKey: "AF_DEEPSEEK_API_KEY", Label: "DeepSeek", Group: "llm"},
+	{EnvKey: "AP_OPENROUTER_API_KEY", Label: "OpenRouter", Group: "llm"},
 	{EnvKey: "AF_BRAVE_API_KEY", Label: "Brave Search", Group: "llm"},
 	{EnvKey: "INSTAGRAM_ACCESS_TOKEN", Label: "Instagram", Group: "messaging"},
 	{EnvKey: "TELEGRAM_BOT_TOKEN", Label: "Telegram", Group: "messaging"},

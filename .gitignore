@@ -90,3 +90,7 @@ ShelfCycle/
 TEST/cmd/localforge/delegation-test.txt
 cmd/localforge/web/
 !.env.template
+
+HEARTBEAT.md
+cmd/localforge/brain/
+api_config/

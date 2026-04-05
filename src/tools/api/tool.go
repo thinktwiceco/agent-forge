@@ -35,14 +35,14 @@ func (w *apiToolWrapper) ServiceNames() []string {
 // The returned value also implements ServiceProvider for service discovery.
 func NewApiTool(name string, services map[string]ServiceConfig, repositoryDir, workingDir string) ServiceProvider {
 	a := &Api{name: name, services: services, repositoryDir: repositoryDir, workingDir: workingDir}
-	t := &core.Tool{
+	t := core.NewTool(core.ToolConfig{
 		Name:                name,
 		Description:         a.generateDescription(),
 		AdvanceDesc:         a.generateAdvancedDescription(),
 		TroubleshootingInfo: a.generateTroubleshootingInfo(),
 		Parameters:          a.generateParameters(),
 		Handler:             a.handler,
-	}
+	})
 	return &apiToolWrapper{Tool: t, a: a}
 }
 

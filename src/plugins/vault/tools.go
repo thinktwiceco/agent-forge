@@ -15,7 +15,7 @@ const (
 )
 
 func newSaveSecretTool(p *VaultPlugin) llms.Tool {
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        saveSecretTool,
 		Description: "Encrypts a secret value and stores it in the vault under the given key. Use this to securely persist API keys, passwords, or any sensitive information.",
 		AdvanceDesc: `Advanced Details:
@@ -58,11 +58,11 @@ func newSaveSecretTool(p *VaultPlugin) llms.Tool {
 
 			return core.NewSuccessResponse(fmt.Sprintf("Secret '%s' saved successfully", key))
 		},
-	}
+	})
 }
 
 func newDeleteSecretTool(p *VaultPlugin) llms.Tool {
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        deleteSecretTool,
 		Description: "Deletes a secret from the vault by its key. The encrypted value is permanently removed from disk.",
 		AdvanceDesc: `Advanced Details:
@@ -91,11 +91,11 @@ func newDeleteSecretTool(p *VaultPlugin) llms.Tool {
 
 			return core.NewSuccessResponse(fmt.Sprintf("Secret '%s' deleted successfully", key))
 		},
-	}
+	})
 }
 
 func newListSecretsTool(p *VaultPlugin) llms.Tool {
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        listSecretsTool,
 		Description: "Lists all secret keys stored in the vault. Returns only the key identifiers, never the secret values.",
 		AdvanceDesc: `Advanced Details:
@@ -115,5 +115,5 @@ func newListSecretsTool(p *VaultPlugin) llms.Tool {
 
 			return core.NewEphemeralResponse(string(data))
 		},
-	}
+	})
 }

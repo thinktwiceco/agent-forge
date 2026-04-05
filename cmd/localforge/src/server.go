@@ -30,12 +30,13 @@ type Server struct {
 	convRegistry     *ConversationRegistry
 	pushRegistry     *PushRegistry
 	providerRegistry *ProviderRegistry
-	knowledgeDB      *sql.DB // opened once at startup; nil if DB not yet available
+	brainDB          *sql.DB // opened once at startup; nil if DB not yet available
 	devMode          bool
 	appDir           string
 	staticFS         fs.FS
 	authConfig       localauth.Config
 	sessionStore     *localauth.SessionStore
+	telegramThreads  *TelegramThreadStore
 }
 
 func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoManager, devMode bool, appDir string) *Server {
@@ -53,7 +54,13 @@ func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoMa
 
 	// Register Telegram provider if token exists
 	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
-		providerRegistry.Register(providers.NewTelegramProvider(token))
+		var allowedIDs []string
+		if raw := os.Getenv("TELEGRAM_ALLOWED_CHAT_IDS"); raw != "" {
+			for _, id := range strings.Split(raw, ",") {
+				allowedIDs = append(allowedIDs, strings.TrimSpace(id))
+			}
+		}
+		providerRegistry.Register(providers.NewTelegramProvider(token, allowedIDs))
 	}
 
 	server := &Server{
@@ -68,6 +75,7 @@ func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoMa
 		appDir:           appDir,
 		authConfig:       authConfig,
 		sessionStore:     localauth.NewSessionStore(),
+		telegramThreads:  NewTelegramThreadStore(telegramThreadMapPath(configMgr)),
 	}
 
 	staticFS, err := server.staticFileSystem()
@@ -79,27 +87,27 @@ func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoMa
 		server.sessionStore.StartCleanup(time.Hour)
 	}
 
-	// Open the knowledge DB once so all handlers share a connection pool.
-	// If the DB file doesn't exist yet we leave knowledgeDB nil and handlers
+	// Open the brain DB once so all handlers share a connection pool.
+	// If the DB file doesn't exist yet we leave brainDB nil and handlers
 	// that need it will return an appropriate error.
-	if db, err := openKnowledgeDB(configMgr); err != nil {
-		log.Printf("knowledge DB not available at startup (will retry per-request): %v", err)
+	if db, err := openBrainDB(configMgr); err != nil {
+		log.Printf("brain DB not available at startup (will retry per-request): %v", err)
 	} else {
-		server.knowledgeDB = db
+		server.brainDB = db
 	}
 
 	server.setupRoutes()
 	return server
 }
 
-// openKnowledgeDB opens the SQLite knowledge database using settings from the config.
-func openKnowledgeDB(configMgr *ConfigManager) (*sql.DB, error) {
+// openBrainDB opens the SQLite brain database using settings from the config.
+func openBrainDB(configMgr *ConfigManager) (*sql.DB, error) {
 	cfg := configMgr.GetConfig()
 	workingDir := cfg.Agent.WorkingDir
 	if workingDir == "" {
 		workingDir = "."
 	}
-	dbPath := filepath.Join(workingDir, "knowledge", "knowledge.db")
+	dbPath := filepath.Join(workingDir, "brain", "brain.db")
 	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_foreign_keys=1")
 	if err != nil {
 		return nil, err
@@ -109,6 +117,46 @@ func openKnowledgeDB(configMgr *ConfigManager) (*sql.DB, error) {
 		return nil, err
 	}
 	return db, nil
+}
+
+// knownTelegramChatIDs returns all Telegram chat IDs we have ever communicated with.
+// It merges two sources: the TelegramThreadStore (explicit /new_conversation sessions)
+// and conversation files named webhook-telegram-<chatID>.json (default session IDs).
+func (s *Server) knownTelegramChatIDs() []string {
+	seen := make(map[string]struct{})
+	var ids []string
+
+	add := func(id string) {
+		if id == "" {
+			return
+		}
+		if _, ok := seen[id]; !ok {
+			seen[id] = struct{}{}
+			ids = append(ids, id)
+		}
+	}
+
+	for _, id := range s.telegramThreads.KnownChatIDs() {
+		add(id)
+	}
+
+	cfg := s.configMgr.GetConfig()
+	workingDir := cfg.Agent.WorkingDir
+	if workingDir == "" {
+		workingDir = "."
+	}
+	agentName := cfg.Agent.Name
+	convDir := filepath.Join(workingDir, "data", "conversations", agentName)
+	entries, _ := os.ReadDir(convDir)
+	for _, e := range entries {
+		name := e.Name()
+		if !strings.HasPrefix(name, "webhook-telegram-") || !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		chatID := strings.TrimSuffix(strings.TrimPrefix(name, "webhook-telegram-"), ".json")
+		add(chatID)
+	}
+	return ids
 }
 
 func (s *Server) staticFileSystem() (fs.FS, error) {
@@ -164,7 +212,6 @@ func (s *Server) setupRoutes() {
 	api.PUT("/config", s.handleUpdateAgentConfig)
 	api.PUT("/config/tools/:toolName", s.handleUpdateToolConfig)
 	api.PUT("/config/plugins", s.handleUpdatePlugins)
-	api.PUT("/config/subagents", s.handleUpdateSubagents)
 	api.GET("/config/providers", s.handleGetProviders)
 	api.PUT("/config/providers", s.handleUpdateProviders)
 	api.POST("/agent/reload", s.handleReload)
@@ -192,8 +239,8 @@ func (s *Server) Run(port string) error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	if s.knowledgeDB != nil {
-		_ = s.knowledgeDB.Close()
+	if s.brainDB != nil {
+		_ = s.brainDB.Close()
 	}
 	if s.httpSrv == nil {
 		return nil

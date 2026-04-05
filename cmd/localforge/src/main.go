@@ -8,11 +8,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/joho/godotenv"
 	agentforge "github.com/thinktwiceco/agent-forge/src"
+	"github.com/thinktwiceco/agent-forge/src/core"
 )
 
 func main() {
@@ -58,8 +60,41 @@ func main() {
 
 	server := NewServer(agentMgr, configMgr, todoMgr, *devMode, appDir)
 
-	// Route background-drain chunks (sub-agent responses) to the push SSE endpoint.
-	agentMgr.SetChunkRouter(server.pushRegistry.Push)
+	// Route background-drain chunks to the push SSE endpoint.
+	// Heartbeat turns go to the fixed "heartbeat-live" push channel so the web
+	// client can maintain a permanent subscription for them.
+	agentMgr.SetChunkRouter(func(chatId string, chunk core.ExtendedChunkResponse) {
+		if strings.HasPrefix(chatId, "heartbeat-") {
+			server.pushRegistry.Push("heartbeat-live", chunk)
+			return
+		}
+		server.pushRegistry.Push(chatId, chunk)
+	})
+
+	// After each heartbeat turn, send the full response to all known Telegram recipients.
+	// Recipients are discovered from conversation files and the telegram thread store —
+	// no TELEGRAM_ALLOWED_CHAT_IDS env var required.
+	agentMgr.SetTurnCompleteRouter(func(chatId, fullContent string) {
+		if !strings.HasPrefix(chatId, "heartbeat-") {
+			return
+		}
+		log.Printf("[heartbeat] turn complete for %s (content len=%d)", chatId, len(fullContent))
+		tp := server.providerRegistry.Get("telegram")
+		if tp == nil {
+			log.Printf("[heartbeat] no telegram provider registered — skipping broadcast")
+			return
+		}
+		recipients := server.knownTelegramChatIDs()
+		log.Printf("[heartbeat] broadcasting to %d telegram recipient(s): %v", len(recipients), recipients)
+		ctx := context.Background()
+		for _, recipientID := range recipients {
+			if err := tp.SendMessage(ctx, recipientID, fullContent); err != nil {
+				log.Printf("[heartbeat] telegram send to %s failed: %v", recipientID, err)
+			} else {
+				log.Printf("[heartbeat] telegram send to %s OK", recipientID)
+			}
+		}
+	})
 
 	shutdownCh := make(chan os.Signal, 1)
 	signal.Notify(shutdownCh, syscall.SIGINT, syscall.SIGTERM)

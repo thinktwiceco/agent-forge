@@ -59,7 +59,7 @@ func TestNewWebTool(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	tool := NewWebTool(tmpDir)
+	tool := NewWebTool(tmpDir, nil)
 	if tool.GetName() != "web_browser" {
 		t.Errorf("Expected tool name 'web_browser', got '%s'", tool.GetName())
 	}

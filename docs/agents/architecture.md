@@ -13,7 +13,6 @@ graph TB
     agents --> context[src/agents/context]
     agents --> prompts[src/agents/prompts]
     agents --> handlers[src/agents/handlers]
-    agents --> system[src/agents/system]
     agents --> tools[src/tools]
     
     tools --> fs[tools/fs]
@@ -21,7 +20,13 @@ graph TB
     tools --> postgres[tools/postgres]
     tools --> api[tools/api]
     tools --> web[tools/web]
-    tools --> vector[tools/vector]
+    tools --> image[tools/image]
+    tools --> instagram[tools/instagram]
+    tools --> telegram[tools/telegram]
+    tools --> meta[tools/meta]
+    tools --> expand[tools/expand]
+    tools --> update[tools/update]
+    tools --> spawn[tools/spawn]
 ```
 
 ## Key Packages
@@ -32,19 +37,18 @@ graph TB
 - `src/agents/context/` - Context management & truncation strategies
 - `src/agents/prompts/` - Prompt building
 - `src/agents/handlers/` - System event handlers
-- `src/agents/system/` - System agent templates
 
 **Extracted Packages (Reusable):**
 - `src/history/` - Conversation history management
 - `src/telemetry/` - Observability (tool execution, tokens, truncation)
 
 **Core Abstractions:**
-- `src/core/` - Core interfaces (SubAgent, Plugin, Tool)
+- `src/core/` - Core interfaces (Plugin, Tool, Executable)
 - `src/llms/` - LLM engine implementations
 
 **Extensions:**
-- `src/tools/` - Built-in tools (fs, git, postgres, api, web, vector)
-- `src/plugins/` - Plugin system (logger, todo, vault, procedures, knowledge, scheduler)
+- `src/tools/` - Built-in tools (fs, git, postgres, api, web, image, instagram, telegram, meta, expand, update, spawn)
+- `src/plugins/` - Plugin system (logger, todo, vault, procedures, scheduler, heartbeat, brain)
 
 ## Import Patterns
 

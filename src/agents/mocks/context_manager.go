@@ -14,7 +14,6 @@ type MockContextManager struct {
 	TruncateHistoryFunc func(messages []*llms.UnifiedMessage) []*llms.UnifiedMessage
 	UpdateConfigFunc    func(config interface{})
 	UpdateToolsFunc     func(tools []llms.Tool)
-	UpdateSubAgentsFunc func(agents []core.SubAgent)
 }
 
 // Ensure MockContextManager implements agents.ContextManager
@@ -29,7 +28,6 @@ func (m *MockContextManager) Context() *core.AgentContext {
 		Trace:          "mock-trace",
 		Model:          "mock-model",
 		Tools:          []llms.Tool{},
-		SubAgents:      []core.SubAgent{},
 		SessionStorage: make(map[string]any),
 		PluginFields:   make(map[string]any),
 	}
@@ -46,7 +44,6 @@ func (m *MockContextManager) BuildContext(responseCh *core.ResponseCh) map[strin
 		"model":          "mock-model",
 		"responseCh":     responseCh,
 		"tools":          []llms.Tool{},
-		"subAgents":      []core.SubAgent{},
 		"sessionStorage": make(map[string]any),
 		"pluginFields":   make(map[string]any),
 	}
@@ -76,11 +73,5 @@ func (m *MockContextManager) UpdateConfig(config interface{}) {
 func (m *MockContextManager) UpdateTools(tools []llms.Tool) {
 	if m.UpdateToolsFunc != nil {
 		m.UpdateToolsFunc(tools)
-	}
-}
-
-func (m *MockContextManager) UpdateSubAgents(agents []core.SubAgent) {
-	if m.UpdateSubAgentsFunc != nil {
-		m.UpdateSubAgentsFunc(agents)
 	}
 }

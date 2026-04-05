@@ -16,7 +16,7 @@ type MockHistoryManager struct {
 	MessagesFunc                         func() []*llms.UnifiedMessage
 	SetMessagesFunc                      func(messages []*llms.UnifiedMessage)
 	ChatIdFunc                           func() string
-	SaveFunc                             func() string
+	SaveFunc                             func() (string, error)
 	LoadFunc                             func(chatId string) error
 }
 
@@ -79,11 +79,11 @@ func (m *MockHistoryManager) ChatId() string {
 	return ""
 }
 
-func (m *MockHistoryManager) Save() string {
+func (m *MockHistoryManager) Save() (string, error) {
 	if m.SaveFunc != nil {
 		return m.SaveFunc()
 	}
-	return ""
+	return "", nil
 }
 
 func (m *MockHistoryManager) Load(chatId string) error {

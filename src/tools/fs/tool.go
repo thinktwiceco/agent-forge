@@ -75,7 +75,7 @@ func NewFsTool(dir string) llms.Tool {
 		}
 	}
 
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        "fs",
 		Description: "Perform file system operations (read, write, delete, list, ripgrep) on files within a restricted directory.",
 		AdvanceDesc: `Advanced Details:
@@ -310,5 +310,5 @@ func NewFsTool(dir string) llms.Tool {
 			// This should never be reached, but included for completeness
 			return core.NewErrorResponse(fmt.Sprintf("unhandled operation: %s", operation))
 		},
-	}
+	})
 }

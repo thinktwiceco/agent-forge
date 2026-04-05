@@ -22,7 +22,7 @@ The `Config` struct contains system-wide settings loaded from environment variab
 The `AgentConfig` struct configures individual agents. Use the [Builder Pattern](AGENT_BUILDER.md) for easier construction:
 
 ### Required Fields
-- `LLMEngine`: The LLM engine (OpenAI, DeepSeek, TogetherAI, etc.)
+- `LLMEngine`: The LLM engine (OpenAI, DeepSeek, TogetherAI, OpenRouter, etc.)
 - `AgentName`: Unique identifier for the agent
 
 ### Optional Fields
@@ -38,13 +38,16 @@ The `AgentConfig` struct configures individual agents. Use the [Builder Pattern]
 - `MainAgent`: Mark as main coordinator (default: `false`)
 - `Tone`: Response tone (`ToneKeepItShort`, `ToneSystemAgent`, or empty)
 - `CanExpand`: Enable expand tool for discovering capabilities (default: `true`)
-- `Reasoning`: Enable reasoning sub-agent (default: `false`)
-
-#### Tools & Sub-Agents
+#### Tools & plugins
 - `Tools`: List of tools available to the agent
-- `SubAgents`: List of sub-agents for delegation
 - `Plugins`: List of plugins to load
 - `MaxToolIterations`: Max tool execution iterations (default: `30`)
+
+For YAML-based agent config (`builder.Config`):
+
+- **Heartbeat:** optional `agent.heartbeat` (`every`, `prompt`, `ack_max_chars`, `active_hours`) when `heartbeat` is listed under `plugins`. See [docs/agents/configuration.md](agents/configuration.md#heartbeat-plugin-yaml).
+- **Brain:** loaded by default; `brain: false` opts out. Optional `agent.brain_plugin` sets `dream` (`on`/`off`) and `dreamTime` (local `HH:MM` when pending conversations are distilled). Distillation writes graph + `brain/persistence/` only when the model returns full retainable fields; see [docs/agents/configuration.md](agents/configuration.md#brain-plugin-yaml) and [src/plugins/README.md](../src/plugins/README.md#brain-plugin).
+- **Spawn subagent:** optional `agent.spawn_subagent: true` enables the built-in `spawn_subagent` tool. See [docs/agents/how-to-system-agents.md](agents/how-to-system-agents.md#ephemeral-subagents-spawn_subagent).
 
 #### History & Persistence
 - `Persistence`: Persistence layer (`"json"` or `""` for none)
@@ -182,6 +185,12 @@ AF_LOG_LEVEL=INFO
 
 # Optional: stream logs to a file (in addition to stdout)
 # AF_LOG_FILE=logs/app.log
+
+# Optional: LLM providers (set the keys you use)
+# AF_OPENAI_API_KEY=
+# AF_DEEPSEEK_API_KEY=
+# AF_TOGETHERAI_API_KEY=
+# AP_OPENROUTER_API_KEY=
 ```
 
 ## Adding New Configuration Fields

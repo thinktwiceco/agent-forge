@@ -1,4 +1,4 @@
-# Minimal agent configuration - customize as needed
+# Minimal agent configuration — customize as needed
 agent:
   name: "$AGENT_NAME"
   system_prompt: |
@@ -8,14 +8,11 @@ agent:
   persistence: "json"
   tools:
     - name: fs
-    - name: git
-    - name: postgres
-  subagents:
-    reasoning: "deepseek::deepseek-chat"
-    web: "togetherai::MiniMaxAI/MiniMax-M2.5"
+    - name: web
+      # headless: true   # optional; default from WEB_TOOL_HEADLESS or true
+  # Optional: spawn_subagent tool for ephemeral child agents (subset of parent tools)
+  # spawn_subagent: true
+  # brain loads by default. To disable: brain: false
   plugins:
     - "todo"
-    - "knowledge"
-    - "procedures"
     - "vault"
-

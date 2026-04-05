@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/thinktwiceco/agent-forge/src/agents"
+	"github.com/thinktwiceco/agent-forge/src/agents/execution"
 	"github.com/thinktwiceco/agent-forge/src/agents/mocks"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/history"
@@ -113,14 +114,14 @@ func Example_interfaceBasedTesting() {
 
 	// Create a mock execution engine that simulates successful tool execution
 	mockExecutor := &mocks.MockExecutionEngine{
-		ExecuteChatWithToolsFunc: func(ctx context.Context, hm history.Manager, responseCh *core.ResponseCh) error {
+		ExecuteChatWithToolsFunc: func(ctx context.Context, hm history.Manager, responseCh *core.ResponseCh) (execution.ExecuteResult, error) {
 			// Simulate a simple response without actual LLM call
 			hm.AddAssistantMessage("Test response", history.TokenUsage{
 				PromptTokens:     10,
 				CompletionTokens: 5,
 				TotalTokens:      15,
 			})
-			return nil
+			return execution.ExecuteResult{}, nil
 		},
 	}
 
@@ -137,7 +138,7 @@ func Example_interfaceBasedTesting() {
 
 	// Test the executor with mock dependencies
 	ctx := context.Background()
-	err := mockExecutor.ExecuteChatWithTools(ctx, mockHistory, nil)
+	_, err := mockExecutor.ExecuteChatWithTools(ctx, mockHistory, nil)
 
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -163,16 +164,4 @@ func Example_interfaceComposition() {
 	// This pattern allows for flexible component swapping and testing
 	fmt.Println("Interfaces enable flexible component composition")
 	// Output: Interfaces enable flexible component composition
-}
-
-// ExampleSubAgent_composition demonstrates the SubAgent interface composition.
-// SubAgent is composed from Identifier, Discoverable, and Executable.
-// Use the smaller interfaces when only a subset of capabilities is needed.
-func ExampleSubAgent_composition() {
-	// Agent implements all three: Identifier, Executable, and full SubAgent
-	// Use core.Identifier when only Name() is needed
-	// Use core.Executable when only ChatStream is needed
-	// Use core.SubAgent when the full contract is required
-	fmt.Println("SubAgent composes Identifier, Discoverable, and Executable")
-	// Output: SubAgent composes Identifier, Discoverable, and Executable
 }
