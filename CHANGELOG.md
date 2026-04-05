@@ -1,5 +1,3 @@
-## [Unreleased]
-
 ## [0.7.0] - 2026-04-05
 
 Summary: working tree vs `HEAD` (v0.6.2) — ~192 files, large net deletion from removed plugins/subagent stack; new spawn, Telegram, heartbeat, and web automation pieces.
@@ -39,6 +37,7 @@ Summary: working tree vs `HEAD` (v0.6.2) — ~192 files, large net deletion from
 
 ## [0.6.0] - 2026-03-07
 - [3ed2764](http://github.com/thinktwiceco/agent-forge/commit/3ed276486c13872649373f751ec2302d87a4eef4) - feat(agents!): parallel tool execution, context truncation, ModelInfo
+
 
 ## [0.4.14] - 2026-03-04
 - [94495fe](http://github.com/thinktwiceco/agent-forge/commit/94495feb91cd2f90dc093b930e096ef7822c60f6) - chore(release): prepare release v0.4.14 (#38)
