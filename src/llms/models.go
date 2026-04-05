@@ -3,6 +3,7 @@ package llms
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -11,6 +12,29 @@ type ToolCall struct {
 	ID        string         `json:"id"`        // Tool call ID
 	Name      string         `json:"name"`      // Tool name
 	Arguments map[string]any `json:"arguments"` // Tool arguments
+}
+
+// ResolveToolNameForTools maps a model-emitted tool name to a registered tool name.
+// Some providers (e.g. Groq) stream names in fragments; a stray trailing ">" can appear
+// and must match the real tool (e.g. memory_read_short_term> -> memory_read_short_term).
+func ResolveToolNameForTools(requested string, tools []Tool) string {
+	if requested == "" || len(tools) == 0 {
+		return requested
+	}
+	for _, t := range tools {
+		if t.GetName() == requested {
+			return requested
+		}
+	}
+	trimmed := strings.TrimSuffix(requested, ">")
+	if trimmed != requested {
+		for _, t := range tools {
+			if t.GetName() == trimmed {
+				return trimmed
+			}
+		}
+	}
+	return requested
 }
 
 // ToolResult represents the result of a tool execution.

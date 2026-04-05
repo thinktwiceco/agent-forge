@@ -17,7 +17,9 @@ func validateAction(value any) error {
 		"fill":          true,
 		"fill_secret":   true,
 		"get_content":   true,
+		"get_snapshot":  true,
 		"save_content":  true,
+		"fetch":         true,
 		"web_search":    true,
 		"upload_file":   true,
 		"refresh":       true,
@@ -25,7 +27,7 @@ func validateAction(value any) error {
 		"close_session": true,
 	}
 	if !validActions[action] {
-		return fmt.Errorf("invalid action: %s. Must be one of: open_session, navigate, click, fill, fill_secret, get_content, save_content, web_search, upload_file, refresh, list_sessions, close_session", action)
+		return fmt.Errorf("invalid action: %s. Must be one of: open_session, navigate, click, fill, fill_secret, get_content, get_snapshot, save_content, fetch, web_search, upload_file, refresh, list_sessions, close_session", action)
 	}
 	return nil
 }

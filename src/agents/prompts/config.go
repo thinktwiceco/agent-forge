@@ -1,9 +1,6 @@
 package prompts
 
-import (
-	"github.com/thinktwiceco/agent-forge/src/core"
-	"github.com/thinktwiceco/agent-forge/src/llms"
-)
+import "github.com/thinktwiceco/agent-forge/src/llms"
 
 // Config holds configuration for prompt building.
 type Config struct {
@@ -11,5 +8,4 @@ type Config struct {
 	MainAgent    bool
 	Tone         string
 	Tools        []llms.Tool
-	SubAgents    []core.SubAgent
 }

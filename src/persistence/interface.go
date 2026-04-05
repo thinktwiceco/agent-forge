@@ -4,7 +4,7 @@ import "github.com/thinktwiceco/agent-forge/src/llms"
 
 // Persistence interface defines methods for saving and retrieving conversation history
 type Persistence interface {
-	SaveHistory(chatId string, history []*llms.UnifiedMessage) string
+	SaveHistory(chatId string, history []*llms.UnifiedMessage) (string, error)
 	GetHistory(chatId string, limit, offset int) []*llms.UnifiedMessage
 }
 
@@ -12,4 +12,5 @@ type Persistence interface {
 type ConversationMetadata interface {
 	GetTitle(chatId string) string
 	SetTitle(chatId string, title string) error
+	DeleteTitle(chatId string) error
 }

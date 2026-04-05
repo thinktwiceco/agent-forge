@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // InstagramProvider implements the Provider interface for Instagram messaging
 type InstagramProvider struct {
 	accessToken string
 	apiVersion  string
+	client      *http.Client
 }
 
 // NewInstagramProvider creates a new Instagram provider
@@ -19,6 +21,7 @@ func NewInstagramProvider(accessToken string) *InstagramProvider {
 	return &InstagramProvider{
 		accessToken: accessToken,
 		apiVersion:  "v18.0",
+		client:      &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -89,8 +92,7 @@ func (p *InstagramProvider) SendMessage(ctx context.Context, recipient string, m
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", p.accessToken))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}

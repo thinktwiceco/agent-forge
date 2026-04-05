@@ -27,6 +27,16 @@ const conversationManager = new ConversationManager(appState, chatManager);
 const todoManager = new TodoManager();
 const fsManager = new FileSystemManager();
 
+function setupSidebarNavActive() {
+  const path = (window.location.pathname || "/").replace(/\/$/, "") || "/";
+  document.querySelectorAll(".sidebar-nav-item").forEach((el) => {
+    const href = el.getAttribute("href");
+    if (!href) return;
+    const hrefPath = href.replace(/\/$/, "") || "/";
+    if (path === hrefPath) el.classList.add("active");
+  });
+}
+
 async function loadAgentName() {
   try {
     const res = await fetch("/api/config");
@@ -35,18 +45,31 @@ async function loadAgentName() {
     appState.agentName = cfg.name || null;
     const nameLabel = document.getElementById("agent-name-label");
     if (nameLabel && cfg.name) nameLabel.textContent = cfg.name;
+    const welcomeTitle = document.getElementById("welcome-agent-name");
+    if (welcomeTitle && cfg.name) welcomeTitle.textContent = cfg.name;
     if (cfg.name) document.title = cfg.name;
+    return cfg;
   } catch {
     // non-critical
   }
+  return null;
 }
 
 async function bootstrap() {
   await setupAuthUI();
-  await loadAgentName();
+  setupSidebarNavActive();
+  const cfg = await loadAgentName();
   await conversationManager.refreshList();
   conversationManager.bindNewChat();
-  todoManager.start();
+
+  // Only poll todos when the todo plugin is active.
+  const plugins = cfg?.plugins || [];
+  if (plugins.includes("todo")) {
+    todoManager.start();
+  }
+
+  // Start permanent heartbeat listener so autonomous agent turns are always visible.
+  chatManager.startHeartbeatListener();
 
   if (appState.conversationId) {
     await chatManager.loadConversation(appState.conversationId);

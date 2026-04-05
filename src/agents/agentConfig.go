@@ -27,7 +27,7 @@ type AgentConfig struct {
 	Description string
 
 	// AdvanceDescription is detailed information about the agent's capabilities,
-	// tools, sub-agents, and usage patterns.
+	// tools, and usage patterns.
 	AdvanceDescription string
 
 	// Troubleshooting provides common issues, debugging tips, and configuration guidance.
@@ -36,15 +36,17 @@ type AgentConfig struct {
 	// Trace is optional trace information (e.g., "thinking", "response").
 	Trace string
 
-	// Reasoning indicates whether reasoning mode is enabled.
-	// This parameter is reserved for future use.
-	Reasoning bool
-
 	// Can Expand indicates whether the agent can exapnd description of tools
 	// or other agents. Each agent and tool has some more detailed descriptions
 	// that are not included in the basic description.
 	// This parameter will default to true
 	CanExpand bool
+
+	// CanSpawnSubagent enables the spawn_subagent built-in tool.
+	// When true, the agent can delegate tasks to ephemeral subagents that share
+	// the same LLM engine and a subset of the parent's tools.
+	// Defaults to false.
+	CanSpawnSubagent bool
 
 	// SystemPrompt is the system prompt to use for the agent.
 	SystemPrompt string
@@ -62,7 +64,7 @@ type AgentConfig struct {
 	MainAgent bool
 
 	// Tone specifies the response tone for the main agent.
-	// Supported values: ToneDefault (""), ToneKeepItShort, ToneSystemAgent
+	// Supported values: ToneDefault (""), ToneKeepItShort, ToneSystemAgent (non-main agents only)
 	// Use constants from the agents package (e.g., agents.ToneKeepItShort)
 	Tone string
 
@@ -75,9 +77,6 @@ type AgentConfig struct {
 	// When set, conversation persistence (json) stores history in WorkingDir/data/conversations/{agentName}.
 	// When empty, persistence uses data/conversations/{agentName} relative to process CWD.
 	WorkingDir string
-
-	// SubAgents is the list of sub-agents available for delegation
-	SubAgents []core.SubAgent
 
 	// DetailsAboutFunc optionally provides per-item discovery. If nil, DetailsAbout returns "Nothing to add about <item>".
 	DetailsAboutFunc func(item string) string
@@ -113,6 +112,10 @@ type AgentConfig struct {
 	// Tracer provides structured observability (tool execution, token usage, truncation).
 	// If nil, defaults to telemetry.NoopTracer.
 	Tracer telemetry.Tracer
+
+	// HeartbeatAckMaxChars matches heartbeat plugin ack_max_chars when the heartbeat plugin is enabled (0 = default 300).
+	// Used by the executor to detect HEARTBEAT_OK ack-only replies.
+	HeartbeatAckMaxChars int
 }
 
 // validate validates that all required fields in AgentConfig are set.
@@ -141,10 +144,6 @@ func (c *AgentConfig) validate() error {
 
 	if c.MaxToolIterations <= 0 {
 		c.MaxToolIterations = defaultMaxToolIterations
-	}
-
-	if c.SubAgents == nil {
-		c.SubAgents = []core.SubAgent{}
 	}
 
 	// Set defaults for context window management

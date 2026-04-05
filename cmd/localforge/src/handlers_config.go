@@ -6,24 +6,49 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// handleGetConfig returns the full agent configuration including subagents and plugins.
+// handleGetConfig returns the full agent configuration including plugins.
 func (s *Server) handleGetConfig(c *gin.Context) {
 	cfg := s.configMgr.GetConfig()
 
 	tools := make([]ToolConfigResponse, 0, len(cfg.Agent.Tools))
 	for _, tool := range cfg.Agent.Tools {
+		var postgresURL, mode string
+		if v, ok := tool.Params["postgresURL"].(string); ok {
+			postgresURL = v
+		}
+		if v, ok := tool.Params["mode"].(string); ok {
+			mode = v
+		}
+
+		var allowedTables, allowedSchemas []string
+		if tables, ok := tool.Params["allowedTables"].([]any); ok {
+			for _, table := range tables {
+				if s, ok := table.(string); ok {
+					allowedTables = append(allowedTables, s)
+				}
+			}
+		}
+		if schemas, ok := tool.Params["allowedSchemas"].([]any); ok {
+			for _, schema := range schemas {
+				if s, ok := schema.(string); ok {
+					allowedSchemas = append(allowedSchemas, s)
+				}
+			}
+		}
+
+		var headless *bool
+		if h, ok := tool.Params["headless"].(bool); ok {
+			headless = &h
+		}
+
 		tools = append(tools, ToolConfigResponse{
 			Name:           tool.Name,
-			PostgresURL:    tool.PostgresURL,
-			Mode:           tool.Mode,
-			AllowedTables:  tool.AllowedTables,
-			AllowedSchemas: tool.AllowedSchemas,
+			PostgresURL:    postgresURL,
+			Mode:           mode,
+			AllowedTables:  allowedTables,
+			AllowedSchemas: allowedSchemas,
+			Headless:       headless,
 		})
-	}
-
-	subagents := make(map[string]string, len(cfg.Agent.Subagents))
-	for role, model := range cfg.Agent.Subagents {
-		subagents[string(role)] = string(model)
 	}
 
 	plugins := cfg.Agent.Plugins
@@ -38,7 +63,6 @@ func (s *Server) handleGetConfig(c *gin.Context) {
 		WorkingDir:   cfg.Agent.WorkingDir,
 		Persistence:  cfg.Agent.Persistence,
 		Tools:        tools,
-		Subagents:    subagents,
 		Plugins:      plugins,
 	}
 	c.JSON(http.StatusOK, response)
@@ -75,21 +99,6 @@ func (s *Server) handleUpdatePlugins(c *gin.Context) {
 	}
 
 	if err := s.configMgr.UpdatePlugins(req.Plugins); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
-
-// handleUpdateSubagents replaces the full subagents map in config.yaml.
-func (s *Server) handleUpdateSubagents(c *gin.Context) {
-	var req UpdateSubagentsRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-
-	if err := s.configMgr.UpdateSubagents(req.Subagents); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

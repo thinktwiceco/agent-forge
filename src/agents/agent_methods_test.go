@@ -35,7 +35,6 @@ func TestAgent_Getters(t *testing.T) {
 		tools:        []llms.Tool{},
 	}
 
-	// Test SubAgent interface methods
 	if a.Name() != "TestAgent" {
 		t.Errorf("Name() = %s, want TestAgent", a.Name())
 	}
@@ -94,46 +93,4 @@ func TestAgent_Initializers(t *testing.T) {
 	// They are private.
 	// We can test public behavior that relies on them.
 	// Or leave it for integration tests.
-}
-
-func TestAgent_SubAgent(t *testing.T) {
-	mockLLM := mocks.NewMockLLMEngine()
-	// Prepare correct arguments
-	config := &AgentConfig{
-		AgentName:   "Sub",
-		Trace:       "sub",
-		Description: "A sub agent",
-		LLMEngine:   mockLLM,
-	}
-	// We need hooks for AddSystemAgent
-	// Manually construct agent with hooks
-	a := NewAgent(config)
-
-	// Create another agent to act as sub-agent
-	subConfig := &AgentConfig{
-		AgentName:   "Child",
-		Trace:       "child",
-		Description: "Child agent",
-		LLMEngine:   mockLLM, // Share mock LLM
-	}
-	sub := NewAgent(subConfig)
-
-	// Convert to interface
-	subInterface := sub.AgentAsSubAgent()
-
-	// Add
-	a.AddSystemAgent(subInterface)
-
-	// Verify it's in the subagents map (private map, but maybe we can query it)
-	// The agent struct has subAgents map[string]SubAgent
-	// But it's private.
-	// We can use GetSystemAgent methods if they exist, or rely on other public side effects.
-	// Looking at agent.go, there is no GetSubAgents public method except as part of Expand/Meta.
-
-	// However, we can check basic successful execution without panic.
-
-	// Check AgentAsSubAgent properties
-	if subInterface.Name() != "Child" {
-		t.Error("SubAgent Name mismatch")
-	}
 }

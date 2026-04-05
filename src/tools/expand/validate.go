@@ -7,10 +7,10 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
-// validateSubjectType ensures that the subject_type is either "tool" or "agent".
+// validateSubjectType ensures that the subject_type is "tool".
 func validateSubjectType(subjectType string) error {
-	if subjectType != "tool" && subjectType != "agent" {
-		return fmt.Errorf("invalid subject_type '%s'. Must be either 'tool' or 'agent'", subjectType)
+	if subjectType != "tool" {
+		return fmt.Errorf("invalid subject_type '%s'. Must be 'tool'", subjectType)
 	}
 	return nil
 }

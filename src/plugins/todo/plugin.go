@@ -84,16 +84,10 @@ func (p *TodoPlugin) SystemPrompt() string {
 	return `
 [TODO]
 - Tool: todo_handler
-- Use with reasoning agent when present
-- Create todo list from user request
-- After adding todos, immediately start working on the first incomplete item without waiting for user input
-- Complete tasks one by one, check as completed, then proceed to the next without pausing
-- Use bulk action to add multiple items
-- Never stop after creating or updating todos — always continue execution until all items are completed
-
-[CLEANUP]
-- Before new todo list: call clearTodos if any todos present
-- After all completed: call clearTodos
+- Use for multi-step work.
+- After creating or updating todos, continue with the first incomplete item without waiting.
+- Complete items one by one until all are done.
+- Clear old todos before starting a new list, and clear the list again after finishing.
 `
 }
 

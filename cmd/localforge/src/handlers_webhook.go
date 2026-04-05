@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/thinktwiceco/agent-forge/cmd/localforge/src/providers"
@@ -65,34 +66,27 @@ func (s *Server) handleWebhook(c *gin.Context) {
 	// Format webhook payload as a message to the agent
 	message := s.formatWebhookMessage(provider, payload)
 
-	// Use a dedicated conversation ID for webhooks (or create a new one per webhook)
-	// Option 1: Shared webhook conversation
-	conversationID := fmt.Sprintf("webhook-%s", provider)
-	// Option 2: New conversation per webhook (comment line above, uncomment below)
-	// conversationID := ""
-
 	agentforge.Debug("Processing webhook from %s: %s", provider, message)
 
-	// Enrich message with metadata
-	enriched := queue.FormatHeaders(message, map[string]string{
-		"sender":   "webhook",
-		"provider": provider,
-	})
-
-	// Start agent processing in the background
-	// For webhooks, we typically don't stream back to the caller
-	// Instead, we acknowledge receipt and process asynchronously
-	// Use context.Background() inside the goroutine so handler return doesn't cancel processing
+	// Start agent processing in the background.
+	// context.Background() is used inside the goroutine so that the HTTP
+	// handler returning does not cancel the ongoing agent processing.
 	go func() {
 		ctx := context.Background()
 		providerInst := s.providerRegistry.Get(provider)
+
+		conversationID := fmt.Sprintf("webhook-%s", provider)
+
+		enriched := queue.FormatHeaders(message, map[string]string{
+			"sender":   "webhook",
+			"provider": provider,
+		})
+
 		if providerInst == nil {
 			agentforge.Debug("No provider registered for %s", provider)
-			// Still process the message but don't send a response
 			responseCh := agent.ChatStream(ctx, enriched, conversationID)
 			stream := responseCh.Start()
 			for range stream {
-				// Drain the stream
 			}
 			return
 		}
@@ -103,18 +97,67 @@ func (s *Server) handleWebhook(c *gin.Context) {
 			return
 		}
 
-		// For Telegram, send initial "processing" message to provide feedback
-		var telegramMessageID int
+		if ap, ok := providerInst.(AllowlistProvider); ok && !ap.IsAllowed(recipientID) {
+			agentforge.Debug("Blocked webhook from %s (chat ID %s not in allowlist)", provider, recipientID)
+			return
+		}
+
 		if provider == "telegram" {
-			if telegramProvider, ok := providerInst.(*providers.TelegramProvider); ok {
-				messageID, err := telegramProvider.SendMessageWithID(ctx, recipientID, "⏳ Processing your request...")
-				if err != nil {
-					agentforge.Debug("Failed to send initial Telegram message: %v", err)
-				} else {
-					telegramMessageID = messageID
-					agentforge.Debug("Sent initial Telegram message with ID %d", messageID)
+			if text, ok := providers.TelegramMessageText(payload); ok && providers.IsTelegramNewConversationCommand(text) {
+				s.telegramThreads.NewSession(recipientID)
+				if err := providerInst.SendMessage(ctx, recipientID, "Started a new conversation. Your next message will use a fresh thread."); err != nil {
+					agentforge.Debug("Failed to send new-conversation ack via %s: %v", provider, err)
+				}
+				return
+			}
+			conversationID = s.telegramThreads.ResolveConversationID(recipientID)
+		} else {
+			conversationID = fmt.Sprintf("webhook-%s-%s", provider, recipientID)
+		}
+
+		// For Telegram callback_query updates, immediately answer the callback to
+		// dismiss the loading spinner on the client side.
+		if tp, ok := providerInst.(*providers.TelegramProvider); ok {
+			if cbq, ok := payload["callback_query"].(map[string]interface{}); ok {
+				if cbqID, ok := cbq["id"].(string); ok && cbqID != "" {
+					if err := tp.AnswerCallbackQuery(ctx, cbqID); err != nil {
+						agentforge.Debug("Failed to answer callback query: %v", err)
+					}
 				}
 			}
+		}
+
+		// For providers that support editable messages, send an immediate
+		// placeholder and start a typing indicator loop, then replace the
+		// placeholder with the final response. Plain providers fall through
+		// to a simple SendMessage.
+		var msgRef string
+		var typingCancel context.CancelFunc
+
+		if ep, ok := providerInst.(EditableProvider); ok {
+			ref, err := ep.SendInitialMessage(ctx, recipientID, "⏳ Processing your request...")
+			if err != nil {
+				agentforge.Debug("Failed to send initial message via %s: %v", provider, err)
+			} else {
+				msgRef = ref
+				agentforge.Debug("Sent initial message via %s (ref=%s)", provider, msgRef)
+			}
+
+			// Typing indicator: Telegram expires it after ~5 s, so refresh every 4 s.
+			typingCtx, cancel := context.WithCancel(ctx)
+			typingCancel = cancel
+			go func() {
+				ticker := time.NewTicker(4 * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-typingCtx.Done():
+						return
+					case <-ticker.C:
+						_ = ep.SendTypingAction(typingCtx, recipientID)
+					}
+				}
+			}()
 		}
 
 		responseCh := agent.ChatStream(ctx, enriched, conversationID)
@@ -126,39 +169,38 @@ func (s *Server) handleWebhook(c *gin.Context) {
 				agentforge.Debug("Webhook processing error: %s", chunk.Content)
 				continue
 			}
-			// Accumulate content chunks only
 			if chunk.Content != "" && chunk.Status != "tool_call" && chunk.Status != "tool_executing" && chunk.Status != "tool_result" {
 				fullResponse.WriteString(chunk.Content)
 			}
 		}
 
-		// Send or edit accumulated response back via provider
-		if fullResponse.Len() > 0 {
-			// For Telegram, edit the initial message if we sent one
-			if provider == "telegram" && telegramMessageID > 0 {
-				if telegramProvider, ok := providerInst.(*providers.TelegramProvider); ok {
-					err := telegramProvider.EditMessage(ctx, recipientID, telegramMessageID, fullResponse.String())
-					if err != nil {
-						agentforge.Debug("Failed to edit Telegram message: %v", err)
-						// Fallback: send as new message
-						err = providerInst.SendMessage(ctx, recipientID, fullResponse.String())
-						if err != nil {
-							agentforge.Debug("Failed to send Telegram message: %v", err)
-						}
-					} else {
-						agentforge.Debug("Successfully edited Telegram message %d", telegramMessageID)
-					}
-					return
-				}
-			}
+		if typingCancel != nil {
+			typingCancel()
+		}
 
-			// For other providers or if edit failed, send as new message
-			err := providerInst.SendMessage(ctx, recipientID, fullResponse.String())
-			if err != nil {
-				agentforge.Debug("Failed to send message via %s: %v", provider, err)
+		if fullResponse.Len() == 0 {
+			return
+		}
+
+		response := fullResponse.String()
+
+		if ep, ok := providerInst.(EditableProvider); ok && msgRef != "" {
+			if err := ep.UpdateMessage(ctx, recipientID, msgRef, response); err != nil {
+				agentforge.Debug("Failed to update message via %s: %v", provider, err)
+				// Fallback to a new message
+				if err := providerInst.SendMessage(ctx, recipientID, response); err != nil {
+					agentforge.Debug("Failed to send fallback message via %s: %v", provider, err)
+				}
 			} else {
-				agentforge.Debug("Successfully sent response to %s via %s", recipientID, provider)
+				agentforge.Debug("Successfully updated message via %s (ref=%s)", provider, msgRef)
 			}
+			return
+		}
+
+		if err := providerInst.SendMessage(ctx, recipientID, response); err != nil {
+			agentforge.Debug("Failed to send message via %s: %v", provider, err)
+		} else {
+			agentforge.Debug("Successfully sent response to %s via %s", recipientID, provider)
 		}
 	}()
 
@@ -172,6 +214,15 @@ func (s *Server) handleWebhook(c *gin.Context) {
 
 // verifyWebhookSignature verifies the webhook signature based on provider
 func (s *Server) verifyWebhookSignature(provider string, body []byte, headers http.Header) error {
+	// Telegram always requires a shared secret; unauthenticated webhooks are rejected.
+	if provider == "telegram" {
+		secret := strings.TrimSpace(os.Getenv("WEBHOOK_SECRET_TELEGRAM"))
+		if secret == "" {
+			return fmt.Errorf("WEBHOOK_SECRET_TELEGRAM is required for Telegram webhooks")
+		}
+		return verifyTelegramSignature(headers.Get("X-Telegram-Bot-Api-Secret-Token"), secret)
+	}
+
 	// Get webhook secret from environment
 	secretEnvVar := fmt.Sprintf("WEBHOOK_SECRET_%s", strings.ToUpper(provider))
 	secret := os.Getenv(secretEnvVar)
@@ -189,8 +240,6 @@ func (s *Server) verifyWebhookSignature(provider string, body []byte, headers ht
 		return verifyStripeSignature(body, headers.Get("Stripe-Signature"), secret)
 	case "instagram":
 		return verifyInstagramSignature(body, headers.Get("X-Hub-Signature-256"), secret)
-	case "telegram":
-		return verifyTelegramSignature(headers.Get("X-Telegram-Bot-Api-Secret-Token"), secret)
 	default:
 		// Generic HMAC-SHA256 verification
 		signature := headers.Get("X-Webhook-Signature")
@@ -448,11 +497,45 @@ func (s *Server) formatInstagramWebhook(payload map[string]interface{}) string {
 	return msg.String()
 }
 
+// formatTelegramSender writes the sender's name/username from a Telegram
+// message map into msg.
+func formatTelegramSender(msg *strings.Builder, message map[string]interface{}) {
+	from, ok := message["from"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	if username, ok := from["username"].(string); ok {
+		fmt.Fprintf(msg, "From: @%s\n", username)
+	} else if firstName, ok := from["first_name"].(string); ok {
+		fmt.Fprintf(msg, "From: %s", firstName)
+		if lastName, ok := from["last_name"].(string); ok {
+			fmt.Fprintf(msg, " %s", lastName)
+		}
+		msg.WriteString("\n")
+	}
+}
+
 // formatTelegramWebhook formats Telegram-specific webhook events
 func (s *Server) formatTelegramWebhook(payload map[string]interface{}) string {
 	var msg strings.Builder
 
-	// Try to get message or edited_message
+	// callback_query — inline keyboard button tap
+	if cbq, ok := payload["callback_query"].(map[string]interface{}); ok {
+		msg.WriteString("(Callback) ")
+		formatTelegramSender(&msg, cbq)
+		if data, ok := cbq["data"].(string); ok {
+			fmt.Fprintf(&msg, "Callback data: %s\n", data)
+		}
+		// Include the original message text for context if present
+		if origMsg, ok := cbq["message"].(map[string]interface{}); ok {
+			if text, ok := origMsg["text"].(string); ok {
+				fmt.Fprintf(&msg, "Original message: %s\n", text)
+			}
+		}
+		return msg.String()
+	}
+
+	// Regular message or edited message
 	var message map[string]interface{}
 	if m, ok := payload["message"].(map[string]interface{}); ok {
 		message = m
@@ -465,22 +548,41 @@ func (s *Server) formatTelegramWebhook(payload map[string]interface{}) string {
 		return "Invalid Telegram payload format"
 	}
 
-	// Extract sender info
-	if from, ok := message["from"].(map[string]interface{}); ok {
-		if username, ok := from["username"].(string); ok {
-			fmt.Fprintf(&msg, "From: @%s\n", username)
-		} else if firstName, ok := from["first_name"].(string); ok {
-			fmt.Fprintf(&msg, "From: %s", firstName)
-			if lastName, ok := from["last_name"].(string); ok {
-				fmt.Fprintf(&msg, " %s", lastName)
-			}
-			msg.WriteString("\n")
-		}
-	}
+	formatTelegramSender(&msg, message)
 
-	// Extract message text
+	// Text message
 	if text, ok := message["text"].(string); ok {
 		fmt.Fprintf(&msg, "Message: %s\n", text)
+		return msg.String()
+	}
+
+	// Media / attachment types — describe them so the agent has context
+	if caption, ok := message["caption"].(string); ok && caption != "" {
+		fmt.Fprintf(&msg, "Caption: %s\n", caption)
+	}
+
+	if _, ok := message["photo"]; ok {
+		msg.WriteString("Message: [user sent a photo]\n")
+	} else if doc, ok := message["document"].(map[string]interface{}); ok {
+		if name, ok := doc["file_name"].(string); ok && name != "" {
+			fmt.Fprintf(&msg, "Message: [user sent a file: %s]\n", name)
+		} else {
+			msg.WriteString("Message: [user sent a file]\n")
+		}
+	} else if _, ok := message["voice"]; ok {
+		msg.WriteString("Message: [user sent a voice message]\n")
+	} else if _, ok := message["video"]; ok {
+		msg.WriteString("Message: [user sent a video]\n")
+	} else if _, ok := message["audio"]; ok {
+		msg.WriteString("Message: [user sent an audio file]\n")
+	} else if _, ok := message["sticker"]; ok {
+		msg.WriteString("Message: [user sent a sticker]\n")
+	} else if loc, ok := message["location"].(map[string]interface{}); ok {
+		lat, _ := loc["latitude"].(float64)
+		lon, _ := loc["longitude"].(float64)
+		fmt.Fprintf(&msg, "Message: [user shared a location: %.6f, %.6f]\n", lat, lon)
+	} else if _, ok := message["contact"]; ok {
+		msg.WriteString("Message: [user shared a contact]\n")
 	}
 
 	return msg.String()
@@ -519,11 +621,38 @@ func (s *Server) handleWebhookSync(c *gin.Context) {
 		return
 	}
 
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	message := s.formatWebhookMessage(provider, payload)
 	conversationID := fmt.Sprintf("webhook-%s", provider)
 
-	ctx, cancel := context.WithCancel(c.Request.Context())
-	defer cancel()
+	providerInst := s.providerRegistry.Get(provider)
+	if providerInst != nil {
+		recipientID, err := providerInst.ExtractRecipient(payload)
+		if err != nil {
+			agentforge.Debug("handleWebhookSync: extract recipient: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "could not extract recipient"})
+			return
+		}
+		if ap, ok := providerInst.(AllowlistProvider); ok && !ap.IsAllowed(recipientID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+		if provider == "telegram" {
+			if text, ok := providers.TelegramMessageText(payload); ok && providers.IsTelegramNewConversationCommand(text) {
+				s.telegramThreads.NewSession(recipientID)
+				if err := providerInst.SendMessage(ctx, recipientID, "Started a new conversation. Your next message will use a fresh thread."); err != nil {
+					agentforge.Debug("handleWebhookSync: send ack: %v", err)
+				}
+				c.JSON(http.StatusOK, gin.H{"status": "accepted", "event": "new_conversation"})
+				return
+			}
+			conversationID = s.telegramThreads.ResolveConversationID(recipientID)
+		} else {
+			conversationID = fmt.Sprintf("webhook-%s-%s", provider, recipientID)
+		}
+	}
 
 	writer := NewSSEWriter(c)
 	writer.SetHeaders()

@@ -32,8 +32,8 @@ func TestTodoPlugin_SystemPrompt(t *testing.T) {
 		t.Error("SystemPrompt() should mention todo_handler tool")
 	}
 
-	if !strings.Contains(prompt, "reasoning agent") {
-		t.Error("SystemPrompt() should mention reasoning agent")
+	if !strings.Contains(prompt, "multi-step work") {
+		t.Error("SystemPrompt() should mention multi-step work guidance")
 	}
 }
 

@@ -73,7 +73,7 @@ func (w *WebBrowser) getContent(agentContext map[string]any, args map[string]any
 	}
 
 	// Get or create browser context (reuses existing browser from previous navigate)
-	ctx, err := getOrCreateBrowser(agentContext)
+	ctx, err := w.getOrCreateBrowser(agentContext)
 	if err != nil {
 		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get browser context: %v", err))
@@ -88,6 +88,7 @@ func (w *WebBrowser) getContent(agentContext map[string]any, args map[string]any
 	// Navigate to URL if provided, otherwise use current page
 	if hasURL && normalizedURL != "" {
 		err = chromedp.Run(timeoutCtx,
+			chromedp.Evaluate(getScript("network_idle"), nil),
 			chromedp.Navigate(normalizedURL),
 		)
 		if err != nil {
@@ -135,9 +136,13 @@ func (w *WebBrowser) getContent(agentContext map[string]any, args map[string]any
 				chromedp.OuterHTML("html", &content, chromedp.ByQuery),
 			)
 		case "text":
-			err = chromedp.Run(timeoutCtx,
-				chromedp.Text("body", &content, chromedp.ByQuery),
-			)
+			if stripRes.Skipped && doStrip {
+				content, err = accessibilitySnapshotText(timeoutCtx)
+			} else {
+				err = chromedp.Run(timeoutCtx,
+					chromedp.Text("body", &content, chromedp.ByQuery),
+				)
+			}
 		case "title":
 			err = chromedp.Run(timeoutCtx,
 				chromedp.Title(&content),

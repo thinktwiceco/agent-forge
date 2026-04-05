@@ -1,15 +1,12 @@
 package expand
 
 import (
-	"context"
-	"fmt"
 	"strings"
 	"testing"
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
-	"github.com/thinktwiceco/agent-forge/src/tools"
 )
 
 // Helper functions
@@ -21,7 +18,7 @@ func setupExpandTool() llms.Tool {
 
 // createMockTool creates a mock discoverable tool for testing
 func createMockTool() llms.Tool {
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:                "mock-tool",
 		Description:         "A mock tool for testing",
 		AdvanceDesc:         "Advanced mock tool with detailed capabilities",
@@ -30,17 +27,7 @@ func createMockTool() llms.Tool {
 		Handler: func(agentContext map[string]any, args map[string]any) llms.ToolReturn {
 			return core.NewSuccessResponse("mock result")
 		},
-	}
-}
-
-// createMockAgent creates a mock agent with given properties
-func createMockAgent(name, basicDesc, advanceDesc, troubleshootingInfo string) *mockDiscoverableAgent {
-	return &mockDiscoverableAgent{
-		name:                name,
-		basicDesc:           basicDesc,
-		advanceDesc:         advanceDesc,
-		troubleshootingInfo: troubleshootingInfo,
-	}
+	})
 }
 
 // createAgentContextWithTools creates an agent context map with tools
@@ -48,45 +35,6 @@ func createAgentContextWithTools(tools []llms.Tool) map[string]any {
 	return map[string]any{
 		"tools": tools,
 	}
-}
-
-// createAgentContextWithSubAgents creates an agent context map with sub-agents
-func createAgentContextWithSubAgents(subAgents []core.SubAgent) map[string]any {
-	return map[string]any{
-		"subAgents": subAgents,
-	}
-}
-
-// mockDiscoverableAgent is a mock agent that implements SubAgent and Discoverable
-type mockDiscoverableAgent struct {
-	name                string
-	basicDesc           string
-	advanceDesc         string
-	troubleshootingInfo string
-}
-
-func (m *mockDiscoverableAgent) Name() string {
-	return m.name
-}
-
-func (m *mockDiscoverableAgent) ChatStream(ctx context.Context, message string, chatId string) *core.ResponseCh {
-	return nil // Not needed for this test
-}
-
-func (m *mockDiscoverableAgent) BasicDescription() string {
-	return m.basicDesc
-}
-
-func (m *mockDiscoverableAgent) AdvanceDescription() string {
-	return m.advanceDesc
-}
-
-func (m *mockDiscoverableAgent) Troubleshooting() string {
-	return m.troubleshootingInfo
-}
-
-func (m *mockDiscoverableAgent) DetailsAbout(item string) string {
-	return fmt.Sprintf("Nothing to add about %s", item)
 }
 
 // Tests
@@ -137,7 +85,7 @@ func TestExpandTool_ExpandToolInfo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			expandTool := setupExpandTool()
 			mockTool := createMockTool()
-			fooTool := tools.NewFooTool()
+			fooTool := core.NewTool(core.ToolConfig{Name: "foo-tool", Description: "foo"})
 
 			agentContext := createAgentContextWithTools([]llms.Tool{mockTool, fooTool})
 
@@ -191,50 +139,6 @@ func TestExpandTool_ExpandToolInfo(t *testing.T) {
 	}
 }
 
-func TestExpandTool_ExpandAgent(t *testing.T) {
-	expandTool := setupExpandTool()
-
-	mockAgent := createMockAgent(
-		"test-agent",
-		"A test agent",
-		"Advanced test agent with special capabilities",
-		"Check agent configuration",
-	)
-
-	// Convert to interface直接
-	var sa core.SubAgent = mockAgent
-	agentContext := createAgentContextWithSubAgents([]core.SubAgent{sa})
-
-	args := map[string]any{
-		"subject_type": "agent",
-		"subject_name": "test-agent",
-		"troubleshoot": true,
-	}
-
-	result := expandTool.Call(agentContext, args)
-
-	if !result.Success() {
-		t.Fatalf("Expected success, got error: %s", result.Error())
-	}
-
-	data := result.Data()
-	t.Logf("Expand agent result:\n%s", data)
-
-	// Verify the response contains expected content
-	if !strings.Contains(data, "AGENT: test-agent") {
-		t.Error("Response should contain agent header")
-	}
-	if !strings.Contains(data, "A test agent") {
-		t.Error("Response should contain basic description")
-	}
-	if !strings.Contains(data, "Advanced test agent with special capabilities") {
-		t.Error("Response should contain advanced description")
-	}
-	if !strings.Contains(data, "Check agent configuration") {
-		t.Error("Response should contain troubleshooting info")
-	}
-}
-
 func TestExpandTool_NotFound(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -247,12 +151,6 @@ func TestExpandTool_NotFound(t *testing.T) {
 			subjectType:  "tool",
 			subjectName:  "nonexistent-tool",
 			agentContext: createAgentContextWithTools([]llms.Tool{}),
-		},
-		{
-			name:         "agent not found",
-			subjectType:  "agent",
-			subjectName:  "nonexistent-agent",
-			agentContext: createAgentContextWithSubAgents([]core.SubAgent{}),
 		},
 	}
 
@@ -293,7 +191,7 @@ func TestExpandTool_InvalidSubjectType(t *testing.T) {
 		t.Error("Expected failure for invalid subject_type")
 	}
 
-	if !strings.Contains(result.Error(), "invalid subject_type") {
+	if !strings.Contains(result.Error(), "invalid subject_type") && !strings.Contains(result.Error(), "Must be") {
 		t.Errorf("Error should mention invalid subject_type, got: %s", result.Error())
 	}
 }

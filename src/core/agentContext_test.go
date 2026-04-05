@@ -37,14 +37,13 @@ func TestRehydrateContext(t *testing.T) {
 	mockTool := mocks.NewMockTool("mock-tool")
 
 	validMap := map[string]any{
-		"agentName":           "test-agent",
-		"trace":               "test-trace",
-		"model":               "test-model",
-		"tools":               []llms.Tool{mockTool},
-		"responseCh":          responseCh,
-		"lastSubagentMessage": "hello",
-		"sessionStorage":      make(map[string]any),
-		"pluginFields":        make(map[string]any),
+		"agentName":      "test-agent",
+		"trace":          "test-trace",
+		"model":          "test-model",
+		"tools":          []llms.Tool{mockTool},
+		"responseCh":     responseCh,
+		"sessionStorage": make(map[string]any),
+		"pluginFields":   make(map[string]any),
 	}
 
 	ac, err := RehydrateContext(validMap)
@@ -54,9 +53,6 @@ func TestRehydrateContext(t *testing.T) {
 
 	if ac.AgentName != "test-agent" {
 		t.Errorf("Expected AgentName 'test-agent', got '%s'", ac.AgentName)
-	}
-	if ac.LastSubagentMessage != "hello" {
-		t.Errorf("Expected LastSubagentMessage 'hello', got '%s'", ac.LastSubagentMessage)
 	}
 	if len(ac.Tools) != 1 {
 		t.Errorf("Expected 1 tool, got %d", len(ac.Tools))
@@ -101,9 +97,7 @@ func TestAgentContext_SyncFromMap(t *testing.T) {
 		PluginFields:   make(map[string]any),
 	}
 
-	// Context map with updates
 	ctxMap := map[string]any{
-		"lastSubagentMessage": "updated message",
 		"pluginFields": map[string]any{
 			"customKey": "customValue",
 		},
@@ -118,9 +112,6 @@ func TestAgentContext_SyncFromMap(t *testing.T) {
 		t.Fatalf("SyncFromMap failed: %v", err)
 	}
 
-	if ac.LastSubagentMessage != "updated message" {
-		t.Errorf("Expected LastSubagentMessage to be updated")
-	}
 	if ac.PluginFields["customKey"] != "customValue" {
 		t.Errorf("Expected PluginFields to be updated")
 	}

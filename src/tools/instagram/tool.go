@@ -91,13 +91,13 @@ func NewInstagramTool(headers map[string]string) llms.Tool {
 		headers = map[string]string{}
 	}
 	t := &instagramTool{headers: headers}
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        toolName,
 		Description: "Instagram Graph API. Call any action with flat parameters — no nested objects needed.",
 		AdvanceDesc: buildAdvancedDescription(),
 		Parameters:  buildParameters(),
 		Handler:     t.handler,
-	}
+	})
 }
 
 func buildAdvancedDescription() string {

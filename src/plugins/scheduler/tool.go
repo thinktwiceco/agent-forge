@@ -11,7 +11,7 @@ import (
 const scheduleTool = "schedule"
 
 func newScheduleTool(p *SchedulerPlugin) llms.Tool {
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        scheduleTool,
 		Description: "Schedule a reminder message to be delivered to the agent at a specific future time.",
 		AdvanceDesc: `Advanced Details:
@@ -81,5 +81,5 @@ func newScheduleTool(p *SchedulerPlugin) llms.Tool {
 				"Reminder scheduled (task_id=%d) for %s", id, scheduledAt.Format(time.RFC3339),
 			))
 		},
-	}
+	})
 }

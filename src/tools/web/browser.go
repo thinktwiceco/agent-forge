@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/chromedp/chromedp"
 	agentforge "github.com/thinktwiceco/agent-forge/src"
@@ -35,12 +36,21 @@ func defaultHeadlessMode() bool {
 	return headless
 }
 
+// effectiveDefaultHeadless returns the configured default, or env-based defaultHeadlessMode when unset.
+func (w *WebBrowser) effectiveDefaultHeadless() bool {
+	if w.defaultHeadless != nil {
+		return *w.defaultHeadless
+	}
+	return defaultHeadlessMode()
+}
+
 // getOrCreateBrowser gets an existing browser context or creates a new one.
-// headless controls whether the browser runs in headless mode.
-// When omitted, the default is true and can be overridden via WEB_TOOL_HEADLESS.
-// The browser context persists across tool calls.
-func getOrCreateBrowser(agentContext map[string]any, headless ...bool) (context.Context, error) {
-	return globalSessionManager.GetOrCreateBrowser(agentContext, headless...)
+// headless, when provided, overrides the tool default for this creation only.
+func (w *WebBrowser) getOrCreateBrowser(agentContext map[string]any, headless ...bool) (context.Context, error) {
+	if len(headless) == 0 {
+		return w.sessionManager.GetOrCreateBrowser(agentContext, w.effectiveDefaultHeadless())
+	}
+	return w.sessionManager.GetOrCreateBrowser(agentContext, headless...)
 }
 
 // CleanupAllBrowsers cleans up all browser sessions.
@@ -116,13 +126,22 @@ type WebBrowser struct {
 	sessionManager *SessionManager
 	// dir is the directory this tool operates in (agent working_dir/web).
 	dir string
+	// defaultHeadless, when non-nil, is the default for new sessions and implicit browser startup.
+	// When nil, WEB_TOOL_HEADLESS / true applies.
+	defaultHeadless *bool
+
+	searchMu    sync.Mutex
+	searchCache map[string]webSearchCacheEntry
 }
 
 // NewWebBrowser creates a new web browser tool instance.
-func NewWebBrowser(dir string) *WebBrowser {
+// defaultHeadless overrides the env default for new browser contexts when non-nil.
+func NewWebBrowser(dir string, defaultHeadless *bool) *WebBrowser {
 	return &WebBrowser{
-		sessionManager: globalSessionManager,
-		dir:            dir,
+		sessionManager:  globalSessionManager,
+		dir:             dir,
+		defaultHeadless: defaultHeadless,
+		searchCache:     make(map[string]webSearchCacheEntry),
 	}
 }
 
@@ -148,7 +167,7 @@ func (w *WebBrowser) listSessions() llms.ToolReturn {
 
 // openSession opens a new named browser session or resumes an existing one.
 func (w *WebBrowser) openSession(agentContext map[string]any, args map[string]any) llms.ToolReturn {
-	headless := defaultHeadlessMode()
+	headless := w.effectiveDefaultHeadless()
 	if h, ok := args["headless"].(bool); ok {
 		headless = h
 	}

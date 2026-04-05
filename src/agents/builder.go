@@ -39,10 +39,9 @@ type Builder struct {
 func NewBuilder(llm llms.LLMEngine, name string) *Builder {
 	return &Builder{
 		config: &AgentConfig{
-			LLMEngine:         llm,
-			AgentName:         name,
-			CanExpand:         true,
-			MaxToolIterations: defaultMaxToolIterations,
+			LLMEngine: llm,
+			AgentName: name,
+			CanExpand: true,
 		},
 	}
 }
@@ -77,15 +76,15 @@ func (b *Builder) WithTrace(trace string) *Builder {
 	return b
 }
 
-// WithReasoning enables reasoning mode.
-func (b *Builder) WithReasoning() *Builder {
-	b.config.Reasoning = true
+// WithCanExpand enables or disables expand capability for tools.
+func (b *Builder) WithCanExpand(canExpand bool) *Builder {
+	b.config.CanExpand = canExpand
 	return b
 }
 
-// WithCanExpand enables or disables expand capability for tools/subagents.
-func (b *Builder) WithCanExpand(canExpand bool) *Builder {
-	b.config.CanExpand = canExpand
+// WithSpawnSubagent enables the spawn_subagent built-in tool.
+func (b *Builder) WithSpawnSubagent() *Builder {
+	b.config.CanSpawnSubagent = true
 	return b
 }
 
@@ -110,7 +109,7 @@ func (b *Builder) AsMainAgent() *Builder {
 	return b
 }
 
-// WithTone sets the response tone (e.g., ToneKeepItShort, ToneSystemAgent).
+// WithTone sets the response tone (e.g., ToneKeepItShort).
 func (b *Builder) WithTone(tone string) *Builder {
 	b.config.Tone = tone
 	return b
@@ -126,15 +125,6 @@ func (b *Builder) WithPersistence(persistence string) *Builder {
 // When set with persistence "json", conversations are stored in workingDir/data/conversations/{agentName}.
 func (b *Builder) WithWorkingDir(dir string) *Builder {
 	b.config.WorkingDir = dir
-	return b
-}
-
-// WithSubAgents adds sub-agents for delegation.
-func (b *Builder) WithSubAgents(subAgents ...core.SubAgent) *Builder {
-	if b.config.SubAgents == nil {
-		b.config.SubAgents = []core.SubAgent{}
-	}
-	b.config.SubAgents = append(b.config.SubAgents, subAgents...)
 	return b
 }
 

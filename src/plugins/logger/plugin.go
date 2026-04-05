@@ -10,7 +10,6 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 	"github.com/thinktwiceco/agent-forge/src/plugins/registry"
-	"github.com/thinktwiceco/agent-forge/src/tools/delegate"
 )
 
 const (
@@ -121,19 +120,13 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 		}
 
 	case llms.TypeToolExecuting:
-		// Show tool execution (suppress for delegate tool when delegating to sub-agents)
-		if extendedChunk.ToolExecuting != nil && extendedChunk.ToolExecuting.Name != delegate.DELEGATE_TOOL {
+		if extendedChunk.ToolExecuting != nil {
 			_, _ = fmt.Fprintf(p.output, "\n%s%s⚙️  Executing tool: %s%s\n", ColorMagenta, ColorBold, extendedChunk.ToolExecuting.Name, ColorReset)
 		}
 
 	case llms.TypeToolResult:
-		// Show tool results (suppress for delegate tool when delegating to sub-agents)
 		if len(extendedChunk.ToolResults) > 0 {
 			for _, result := range extendedChunk.ToolResults {
-				if result.ToolName == delegate.DELEGATE_TOOL {
-					// Skip verbose delegate tool completion messages for sub-agents
-					continue
-				}
 				if result.Success {
 					_, _ = fmt.Fprintf(p.output, "%s%s✓ Tool completed: %s%s\n", ColorGreen, ColorBold, result.ToolName, ColorReset)
 				} else {

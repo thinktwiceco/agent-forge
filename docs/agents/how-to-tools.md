@@ -20,7 +20,7 @@ import (
 )
 
 func NewMyTool(config string) llms.Tool {
-    return &core.Tool{
+    return core.NewTool(core.ToolConfig{
         Name:        "my_tool",
         Description: "Brief description",
         AdvanceDesc: `Detailed instructions and examples`,
@@ -48,9 +48,11 @@ func NewMyTool(config string) llms.Tool {
             
             return core.NewSuccessResponse(result)
         },
-    }
+    })
 }
 ```
+
+Keep `Description` brief. It is used in provider tool metadata, while richer guidance should live in `AdvanceDesc`, `TroubleshootingInfo`, and `DetailsAboutFunc` so the always-on prompt can stay lean.
 
 ## Step 3: Add Tests
 

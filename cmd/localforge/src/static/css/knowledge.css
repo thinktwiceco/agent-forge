@@ -35,8 +35,15 @@
 }
 
 .brand-icon {
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
   color: var(--accent);
+}
+
+.brand-icon svg {
+  display: block;
 }
 
 .brand-name {

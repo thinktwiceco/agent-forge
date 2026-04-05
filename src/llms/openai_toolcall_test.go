@@ -5,6 +5,16 @@ import (
 	"testing"
 )
 
+type mockNamedTool struct {
+	name string
+}
+
+func (m *mockNamedTool) GetName() string                                { return m.name }
+func (m *mockNamedTool) Call(map[string]any, map[string]any) ToolReturn { return nil }
+func (m *mockNamedTool) GetFunctionDefinition() FunctionDefinition {
+	return FunctionDefinition{Name: m.name}
+}
+
 // TestToolCallSerialization tests that ToolCall can be properly serialized and deserialized
 func TestToolCallSerialization(t *testing.T) {
 	toolCall := ToolCall{
@@ -136,5 +146,21 @@ func TestToolCallAccumulation(t *testing.T) {
 	// Verify
 	if args["echo"] != "Hello, world!" {
 		t.Errorf("Accumulated arguments mismatch: got %v, want 'Hello, world!'", args["echo"])
+	}
+}
+
+func TestResolveToolNameForTools_trailingGT(t *testing.T) {
+	tools := []Tool{
+		&mockNamedTool{name: "memory_read_short_term"},
+		&mockNamedTool{name: "find"},
+	}
+	if got := ResolveToolNameForTools("memory_read_short_term>", tools); got != "memory_read_short_term" {
+		t.Errorf("got %q, want memory_read_short_term", got)
+	}
+	if got := ResolveToolNameForTools("memory_read_short_term", tools); got != "memory_read_short_term" {
+		t.Errorf("got %q, want memory_read_short_term", got)
+	}
+	if got := ResolveToolNameForTools("unknown>", tools); got != "unknown>" {
+		t.Errorf("got %q, want unknown>", got)
 	}
 }

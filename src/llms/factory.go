@@ -18,24 +18,24 @@ type OpenAILLMBuilder struct {
 	ctx            context.Context
 }
 
-func NewOpenAILLMBuilder(provider string) *OpenAILLMBuilder {
-	if provider != "openai" && provider != "deepseek" && provider != "togetherai" {
-		panic(fmt.Sprintf("Invalid provider: %s", provider))
+func NewOpenAILLMBuilder(provider string) (*OpenAILLMBuilder, error) {
+	if provider != "openai" && provider != "deepseek" && provider != "togetherai" && provider != "openrouter" {
+		return nil, fmt.Errorf("invalid provider: %s", provider)
 	}
 	return &OpenAILLMBuilder{
 		provider: provider,
 		ctx:      context.Background(),
-	}
+	}, nil
 }
 
-func (b *OpenAILLMBuilder) validate() {
+func (b *OpenAILLMBuilder) validate() error {
 	c, err := agentforge.NewConfig()
 	if err != nil {
 		agentforge.Error("Failed to load config: %v", err)
 	}
 
 	if b.provider == "" {
-		agentforge.Error("Provider is required")
+		return fmt.Errorf("provider is required")
 	}
 
 	if b.apiKey == "" {
@@ -46,6 +46,8 @@ func (b *OpenAILLMBuilder) validate() {
 			b.apiKey = c.AFDeepSeekAPIKey
 		case "togetherai":
 			b.apiKey = c.AFTogetherAIAPIKey
+		case "openrouter":
+			b.apiKey = c.AFOpenRouterAPIKey
 		}
 	}
 
@@ -62,7 +64,7 @@ func (b *OpenAILLMBuilder) validate() {
 		if ok {
 			b.baseURL = canidateBaseURL
 		} else {
-			panic(fmt.Sprintf("No default base URL found for provider: %s", b.provider))
+			return fmt.Errorf("no default base URL found for provider: %s", b.provider)
 		}
 	}
 
@@ -71,7 +73,7 @@ func (b *OpenAILLMBuilder) validate() {
 		if ok {
 			b.model = canidateModel
 		} else {
-			panic(fmt.Sprintf("No default model found for provider: %s", b.provider))
+			return fmt.Errorf("no default model found for provider: %s", b.provider)
 		}
 	}
 
@@ -103,6 +105,7 @@ func (b *OpenAILLMBuilder) validate() {
 	agentforge.Info("LLM builder validated: reasoningModel=%+v", b.reasoningModel)
 	agentforge.Info("LLM builder validated: fastModel=%+v", b.fastModel)
 	agentforge.Info("LLM builder validated: baseURL=%+v", b.baseURL)
+	return nil
 }
 
 func (b *OpenAILLMBuilder) SetProvider(p string) *OpenAILLMBuilder {
@@ -174,7 +177,9 @@ func (m *MultiModelLLM) FastModel() *openAILLM {
 }
 
 func (b *OpenAILLMBuilder) Build() (*MultiModelLLM, error) {
-	b.validate()
+	if err := b.validate(); err != nil {
+		return nil, err
+	}
 
 	multiModel := &MultiModelLLM{}
 

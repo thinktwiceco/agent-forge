@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
@@ -195,6 +196,16 @@ func (a *openAILLM) streamResponse(messages []*UnifiedMessage, tools []Tool, res
 		params.Tools = openaiTools
 	}
 
+	// Groq validates streamed tool output strictly; models sometimes emit malformed
+	// tool names/args. disable_tool_validation lets the stream finish so we can map tools.
+	// OpenRouter routes many slugs through Groq but uses openrouter.ai as base URL, so
+	// baseURL alone is not enough—also enable when provider is openrouter.
+	if len(tools) > 0 && (strings.Contains(strings.ToLower(a.baseURL), "groq") || a.provider == "openrouter") {
+		params.SetExtraFields(map[string]any{"disable_tool_validation": true})
+		// Reduces streaming tool-call fragmentation issues on some Groq-backed routes.
+		params.ParallelToolCalls = openai.Bool(false)
+	}
+
 	// Create streaming request
 	stream := a.client.Chat.Completions.NewStreaming(a.ctx, params)
 	defer func() {
@@ -281,7 +292,7 @@ func (a *openAILLM) streamResponse(messages []*UnifiedMessage, tools []Tool, res
 						toolCallsMap[idx].ID = toolCallDelta.ID
 					}
 					if toolCallDelta.Function.Name != "" {
-						toolCallsMap[idx].Name = toolCallDelta.Function.Name
+						toolCallsMap[idx].Name += toolCallDelta.Function.Name
 					}
 					if toolCallDelta.Function.Arguments != "" {
 						toolCallsMap[idx].Arguments += toolCallDelta.Function.Arguments
@@ -317,7 +328,7 @@ func (a *openAILLM) streamResponse(messages []*UnifiedMessage, tools []Tool, res
 
 				toolCalls = append(toolCalls, ToolCall{
 					ID:        toolData.ID,
-					Name:      toolData.Name,
+					Name:      ResolveToolNameForTools(toolData.Name, tools),
 					Arguments: args,
 				})
 			}

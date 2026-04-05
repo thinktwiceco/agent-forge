@@ -54,12 +54,6 @@ func TestMetaTool_HandleMethod(t *testing.T) {
 			wantContent: "meta",
 		},
 		{
-			name:        "get_subagents",
-			method:      "get_subagents",
-			wantSuccess: true,
-			wantContent: "[]", // No subagents in context
-		},
-		{
 			name:        "unknown_method",
 			method:      "invalid_method",
 			wantSuccess: false,

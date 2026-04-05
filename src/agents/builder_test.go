@@ -25,8 +25,16 @@ func TestNewBuilder(t *testing.T) {
 	if !b.config.CanExpand {
 		t.Error("CanExpand should default to true")
 	}
-	if b.config.MaxToolIterations != defaultMaxToolIterations {
-		t.Errorf("MaxToolIterations = %d, want %d", b.config.MaxToolIterations, defaultMaxToolIterations)
+	if b.config.MaxToolIterations != 0 {
+		t.Errorf("MaxToolIterations = %d, want 0", b.config.MaxToolIterations)
+	}
+
+	agent, err := b.Build()
+	if err != nil {
+		t.Fatalf("Build failed: %v", err)
+	}
+	if agent.config.MaxToolIterations != defaultMaxToolIterations {
+		t.Errorf("MaxToolIterations = %d, want %d after build", agent.config.MaxToolIterations, defaultMaxToolIterations)
 	}
 }
 
@@ -68,20 +76,6 @@ func TestBuilder_AsMainAgent(t *testing.T) {
 	}
 	if agent.config.Tone != ToneKeepItShort {
 		t.Errorf("Tone = %q, want %q", agent.config.Tone, ToneKeepItShort)
-	}
-}
-
-func TestBuilder_WithReasoning(t *testing.T) {
-	mockLLM := mocks.NewMockLLMEngine()
-	agent, err := NewBuilder(mockLLM, "reasoning-agent").
-		WithReasoning().
-		Build()
-
-	if err != nil {
-		t.Fatalf("Build() error = %v", err)
-	}
-	if !agent.config.Reasoning {
-		t.Error("Reasoning should be true")
 	}
 }
 

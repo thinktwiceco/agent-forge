@@ -78,7 +78,7 @@ type Tool interface {
 	GetName() string
 
 	// Call executes the tool with the given context and arguments.
-	Call(agentContext map[string]any, args map[string]any) toolReturn
+	Call(agentContext map[string]any, args map[string]any) ToolReturn
 
 	// GetFunctionDefinition returns the function definition of the tool.
 	GetFunctionDefinition() FunctionDefinition
@@ -92,6 +92,3 @@ type ToolReturn interface {
 	Ephemeral() bool
 	Cleanup() func() // Optional cleanup function to be executed after all tool iterations complete
 }
-
-// toolReturn is an alias for ToolReturn to maintain backward compatibility.
-type toolReturn = ToolReturn

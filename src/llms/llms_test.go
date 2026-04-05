@@ -107,7 +107,10 @@ func TestOpenAILLMBuilder_SettersAndBuild(t *testing.T) {
 		_ = recover()
 	}()
 
-	b := NewOpenAILLMBuilder("openai")
+	b, err := NewOpenAILLMBuilder("openai")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	b.SetApiKey("sk-test")
 	b.SetModel("gpt-4")
 	b.SetCheapModel("gpt-3.5")
@@ -129,12 +132,44 @@ func TestOpenAILLMBuilder_SettersAndBuild(t *testing.T) {
 }
 
 func TestOpenAILLMBuilder_InvalidProvider(t *testing.T) {
+	_, err := NewOpenAILLMBuilder("invalid")
+	if err == nil {
+		t.Error("Expected error for invalid provider")
+	}
+}
+
+func TestOpenAILLMBuilder_OpenRouter_SettersAndBuild(t *testing.T) {
 	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected panic for invalid provider")
+		if r := recover(); r != nil {
+			t.Errorf("Unexpected panic: %v", r)
 		}
 	}()
-	NewOpenAILLMBuilder("invalid")
+
+	b, err := NewOpenAILLMBuilder("openrouter")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	b.SetApiKey("sk-or-test")
+	b.SetModel(OPENROUTER_GPT4O)
+	b.SetCheapModel(OPENROUTER_GPT4O_MINI)
+	b.SetReasoningModel(OPENROUTER_GPT4O)
+	b.SetFastModel(OPENROUTER_GPT4O_MINI)
+	b.SetBaseURL(OPENROUTER_BASE_URL)
+
+	llms, err := b.Build()
+	if err != nil {
+		t.Fatalf("Build failed: %v", err)
+	}
+
+	if llms.MainModel().Model() != OPENROUTER_GPT4O {
+		t.Errorf("Main model mismatch")
+	}
+	if llms.MainModel().Provider() != "openrouter" {
+		t.Errorf("Provider mismatch")
+	}
+	if llms.CheapModel().Model() != OPENROUTER_GPT4O_MINI {
+		t.Error("Cheap model mismatch")
+	}
 }
 
 // Mock tool for ToOpenAITool test

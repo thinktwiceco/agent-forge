@@ -24,7 +24,7 @@ type Manager interface {
 	Messages() []*llms.UnifiedMessage
 	SetMessages(messages []*llms.UnifiedMessage)
 	ChatId() string
-	Save() string
+	Save() (string, error)
 	Load(chatId string) error
 }
 
@@ -116,17 +116,21 @@ func (ch *ConversationHistory) ChatId() string {
 	return ch.chatId
 }
 
-// Save persists the history and returns the chat ID (possibly newly generated).
-func (ch *ConversationHistory) Save() string {
+// Save persists the history and returns the chat ID (possibly newly generated) and any error.
+func (ch *ConversationHistory) Save() (string, error) {
 	if ch.persistence != nil {
 		for _, message := range ch.messages {
 			if message.Ephemeral() {
 				message.SetContent("[Tool Call Executed]")
 			}
 		}
-		ch.chatId = ch.persistence.SaveHistory(ch.chatId, ch.messages)
+		newChatId, err := ch.persistence.SaveHistory(ch.chatId, ch.messages)
+		if err != nil {
+			return ch.chatId, err
+		}
+		ch.chatId = newChatId
 	}
-	return ch.chatId
+	return ch.chatId, nil
 }
 
 // Load loads conversation history from persistence for the specified chatId.

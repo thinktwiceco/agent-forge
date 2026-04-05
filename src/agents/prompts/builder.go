@@ -1,9 +1,6 @@
 package prompts
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 // Ensure Builder implements agents.PromptBuilder interface at compile time
 // This is a forward declaration - the actual interface check is done
@@ -25,7 +22,7 @@ func NewBuilder(config Config) *Builder {
 	return &Builder{config: config}
 }
 
-// UpdateConfig updates the builder's configuration (call when tools or sub-agents change).
+// UpdateConfig updates the builder's configuration (call when tools change).
 func (b *Builder) UpdateConfig(cfg interface{}) {
 	if config, ok := cfg.(Config); ok {
 		b.config = config
@@ -35,8 +32,7 @@ func (b *Builder) UpdateConfig(cfg interface{}) {
 // Build returns the complete system prompt.
 func (b *Builder) Build() string {
 	prompt := b.addSystemPrompt()
-	prompt = b.buildSubAgentsSystemPrompt(prompt)
-	prompt = b.buildToolsDescriptions(prompt)
+	prompt = b.addToolsGuidance(prompt)
 	return normalizePromptIndentation(prompt)
 }
 
@@ -86,24 +82,7 @@ func (b *Builder) addSystemPrompt() string {
 	return prompt
 }
 
-func (b *Builder) buildSubAgentsSystemPrompt(prompt string) string {
-	if len(b.config.SubAgents) == 0 {
-		return prompt
-	}
-
-	header, err := LoadMainPrompt("sub-agents-header")
-	if err != nil {
-		panic(err)
-	}
-	saPrompt := "\n" + header + "\n"
-	for _, sa := range b.config.SubAgents {
-		saPrompt += fmt.Sprintf("📌 %s: %s\n\n", sa.Name(), sa.BasicDescription())
-	}
-	prompt += saPrompt
-	return prompt
-}
-
-func (b *Builder) buildToolsDescriptions(prompt string) string {
+func (b *Builder) addToolsGuidance(prompt string) string {
 	if len(b.config.Tools) == 0 {
 		return prompt
 	}
@@ -112,12 +91,13 @@ func (b *Builder) buildToolsDescriptions(prompt string) string {
 	if err != nil {
 		panic(err)
 	}
-	toolsPrompt := "\n" + header + "\n"
-	for _, tool := range b.config.Tools {
-		toolsPrompt += fmt.Sprintf("📌 %s: %s\n\n", tool.GetName(), tool.GetFunctionDefinition().Description)
+
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return prompt
 	}
-	prompt += toolsPrompt
-	return prompt
+
+	return prompt + "\n\n" + header
 }
 
 // NormalizePromptIndentation normalizes the indentation of a prompt string.

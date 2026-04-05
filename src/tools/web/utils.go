@@ -11,16 +11,21 @@ import (
 )
 
 const (
-	defaultTimeout     = 60 * time.Second
-	defaultSettleDelay = 500 * time.Millisecond
+	defaultTimeout       = 60 * time.Second
+	defaultSettleDelay   = 500 * time.Millisecond
+	networkIdleTimeout   = 10 * time.Second
+	networkIdlePollEvery = 50 * time.Millisecond
 )
 
 // waitForPageReady waits for the page to be fully ready for content extraction.
-// Phase 1: polls document.readyState until it equals 'complete', ensuring all
-// scripts have executed (critical for JS-heavy SPAs).
-// Phase 2: holds a short settle delay to allow async data fetches and re-renders
-// triggered by those scripts to finish. Pass 0 to skip the settle delay.
+// Phase 1: inject fetch/XHR counter, then poll document.readyState === 'complete'.
+// Phase 2 (skipped if settleDelay == 0): wait until in-flight fetch/XHR count stays
+// at 0 for settleDelay (network-idle threshold). Outer cap: networkIdleTimeout.
+// settleDelay 0 skips the network-idle phase (backward compatible with callers that opt out).
 func waitForPageReady(ctx context.Context, settleDelay time.Duration) error {
+	if err := chromedp.Run(ctx, chromedp.Evaluate(getScript("network_idle"), nil)); err != nil {
+		return err
+	}
 	if err := chromedp.Run(ctx,
 		chromedp.Poll(`document.readyState === 'complete'`, nil,
 			chromedp.WithPollingInterval(200*time.Millisecond),
@@ -28,10 +33,43 @@ func waitForPageReady(ctx context.Context, settleDelay time.Duration) error {
 	); err != nil {
 		return err
 	}
-	if settleDelay > 0 {
-		_ = chromedp.Run(ctx, chromedp.Sleep(settleDelay))
+	if settleDelay <= 0 {
+		return nil
 	}
-	return nil
+	return waitForNetworkIdle(ctx, settleDelay)
+}
+
+// waitForNetworkIdle polls window.__agentPending until it remains 0 for threshold,
+// or until networkIdleTimeout elapses. On timeout, returns nil (best effort) so pages
+// with perpetual background polling do not fail navigate/get_content.
+func waitForNetworkIdle(ctx context.Context, threshold time.Duration) error {
+	deadline := time.Now().Add(networkIdleTimeout)
+	var stableStart time.Time
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if time.Now().After(deadline) {
+			return nil
+		}
+		var pending float64
+		if err := chromedp.Run(ctx, chromedp.Evaluate(`Number(window.__agentPending||0)`, &pending)); err != nil {
+			return err
+		}
+		if pending == 0 {
+			if stableStart.IsZero() {
+				stableStart = time.Now()
+			}
+			if time.Since(stableStart) >= threshold {
+				return nil
+			}
+		} else {
+			stableStart = time.Time{}
+		}
+		if err := chromedp.Run(ctx, chromedp.Sleep(networkIdlePollEvery)); err != nil {
+			return err
+		}
+	}
 }
 
 // normalizeURL validates and normalizes a URL by adding scheme if missing.

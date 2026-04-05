@@ -67,14 +67,12 @@ agent, err := agents.NewBuilder(engine, "assistant").
 | `WithTroubleshooting(s)` | Debugging guidance |
 | `WithSystemPrompt(s)` | System prompt |
 | `WithTrace(s)` | Trace identifier |
-| `WithReasoning()` | Enable reasoning mode |
-| `WithCanExpand(bool)` | Enable expand for tools/subagents |
+| `WithCanExpand(bool)` | Enable expand for tools |
 | `WithTools(...llms.Tool)` | Add tools (append) |
 | `WithMaxToolIterations(n)` | Max tool execution iterations |
 | `AsMainAgent()` | Mark as main agent |
 | `WithTone(s)` | Response tone (e.g., `ToneKeepItShort`) |
 | `WithPersistence(s)` | Persistence layer ("", "json") |
-| `WithSubAgents(...)` | Add sub-agents for delegation |
 | `WithPlugins(...)` | Add plugins |
 | `WithContextWindow(n)` | Context size; sets reserved/minRecent defaults |
 | `WithReservedOutputTokens(n)` | Token reserve for completion |
@@ -98,7 +96,6 @@ agent, err := agents.NewBuilder(llmEngine, "main-agent").
     WithTone(agents.ToneKeepItShort).
     WithDescription("Main conversational agent").
     WithTools(fsTool, gitTool).
-    WithSubAgents(codingAgent, reasoningAgent).
     WithContextWindow(128000).
     Build()
 ```

@@ -11,7 +11,7 @@ import (
 const PROCEDURE_TOOL = "procedure"
 
 func newProcedureTool(plugin *ProceduresPlugin) llms.Tool {
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        PROCEDURE_TOOL,
 		Description: `Execute structured multi-step procedures. start_procedure: begin named procedure (requires name). next_step: advance to next step. goto_step: jump to a specific step (requires stepNumber). installable_procedures: list procedures available on GitHub. install_procedure: download a procedure from GitHub into procedures/ (requires procedureSlug).`,
 		AdvanceDesc: `[ACTIONS]
@@ -22,11 +22,12 @@ func newProcedureTool(plugin *ProceduresPlugin) llms.Tool {
 - install_procedure: Download a procedure from GitHub into the local procedures/ folder. Required: procedureSlug (directory name in the remote repo, e.g. 'gmail-login')
 
 [STEP CONTENT]
-- Each action returns step folder files. Read for instructions.
+- Each action returns step folder files. Read for instructions (same layout whether the folder was authored as manifest + phases or adapted from SKILL.md).
 - Procedure names in manifest.yaml. System prompt lists available procedures.
 
 [CREATING PROCEDURES]
 - New procedures MUST be created inside procedures/ (e.g. procedures/my-procedure/manifest.yaml, procedures/my-procedure/0/instructions.md). Never create at working dir root.
+- Alternatively, place only procedures/my-procedure/SKILL.md (optional YAML frontmatter with name and description). On load, the plugin writes manifest.yaml and phase folders by splitting the body on top-level ## headings (preamble merges into step 0). start_procedure uses the name field in manifest.yaml.
 - Procedures installed from the repository are stored in procedures/ alongside user-created procedures.`,
 		TroubleshootingInfo: `Troubleshooting:
 - Ensure 'action' is 'start_procedure', 'next_step', 'goto_step', 'installable_procedures', or 'install_procedure'.
@@ -86,7 +87,7 @@ func newProcedureTool(plugin *ProceduresPlugin) llms.Tool {
 				))
 			}
 		},
-	}
+	})
 }
 
 func (p *ProceduresPlugin) handleStartProcedure(args map[string]any) llms.ToolReturn {

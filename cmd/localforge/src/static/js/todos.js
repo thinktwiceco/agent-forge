@@ -72,7 +72,7 @@ export class TodoManager {
 
     // Empty state
     if (this.todos.length === 0) {
-      html += '<div class="todos-empty">No active tasks</div>';
+      html += '<div class="todos-empty">No tasks yet.<br />They appear here when the agent uses the todo tool.</div>';
     }
 
     this.container.innerHTML = html;

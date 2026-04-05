@@ -41,7 +41,6 @@ class SettingsManager {
     this.providers = await provRes.json();
 
     this._renderAgent(this.config);
-    this._renderSubagents(this.config);
     this._renderPlugins(this.config);
     this._renderTools(this.config);
     this._renderProviders(this.providers);
@@ -83,47 +82,6 @@ class SettingsManager {
         if (nameEl && updated.name) nameEl.textContent = updated.name;
       }
     );
-  }
-
-  // ─── Sub-agents ────────────────────────────────────────────────────────────
-
-  _renderSubagents(cfg) {
-    const list = document.getElementById("subagents-list");
-    list.innerHTML = "";
-
-    const subagents = cfg.subagents || {};
-    for (const [role, model] of Object.entries(subagents)) {
-      list.appendChild(this._subagentRow(role, model));
-    }
-
-    document.getElementById("add-subagent").onclick = () => {
-      list.appendChild(this._subagentRow("", ""));
-    };
-
-    document.getElementById("save-subagents").onclick = () => this._saveSubagents();
-  }
-
-  _subagentRow(role, model) {
-    const row = document.createElement("div");
-    row.className = "subagent-row";
-    row.innerHTML = `
-      <input type="text" placeholder="role (e.g. reasoning)" value="${_esc(role)}" data-field="role" />
-      <input type="text" placeholder="model (e.g. deepseek::deepseek-chat)" value="${_esc(model)}" data-field="model" />
-      <button class="btn-icon" title="Remove" style="color:var(--error)">✕</button>
-    `;
-    row.querySelector("button").onclick = () => row.remove();
-    return row;
-  }
-
-  async _saveSubagents() {
-    const rows = document.querySelectorAll("#subagents-list .subagent-row");
-    const subagents = {};
-    for (const row of rows) {
-      const role = row.querySelector('[data-field="role"]').value.trim();
-      const model = row.querySelector('[data-field="model"]').value.trim();
-      if (role && model) subagents[role] = model;
-    }
-    await this._save("/api/config/subagents", "PUT", { subagents }, "save-subagents-status");
   }
 
   // ─── Plugins ───────────────────────────────────────────────────────────────

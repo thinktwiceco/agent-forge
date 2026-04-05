@@ -56,8 +56,7 @@ type PromptBuilder interface {
 
 **Responsibilities**:
 - Building the base system prompt
-- Adding tool descriptions
-- Adding sub-agent descriptions
+- Adding concise tool-use guidance when tools are configured
 - Applying tone and style configurations
 - Normalizing prompt formatting
 
@@ -107,9 +106,6 @@ type ContextManager interface {
     
     // UpdateTools updates just the tools without rebuilding entire config
     UpdateTools(tools []llms.Tool)
-    
-    // UpdateSubAgents updates just the sub-agents without rebuilding entire config
-    UpdateSubAgents(agents []core.SubAgent)
 }
 ```
 
@@ -121,60 +117,25 @@ type ContextManager interface {
 - Building context maps for tool execution
 - Syncing changes back after tool execution
 - Truncating message history (if configured with token counter and strategy)
-- Updating context when tools or sub-agents change
+- Updating context when tools change
 - Managing session storage across requests
 - Managing plugin fields
 - Preserving context state during updates
 
 ### HookRegistry
 
-Manages agent lifecycle hooks (internal interface).
-
-```go
-type HookRegistry interface {
-    on(event core.Event, hook any)
-    contextBuildEvent(a *Agent, agentContext *core.AgentContext) []error
-    beforeToolExecutionEvent(a *Agent, toolCall *llms.ToolCall) []error
-    toolExecutionEvent(a *Agent, toolResult *llms.ToolResult) []error
-    // ... other event methods
-}
-```
+Manages agent lifecycle hooks. This is an **internal** interface with unexported methods — plugins interact with it indirectly via `core.HookProvider.Hooks()`.
 
 **Implementation**: `AgentHooks`
 
 **Responsibilities**:
-- Event registration
+- Event registration (type-safe via typed hook constructors like `OnToolExecutionHook`)
 - Event triggering at lifecycle points
 - Error collection from hooks
 
-### SubAgent Composition (core package)
+### Executable (core package)
 
-The `SubAgent` interface is composed from smaller, focused interfaces to support interface segregation:
-
-```go
-// Identifier - for lookup and display
-type Identifier interface {
-    Name() string
-}
-
-// Executable - for chat execution (e.g., delegation)
-type Executable interface {
-    ChatStream(ctx context.Context, message string, chatId string) *ResponseCh
-}
-
-// SubAgent - full contract for sub-agents (backward compatible)
-type SubAgent interface {
-    Identifier
-    agentforge.Discoverable   // BasicDescription, AdvanceDescription, Troubleshooting
-    Executable
-}
-```
-
-**When to use each**:
-- **Identifier**: When only the agent name is needed (lookup, display)
-- **Executable**: When only chat execution is needed (e.g., delegate tool stores `map[string]Executable`)
-- **agentforge.Discoverable**: When only discovery descriptions are needed (e.g., expand tool)
-- **SubAgent**: When the full contract is required (AddSystemAgent, context, prompts)
+`core.Executable` is implemented by `*agents.Agent` for streaming chat. Use `core.Identifier` (`Name()`) when only identification is needed.
 
 ## Usage Patterns
 

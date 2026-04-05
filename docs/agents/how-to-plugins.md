@@ -127,6 +127,6 @@ See [src/plugins/README.md](../../src/plugins/README.md#lifecycle-events) for th
 - `EventToolExecution`, `EventBeforeToolExecution`
 - `EventNewUserMessage`, `EventNewAssistantMessage`
 - `EventNewChunk`, `EventContextBuild`
-- `EventAddSystemAgent`, `EventAddedSystemAgent`
 - `EventNewAssistantMessageWithToolCalls`
 - `EventAddedTools`
+- `EventChatStart`

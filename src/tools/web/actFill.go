@@ -42,6 +42,9 @@ func (w *WebBrowser) doFill(agentContext map[string]any, args map[string]any, op
 	}
 
 	value, ok := args[valueKey].(string)
+	if !ok && valueKey == "resolveSecretVaultKey" {
+		value, ok = args["resolve_secret_vault_key"].(string)
+	}
 	if !ok {
 		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(valueKey + " parameter is required for " + operation + " action and must be a string")
@@ -54,7 +57,7 @@ func (w *WebBrowser) doFill(agentContext map[string]any, args map[string]any, op
 		}
 	}
 
-	ctx, err := getOrCreateBrowser(agentContext)
+	ctx, err := w.getOrCreateBrowser(agentContext)
 	if err != nil {
 		w.sessionManager.RecordOperation(false)
 		return core.NewErrorResponse(fmt.Sprintf("failed to get browser context: %v", err))

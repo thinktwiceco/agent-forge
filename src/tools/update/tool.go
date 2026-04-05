@@ -23,7 +23,7 @@ type Update struct {
 func NewUpdateTool(dir string) llms.Tool {
 	updateTool := &Update{dir: dir}
 
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        "update",
 		Description: "Run the root update-release.sh script to update the current agent installation.",
 		AdvanceDesc: `Advanced Details:
@@ -45,7 +45,7 @@ func NewUpdateTool(dir string) llms.Tool {
 			}
 			return core.NewSuccessResponse(result)
 		},
-	}
+	})
 }
 
 func (u *Update) validateScriptPath() (string, error) {

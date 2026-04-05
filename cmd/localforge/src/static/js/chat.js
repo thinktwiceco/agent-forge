@@ -35,14 +35,57 @@ function formatToolResultSummary(result) {
   return summary ? `✓ ${name}: ${summary}` : `✓ ${name}`;
 }
 
-// ─── Empty state HTML ──────────────────────────────────────────────────────
+// ─── Empty / welcome state HTML ────────────────────────────────────────────
 const EMPTY_STATE_HTML = `
-  <div class="empty-state">
-    <div class="empty-icon">✦</div>
-    <h2>Start a conversation</h2>
-    <p>Select one from the sidebar or send a message to begin.</p>
+  <div class="welcome-state" id="welcome-state">
+    <div class="welcome-icon" aria-hidden="true">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)"
+        stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+    </div>
+    <h2 class="welcome-title" id="welcome-agent-name">ThinkTwice</h2>
+    <p class="welcome-sub">An AI agent with tools, memory, and reasoning.</p>
+    <div class="welcome-chips">
+      <button type="button" class="welcome-chip">Explain this codebase</button>
+      <button type="button" class="welcome-chip">Draft a plan for…</button>
+      <button type="button" class="welcome-chip">Search the web for…</button>
+      <button type="button" class="welcome-chip">Review recent changes</button>
+    </div>
   </div>
 `;
+
+function escapeHtml(s) {
+  if (typeof s !== "string") return "";
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+let markedCodeRendererInstalled = false;
+
+function ensureMarkedCodeRenderer() {
+  if (markedCodeRendererInstalled || typeof marked === "undefined") return;
+  marked.use({
+    renderer: {
+      // Marked v11+ invokes renderers with positional args (same as default Renderer.code).
+      code(src, infostring, escaped) {
+        const langRaw =
+          ((infostring || "").match(/^\S*/)?.[0] || "").trim() || "text";
+        const langDisplay = langRaw.toLowerCase();
+        const langSlug =
+          langRaw.replace(/[^a-zA-Z0-9_.-]/g, "").replace(/^\.+/, "") || "text";
+        const body = escaped ? src : escapeHtml(src);
+        return `<div class="code-block"><div class="code-header"><span class="code-lang">${escapeHtml(langDisplay)}</span><button type="button" class="code-copy-btn">Copy</button></div><pre><code class="language-${escapeHtml(langSlug)}">${body}</code></pre></div>`;
+      },
+    },
+  });
+  markedCodeRendererInstalled = true;
+}
 
 // ─── Thinking indicator HTML ───────────────────────────────────────────────
 function makeThinkingEl() {
@@ -86,10 +129,12 @@ export class ChatManager {
     this.abortController = null;
     this.pushController = null;
     this.pushChatId = null;
+    this.heartbeatPushController = null;
     this.pendingUploads = [];
 
     this._bindEvents();
     this._bindScrollButton();
+    this._bindMessagesClickDelegation();
     this._showEmptyState();
   }
 
@@ -143,6 +188,34 @@ export class ChatManager {
     }
   }
 
+  _bindMessagesClickDelegation() {
+    if (!this.messagesEl) return;
+    this.messagesEl.addEventListener("click", (e) => {
+      const chip = e.target.closest(".welcome-chip");
+      if (chip && this.messagesEl.contains(chip)) {
+        e.preventDefault();
+        this.inputEl.value = chip.textContent.trim();
+        this._resizeTextarea();
+        this.inputEl.focus();
+        return;
+      }
+      const copyBtn = e.target.closest(".code-copy-btn");
+      if (!copyBtn || !this.messagesEl.contains(copyBtn)) return;
+      e.preventDefault();
+      const block = copyBtn.closest(".code-block");
+      const codeEl = block?.querySelector("pre code");
+      if (!codeEl) return;
+      const t = codeEl.textContent ?? "";
+      navigator.clipboard.writeText(t).then(() => {
+        const prev = copyBtn.textContent;
+        copyBtn.textContent = "Copied!";
+        setTimeout(() => {
+          copyBtn.textContent = prev || "Copy";
+        }, 1500);
+      });
+    });
+  }
+
   _bindScrollButton() {
     if (!this.scrollBtn) return;
     this.messagesEl.addEventListener("scroll", () => {
@@ -170,8 +243,7 @@ export class ChatManager {
   }
 
   _clearEmptyState() {
-    const empty = this.messagesEl.querySelector(".empty-state");
-    if (empty) empty.remove();
+    this.messagesEl.querySelector(".welcome-state")?.remove();
   }
 
   // ── Image uploads ─────────────────────────────────────────────────────────
@@ -364,6 +436,37 @@ export class ChatManager {
     }
   }
 
+  // ── Heartbeat push listener (permanent background SSE) ────────────────────
+  // Subscribes to the fixed "heartbeat-live" channel so heartbeat responses
+  // are always visible in the active conversation view, regardless of which
+  // conversation is currently open.
+  startHeartbeatListener() {
+    if (this.heartbeatPushController) return;
+    this.heartbeatPushController = new AbortController();
+    const controller = this.heartbeatPushController;
+
+    (async () => {
+      while (!controller.signal.aborted) {
+        try {
+          const res = await fetch(
+            "/api/chat/push?conversationId=heartbeat-live",
+            { signal: controller.signal }
+          );
+          if (!res.ok || !res.body) {
+            await new Promise((r) => setTimeout(r, 5000));
+            continue;
+          }
+          await parseSSEStream(res.body, (eventType, payload) => {
+            this.handlePushEvent(eventType, payload);
+          });
+        } catch (err) {
+          if (err.name === "AbortError") break;
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      }
+    })();
+  }
+
   handlePushEvent(eventType, payload) {
     if (!payload) return;
     if (eventType === "content") this.handleContentEvent(payload);
@@ -466,7 +569,13 @@ export class ChatManager {
       let content = msg.content || "";
       const sep = content.indexOf("\n\n");
       if (sep !== -1 && /^sender:/m.test(content.slice(0, sep))) {
-        if (!/^sender:\s*user\s*$/m.test(content.slice(0, sep))) return;
+        const headers = content.slice(0, sep);
+        // Browser chat uses sender: user; Telegram/webhook inbound uses sender: webhook.
+        // Other senders (scheduler, heartbeat, etc.) stay hidden here.
+        const showAsYou =
+          /^sender:\s*user\s*$/m.test(headers) ||
+          /^sender:\s*webhook\s*$/m.test(headers);
+        if (!showAsYou) return;
         content = content.slice(sep + 2);
       }
       this.appendUserMessage(content, []);
@@ -876,7 +985,12 @@ export class ChatManager {
 
   renderMarkdown(text) {
     if (typeof marked === "undefined" || typeof DOMPurify === "undefined") return text;
-    return DOMPurify.sanitize(marked.parse(text));
+    ensureMarkedCodeRenderer();
+    const raw = marked.parse(text);
+    return DOMPurify.sanitize(raw, {
+      ADD_TAGS: ["button", "div", "span"],
+      ADD_ATTR: ["class", "type"],
+    });
   }
 
   scrollToBottom() {

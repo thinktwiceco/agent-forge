@@ -1,8 +1,4 @@
-<div align="center">
-  <img src="assets/agent_forge_logo.png" alt="Agent Forge Logo" width="400"/>
-</div>
-
-A Go framework and application for building AI agents with LLM integration, tool execution, and multi-agent orchestration.
+A Go framework and application for building AI agents with LLM integration, tool execution, and optional ephemeral subagents via `spawn_subagent`.
 
 **Two ways to use agent-forge:**
 
@@ -35,10 +31,10 @@ A Go framework and application for building AI agents with LLM integration, tool
 **Library:**
 - Simple agent creation with fluent API
 - Extensible tool system with custom tool support
-- Multi-agent teams with delegation pattern
+- Optional **spawn_subagent** tool for synchronous ephemeral sub-tasks with a subset of tools
 - Real-time streaming responses
-- Multiple LLM providers (OpenAI, DeepSeek, TogetherAI)
-- Built-in tools (filesystem, git, web, postgres, vector DB)
+- Multiple LLM providers (OpenAI, DeepSeek, TogetherAI, OpenRouter)
+- Built-in tools (filesystem, git, web, postgres, API client, Instagram Graph, update script, Telegram dev helper, vector DB when configured)
 - Plugin system for extending functionality
 - Conversation persistence and history management
 
@@ -99,9 +95,9 @@ go get github.com/thinktwiceco/agent-forge
 src/
 ├── agents/       # Agent creation and execution
 ├── builder/      # Config-driven agent builder
-├── core/         # Core interfaces (Tool, Plugin, SubAgent)
+├── core/         # Core interfaces (Tool, Plugin)
 ├── llms/         # LLM provider integrations
-├── tools/        # Built-in tools (fs, git, web, postgres, api, vector)
+├── tools/        # Built-in tools (fs, git, web, postgres, api, instagram, update, telegram, …)
 ├── plugins/      # Plugin system and built-in plugins
 ├── history/      # Conversation history management
 └── telemetry/    # Observability (tool exec, tokens, truncation)
@@ -153,23 +149,22 @@ See [docs/AGENT_BUILDER.md](docs/AGENT_BUILDER.md) for comprehensive documentati
 | API | `api.NewApiTool(name, endpoints, authHook)` | HTTP API calls with auth support |
 | Vector | `vector.NewVectorTool(db, embeddings)` | Semantic search and indexing |
 
-#### System Agents (Subagents)
+#### Ephemeral subagents (`spawn_subagent`)
 
-| Subagent | Constructor | Description |
-|----------|------------|-------------|
-| Reasoning | `agents.ReasoningAgent(llm)` | Analyzes questions, finds ambiguities |
-| OS | `agents.OsAgent(llm, root)` | File system and OS tasks |
-| Git | `agents.GitAgent(llm, workingDir)` | Git repository operations |
-| Coding | `agents.CodingAgent(llm, root)` | Code generation and analysis |
-| Web | `agents.WebAgent(llm, workingDir)` | Web navigation and automation |
-| Vision | `agents.VisionAgent(llm, workingDir)` | Loads images and answers visual questions (requires vision-capable model, e.g. gpt-4o) |
-
-Add subagents with:
+There is no fixed roster of system subagents or a **delegate** tool. To run an isolated sub-task with only some tools, enable **spawn_subagent** and call it from the model:
 
 ```go
-agent.AddSystemAgent(agents.ReasoningAgent(llm))
-agent.AddSystemAgent(agents.WebAgent(llm, workingDir))
+agent, err := agents.NewBuilder(llm, "main").
+    WithTools(fsTool, webTool).
+    WithSpawnSubagent().
+    Build()
 ```
+
+- **Parameters:** `prompt` (task for the child), `tools` (names from the parent’s tool list).
+- The child agent always gets **meta** and **expand**; it also gets the **todo** plugin if that plugin is registered in the binary.
+- The call is **synchronous**: the tool returns the subagent’s final text when done.
+
+YAML (Localforge): set `agent.spawn_subagent: true` in `config.yaml`. See [docs/TOOLS.md](docs/TOOLS.md) for the full tool contract.
 
 ### Adding Tools and Plugins
 
@@ -195,7 +190,7 @@ agent.AddTools([]llms.Tool{tool})
 
 #### Plugins
 
-Plugins extend agents with tools, hooks, and system prompts. Available plugins: `logger`, `todo`, `vault`, `procedures`, `knowledge`.
+Plugins extend agents with tools, hooks, and system prompts. Available plugins: `logger`, `todo`, `vault`, `procedures`, `brain`.
 
 ```yaml
 agent:
@@ -270,7 +265,7 @@ func main() {
     })
     
     // Chat with streaming
-    responseCh := agent.ChatStream("Hello! How can you help me?", "")
+    responseCh := agent.ChatStream(ctx, "Hello! How can you help me?", "")
     for chunk := range responseCh.Start() {
         if chunk.Content != "" {
             fmt.Print(chunk.Content)
@@ -315,18 +310,16 @@ func main() {
         },
     }
     
-    // Create agent with tools and subagents
+    // Create agent with tools
     agent, _ := agents.NewBuilder(llm, "MathAssistant").
         WithSystemPrompt("You are a helpful math assistant.").
         WithTools(calcTool, fs.NewFsTool("/tmp")).
         WithPersistence("json").
         AsMainAgent().
         Build()
-    
-    agent.AddSystemAgent(agents.ReasoningAgent(llm))
-    
+
     // Chat with streaming
-    responseCh := agent.ChatStream("What is 15 multiplied by 23?", "")
+    responseCh := agent.ChatStream(ctx, "What is 15 multiplied by 23?", "")
     for chunk := range responseCh.Start() {
         if chunk.Content != "" {
             fmt.Print(chunk.Content)
@@ -348,19 +341,11 @@ func main() {
 - Multi-agent orchestration
 - File uploads and knowledge integration
 
-**Chat interface** — Real-time streaming, conversation history, active tasks:
+**Chat interface** — Real-time streaming, conversation history, and active tasks.
 
-![Chat](assets/chat-main.png)
+**Settings** — Agent identity, plugins, and API keys.
 
-**Settings** — Agent identity, sub-agents, plugins, and API keys:
-
-![Agent](assets/settings-agent.png) ![Sub-agents](assets/settings-subagents.png)
-
-![Plugins](assets/settings-plugins.png) ![API Keys](assets/settings-api-keys.png)
-
-**Knowledge graph** — Node types, filters, and visualization:
-
-![Knowledge Graph](assets/knowledge-graph.png)
+**Knowledge graph** — Brain DB (`topic` -> `conversation` long-term memory graph), filters, and visualization on `/knowledge`.
 
 ### Installation
 
@@ -369,7 +354,7 @@ func main() {
 ```bash
 curl -fsSL https://raw.githubusercontent.com/thinktwiceco/agent-forge/main/scripts/install-release.sh | bash -s -- ./my-agent
 cd my-agent
-# Edit config.yaml (model, system_prompt, tools, subagents)
+# Edit config.yaml (model, system_prompt, tools, plugins)
 # Add API keys to .env
 ./start.sh
 ```
@@ -419,6 +404,7 @@ Create a `.env` file:
 AF_OPENAI_API_KEY=your-key
 AF_DEEPSEEK_API_KEY=your-key
 AF_TOGETHERAI_API_KEY=your-key
+AP_OPENROUTER_API_KEY=your-key
 AGENT_WORKING_DIR=/path/to/working/dir
 ```
 
@@ -468,7 +454,6 @@ GET /api/config              # Get agent configuration
 PUT /api/config              # Update agent config
 PUT /api/config/tools/:name  # Update tool config
 PUT /api/config/plugins      # Update plugins list
-PUT /api/config/subagents    # Update subagents
 GET /api/config/providers    # Get push providers (Instagram, Telegram)
 PUT /api/config/providers    # Update provider settings
 POST /api/agent/reload       # Reload agent from config
@@ -479,15 +464,18 @@ POST /api/agent/reload       # Reload agent from config
 - `POST /api/upload` - Upload files
 - `GET /api/fs/list`, `GET /api/fs/read` - FS visualization
 - `GET /api/knowledge/graph`, `GET /api/knowledge/stats`, `GET /api/knowledge/node/:id` - Knowledge graph
-- `POST /api/webhooks/:provider` - Webhook receiver (Instagram, Telegram)
-- `POST /api/webhooks/:provider/sync` - Webhook sync
+- `POST /api/webhooks/:provider` - Webhook receiver (Instagram, Telegram; set `WEBHOOK_SECRET_<PROVIDER>` for verification)
+- `POST /api/webhooks/:provider/sync` - Webhook sync (SSE stream to caller)
+
+For Telegram local dev, enable the [telegram tool](docs/TOOLS.md#telegram-tool) in agent config (`tools: [{ name: telegram, port: "8080" }]`) or set `TELEGRAM_BOT_TOKEN` / tunnel manually. To start a **new** persisted chat thread from Telegram, send **`/new_conversation`**; see [Telegram webhook threads](docs/TOOLS.md#telegram-webhook-threads) in `docs/TOOLS.md`.
 
 #### Directory Structure
 
 ```
 working_dir/
 ├── data/
-│   └── conversations/  # Conversation history (JSON)
+│   ├── conversations/      # Conversation history (JSON)
+│   └── telegram_thread_map.json  # Optional; Telegram chat → active thread id (see docs/TOOLS.md)
 ├── repos/              # Git tool cloned repos
 ├── web/                # Web tool saved content
 ├── vault/              # Vault plugin encrypted secrets
@@ -506,7 +494,9 @@ working_dir/
 | `working_dir` | string | No | Working directory for tools/plugins | - |
 | `persistence` | string | No | Conversation persistence | `""` (none) |
 | `tools` | array | No | List of tools to enable | `[]` |
-| `subagents` | map | No | Map of subagent name to model | `{}` |
+| `brain` | bool | No | Set `false` to disable the default brain plugin | omit (brain on) |
+| `brain_plugin` | object | No | Dreaming schedule (`dream`, `dreamTime`) when brain is on | — |
+| `heartbeat` | object | No | Proactive ticks; only used if `heartbeat` is in `plugins` | — |
 | `plugins` | array | No | List of plugin identifiers | `[]` |
 
 **Model Format:** `provider::model-name`
@@ -518,50 +508,42 @@ working_dir/
 | OpenAI | `openai` | `AF_OPENAI_API_KEY` | `gpt-5`, `gpt-5.1`, `gpt-5.2` |
 | DeepSeek | `deepseek` | `AF_DEEPSEEK_API_KEY` | `deepseek-chat`, `deepseek-reasoner` |
 | TogetherAI | `togetherai` | `AF_TOGETHERAI_API_KEY` | `meta-llama/Llama-3.2-3B-Instruct-Turbo`, `meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo`, `Qwen/Qwen2.5-7B-Instruct-Turbo`, `Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8`, `openai/gpt-oss-120b`, `zai-org/GLM-4.7`, `moonshotai/Kimi-K2.5` |
+| OpenRouter | `openrouter` | `AP_OPENROUTER_API_KEY` | Any [OpenRouter](https://openrouter.ai/models) model id (e.g. `openai/gpt-4o`, `openai/gpt-4o-mini`); defaults in code use `openai/gpt-4o` |
 
 #### Tools Configuration
 
-| Tool | Identifier | Required Parameters | Optional Parameters |
-|------|-----------|-------------------|-------------------|
-| File System | `fs` | `root` (string) | - |
-| Git | `git` | `root` (string) | - |
-| Web | `web` | `root` (string) | - |
-| Postgres | `postgres` | `postgresURL` (string), `mode` (string), `allowedTables` (array) | `allowedSchemas` (array) |
-| API | `api` | `endpoints` (array) | `onApiCallHook` (string) |
-| Vector | `vector` | (requires vector-storage section) | - |
+`agent.working_dir` is required for `fs`, `git`, `web`, `update`, and `api` (relative paths resolve under it). See [src/builder/README.md](src/builder/README.md#tools-configuration) and [docs/TOOLS.md](docs/TOOLS.md).
+
+| Tool | Identifier | Required YAML / env | Optional YAML |
+|------|-----------|---------------------|---------------|
+| File System | `fs` | `working_dir` | — |
+| Git | `git` | `working_dir` | — |
+| Web | `web` | `working_dir` | `headless` (bool) |
+| Postgres | `postgres` | `postgresURL`, `mode`, `allowedTables` | `allowedSchemas` |
+| API | `api` | `working_dir`, `config_folder` | — |
+| Instagram | `instagram` | `INSTAGRAM_ACCESS_TOKEN` env | — |
+| Update | `update` | `working_dir` | — |
+| Telegram | `telegram` | — | `port` (default `8080`; ngrok tunnels this port) |
+| Vector | `vector` | `vector-storage` section in YAML | — |
 
 **Example:**
 
 ```yaml
-tools:
-  - name: fs
-    root: "/path/to/sandbox"
-  - name: postgres
-    postgresURL: "postgresql://user:pass@host:5432/db"
-    mode: "read"  # or "write"
-    allowedTables: ["users", "products"]
-    allowedSchemas: ["public"]
+agent:
+  working_dir: "/path/to/agent-data"
+  tools:
+    - name: fs
+    - name: web
+    - name: postgres
+      postgresURL: "postgresql://user:pass@host:5432/db"
+      mode: "read"
+      allowedTables: ["users", "products"]
+      allowedSchemas: ["public"]
 ```
 
-#### Subagents Configuration
+#### Ephemeral subtasks (`spawn_subagent`)
 
-| Subagent | Identifier | Requirements | Description |
-|----------|-----------|--------------|-------------|
-| Reasoning | `reasoning` | Model spec | Analyzes questions, finds ambiguities |
-| OS | `os` | Model spec, working_dir | File system and OS operations |
-| Git | `git` | Model spec, working_dir | Git repository operations |
-| Web | `web` | Model spec, working_dir | Web navigation and automation |
-| Coding | `coding` | Model spec, working_dir | Code generation and analysis |
-| Vision | `vision` | Model spec (vision-capable, e.g. gpt-4o), working_dir | Loads images and answers visual questions |
-
-**Example:**
-
-```yaml
-subagents:
-  reasoning: "deepseek::deepseek-reasoner"
-  web: "deepseek::deepseek-chat"
-  git: "deepseek::deepseek-chat"
-```
+The old YAML `subagents` map and fixed system-agent roster are **removed**. For a short-lived child agent with a subset of tools, enable **spawn_subagent** in code (`agents.NewBuilder(...).WithSpawnSubagent().Build()`). See [docs/agents/how-to-system-agents.md](docs/agents/how-to-system-agents.md).
 
 #### Plugins
 
@@ -571,7 +553,9 @@ subagents:
 | Todo | `todo` | Task management | None |
 | Vault | `vault` | Encrypted secret storage | Requires `VAULT_MASTER_KEY` env var |
 | Procedures | `procedures` | Multi-phase workflows | Auto-scans `procedures/` directory |
-| Knowledge | `knowledge` | Knowledge graph integration | None |
+| Scheduler | `scheduler` | Scheduled jobs | None |
+| Heartbeat | `heartbeat` | Proactive timed agent turns | Optional `agent.heartbeat` YAML |
+| Brain | *(default)* | Long-term memory graph; opt out with `brain: false` | Optional `agent.brain_plugin` for dreaming |
 
 **Example:**
 
@@ -614,6 +598,7 @@ vector-storage:
 | `AF_OPENAI_API_KEY` | OpenAI API key | If using OpenAI | - |
 | `AF_DEEPSEEK_API_KEY` | DeepSeek API key | If using DeepSeek | - |
 | `AF_TOGETHERAI_API_KEY` | TogetherAI API key | If using TogetherAI | - |
+| `AP_OPENROUTER_API_KEY` | OpenRouter API key | If using OpenRouter (`openrouter::...`) | - |
 | `AF_LOG_LEVEL` | Log level | No | `INFO` |
 | `AF_LOG_FILE` | Log file path | No | - |
 | `VAULT_MASTER_KEY` | Vault encryption key (base64-encoded 32 bytes) | If using vault plugin | - |

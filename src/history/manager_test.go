@@ -8,15 +8,15 @@ import (
 
 // mockPersistence implements persistence.Persistence for testing.
 type mockPersistence struct {
-	saveHistoryFunc func(chatId string, history []*llms.UnifiedMessage) string
+	saveHistoryFunc func(chatId string, history []*llms.UnifiedMessage) (string, error)
 	getHistoryFunc  func(chatId string, limit, offset int) []*llms.UnifiedMessage
 }
 
-func (m *mockPersistence) SaveHistory(chatId string, history []*llms.UnifiedMessage) string {
+func (m *mockPersistence) SaveHistory(chatId string, history []*llms.UnifiedMessage) (string, error) {
 	if m.saveHistoryFunc != nil {
 		return m.saveHistoryFunc(chatId, history)
 	}
-	return chatId
+	return chatId, nil
 }
 
 func (m *mockPersistence) GetHistory(chatId string, limit, offset int) []*llms.UnifiedMessage {
@@ -85,8 +85,8 @@ func TestConversationHistory_ToolMessages(t *testing.T) {
 
 func TestConversationHistory_Save(t *testing.T) {
 	mockP := &mockPersistence{
-		saveHistoryFunc: func(chatId string, history []*llms.UnifiedMessage) string {
-			return "new-id"
+		saveHistoryFunc: func(chatId string, history []*llms.UnifiedMessage) (string, error) {
+			return "new-id", nil
 		},
 	}
 
@@ -96,7 +96,10 @@ func TestConversationHistory_Save(t *testing.T) {
 	)
 	h.SetMessages([]*llms.UnifiedMessage{llms.ToolMessage("1", "res", true)})
 
-	newId := h.Save()
+	newId, err := h.Save()
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
 	if newId != "new-id" {
 		t.Errorf("Expected new-id, got %s", newId)
 	}

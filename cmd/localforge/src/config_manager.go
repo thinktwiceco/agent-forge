@@ -285,34 +285,6 @@ func (cm *ConfigManager) UpdatePlugins(plugins []string) error {
 	return cm.save()
 }
 
-// UpdateSubagents replaces the subagents map in config.yaml.
-func (cm *ConfigManager) UpdateSubagents(subagents map[string]string) error {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	err := cm.patchYAMLNode(func(root *yaml.Node) error {
-		n, err := yamlMappingNode(root, "agent", "subagents")
-		if err != nil {
-			return err
-		}
-		n.Kind = yaml.MappingNode
-		n.Tag = "!!map"
-		n.Value = ""
-		n.Content = nil
-		for role, model := range subagents {
-			n.Content = append(n.Content,
-				&yaml.Node{Kind: yaml.ScalarNode, Value: role, Tag: "!!str"},
-				&yaml.Node{Kind: yaml.ScalarNode, Value: model, Tag: "!!str"},
-			)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	return cm.save()
-}
-
 // UpdateToolConfig updates settings for a named tool in config.yaml.
 func (cm *ConfigManager) UpdateToolConfig(toolName string, update UpdateToolConfigRequest) error {
 	if update.PostgresURL == nil &&

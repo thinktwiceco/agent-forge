@@ -12,6 +12,7 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/tools/git"
 	"github.com/thinktwiceco/agent-forge/src/tools/instagram"
 	"github.com/thinktwiceco/agent-forge/src/tools/postgres"
+	"github.com/thinktwiceco/agent-forge/src/tools/telegram"
 	"github.com/thinktwiceco/agent-forge/src/tools/update"
 	"github.com/thinktwiceco/agent-forge/src/tools/web"
 	"gopkg.in/yaml.v3"
@@ -19,14 +20,8 @@ import (
 
 // Tool represents a tool configuration entry in config.yaml
 type Tool struct {
-	Name string `yaml:"name"`
-	// Postgres-specific configs
-	PostgresURL    string   `yaml:"postgresURL,omitempty"`
-	Mode           string   `yaml:"mode,omitempty"`
-	AllowedTables  []string `yaml:"allowedTables,omitempty"`
-	AllowedSchemas []string `yaml:"allowedSchemas,omitempty"`
-	// API tool: path to folder containing one JSON file per service (relative to working_dir or absolute)
-	ConfigFolder string `yaml:"config_folder,omitempty"`
+	Name   string
+	Params map[string]any
 }
 
 // UnmarshalYAML implements custom unmarshaling to support both string and object formats
@@ -36,12 +31,29 @@ func (t *Tool) UnmarshalYAML(value *yaml.Node) error {
 		t.Name = toolName
 		return nil
 	}
-	type toolAlias Tool
-	var tmp toolAlias
-	if err := value.Decode(&tmp); err != nil {
+
+	var raw map[string]any
+	if err := value.Decode(&raw); err != nil {
 		return err
 	}
-	*t = Tool(tmp)
+
+	nameObj, ok := raw["name"]
+	if !ok {
+		return fmt.Errorf("tool definition missing 'name' field")
+	}
+
+	nameStr, ok := nameObj.(string)
+	if !ok {
+		return fmt.Errorf("tool 'name' must be a string")
+	}
+
+	t.Name = nameStr
+	delete(raw, "name")
+
+	if len(raw) > 0 {
+		t.Params = raw
+	}
+
 	return nil
 }
 
@@ -53,6 +65,7 @@ const (
 	API_TOOL         = "api"
 	INSTAGRAM_TOOL   = "instagram"
 	UPDATE_TOOL      = "update"
+	TELEGRAM_TOOL    = "telegram"
 )
 
 func (t *Tool) getTool(
@@ -70,31 +83,49 @@ func (t *Tool) getTool(
 		if workingDir == "" {
 			return nil, fmt.Errorf("working_dir is required for web tool")
 		}
-		return web.NewWebTool(filepath.Join(workingDir, "web")), nil
+		var headless *bool
+		if h, ok := t.Params["headless"].(bool); ok {
+			headless = &h
+		}
+		return web.NewWebTool(filepath.Join(workingDir, "web"), headless), nil
 	case GIT_TOOL:
 		if workingDir == "" {
 			return nil, fmt.Errorf("working_dir is required for git tool")
 		}
 		return git.NewGitTool(filepath.Join(workingDir, "repos")), nil
 	case POSTGRES_TOOL:
-		if t.PostgresURL == "" {
+		postgresURL, _ := t.Params["postgresURL"].(string)
+		mode, _ := t.Params["mode"].(string)
+
+		var allowedTables, allowedSchemas []string
+		if tables, ok := t.Params["allowedTables"].([]any); ok {
+			for _, table := range tables {
+				if s, ok := table.(string); ok {
+					allowedTables = append(allowedTables, s)
+				}
+			}
+		}
+		if schemas, ok := t.Params["allowedSchemas"].([]any); ok {
+			for _, schema := range schemas {
+				if s, ok := schema.(string); ok {
+					allowedSchemas = append(allowedSchemas, s)
+				}
+			}
+		}
+
+		if postgresURL == "" {
 			return nil, fmt.Errorf("postgresURL is required for postgres tool")
 		}
-		if t.Mode == "" {
+		if mode == "" {
 			return nil, fmt.Errorf("mode is required for postgres tool")
 		}
-		if t.Mode != "read" && t.Mode != "write" {
-			return nil, fmt.Errorf("mode must be 'read' or 'write', got: %s", t.Mode)
+		if mode != "read" && mode != "write" {
+			return nil, fmt.Errorf("mode must be 'read' or 'write', got: %s", mode)
 		}
-		if len(t.AllowedTables) == 0 {
+		if len(allowedTables) == 0 {
 			return nil, fmt.Errorf("allowedTables must contain at least one table")
 		}
-		return postgres.NewPostgresTool(
-			t.PostgresURL,
-			t.Mode,
-			t.AllowedTables,
-			t.AllowedSchemas,
-		), nil
+		return postgres.NewPostgresTool(postgresURL, mode, allowedTables, allowedSchemas), nil
 	case INSTAGRAM_TOOL:
 		token := os.Getenv("INSTAGRAM_ACCESS_TOKEN")
 		return instagram.NewInstagramTool(map[string]string{
@@ -102,10 +133,11 @@ func (t *Tool) getTool(
 			"Content-Type":  "application/json",
 		}), nil
 	case API_TOOL:
-		if t.ConfigFolder == "" {
+		configFolder, _ := t.Params["config_folder"].(string)
+		if configFolder == "" {
 			return nil, fmt.Errorf("config_folder is required for api tool (path to folder containing <service>.json files)")
 		}
-		folderPath := t.ConfigFolder
+		folderPath := configFolder
 		if !filepath.IsAbs(folderPath) {
 			folderPath = filepath.Join(workingDir, folderPath)
 		}
@@ -143,6 +175,9 @@ func (t *Tool) getTool(
 			return nil, fmt.Errorf("working_dir is required for update tool")
 		}
 		return update.NewUpdateTool(workingDir), nil
+	case TELEGRAM_TOOL:
+		port, _ := t.Params["port"].(string)
+		return telegram.NewTelegramTool(port), nil
 	}
 	return nil, fmt.Errorf("invalid tool: %s", t.Name)
 }

@@ -8,7 +8,7 @@ Ask the user: **What is the goal?** Capture the goal clearly.
 
 ## 2. Break down the goal
 
-Delegate to the **reasoning agent** (use the `delegate` tool with subAgent `system-reasoning`). Ask it to break down the goal into:
+If the main agent has **spawn_subagent** enabled, spawn a short-lived subagent with only the tools it needs. Pass a clear `prompt` and a minimal `tools` list. Ask it to break down the goal into:
 
 - **Steps** — ordered list of what to do
 - **Tools** — which tools are needed for each step

@@ -1,7 +1,7 @@
 // ─── Agent Layer: Initialization ─────────────────────────────────────────────
 //
 // The agent layer is purely a runtime concern. It derives all of its state from
-// agents.AgentConfig (produced by builder.AgentBuilder.Build()) and holds no
+// agents.AgentConfig (produced by builder.AgentFactory.Build()) and holds no
 // durable state of its own. On every AgentManager.Reload() the entire agent is
 // discarded and rebuilt from scratch — a safe operation because:
 //
@@ -24,6 +24,7 @@
 package agents
 
 import (
+	"context"
 	"fmt"
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
@@ -33,9 +34,10 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/agents/prompts"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
-	"github.com/thinktwiceco/agent-forge/src/tools/delegate"
+	"github.com/thinktwiceco/agent-forge/src/plugins/registry"
 	"github.com/thinktwiceco/agent-forge/src/tools/expand"
 	"github.com/thinktwiceco/agent-forge/src/tools/meta"
+	"github.com/thinktwiceco/agent-forge/src/tools/spawn"
 )
 
 // ==============================
@@ -53,7 +55,6 @@ func (a *Agent) ensureConfig() {
 	}
 
 	a.llmEngine = a.config.LLMEngine
-	a.subAgents = a.config.SubAgents
 
 	// Initialize tools from config (if provided)
 	if a.config.Tools != nil {
@@ -136,43 +137,45 @@ func (a *Agent) initSystemTools() {
 		et := expand.NewExpandTool()
 		a.tools = append(a.tools, et)
 	}
-}
 
-// initResponseCh initializes the response channel.
-// This method is not used - setResponseCh() is used instead.
-// Keeping for backward compatibility if needed.
-//
-//nolint:unused // Reserved for backward compatibility
-func (a *Agent) initResponseCh() {
-	a.responseCh = core.NewResponseCh(a.Name(), a.Trace(), "", nil)
-	a.responseCh.Start()
-}
+	// Spawn Subagent Tool - add only if enabled
+	if a.config.CanSpawnSubagent {
+		llmEngine := a.llmEngine
+		workingDir := a.config.WorkingDir
+		factory := func(ctx context.Context, prompt string, tools []llms.Tool) (string, error) {
+			b := NewBuilder(llmEngine, "subagent").WithTools(tools...)
 
-func (a *Agent) loadDelegateTool() {
-	if len(a.subAgents) == 0 {
-		return
-	}
+			// Attach the todo plugin when it has been registered (e.g. via allplugins blank import).
+			// Using the registry avoids a direct import of src/plugins/todo which would create
+			// a circular dependency (todo imports src/agents for its hook type).
+			if todoFactory, err := registry.Get("todo"); err == nil {
+				b = b.WithPlugins(todoFactory(workingDir))
+			}
 
-	// Look if a delegate tool already exists
-	for _, tool := range a.tools {
-		if tool.GetName() == delegate.DELEGATE_TOOL {
-			a.tools = a.removeDelegateTool(a.tools)
+			sub, err := b.Build()
+			if err != nil {
+				return "", err
+			}
+			var finalContent string
+			for chunk := range sub.ChatStream(ctx, prompt, "").Start() {
+				if chunk.FullContent != "" {
+					finalContent = chunk.FullContent
+				}
+			}
+			return finalContent, nil
 		}
+		a.tools = append(a.tools, spawn.NewSpawnSubagentTool(factory))
 	}
-
-	dt := delegate.NewDelegateTool(a.subAgents, a.inbox)
-	a.tools = append(a.tools, dt)
 }
 
 // initAgentContext rebuilds the agent context and syncs all components.
-// Called when tools or sub-agents change (e.g. AddTools, AddSystemAgent).
+// Called when tools change (e.g. AddTools).
 func (a *Agent) initAgentContext() {
 	a.contextMgr.UpdateConfig(agentctx.Config{
 		AgentName:          a.Name(),
 		Trace:              a.Trace(),
 		Model:              fmt.Sprintf("%s-%s", a.config.LLMEngine.Provider(), a.config.LLMEngine.Model()),
 		Tools:              a.tools,
-		SubAgents:          a.subAgents,
 		TokenCounter:       a.tokenCounter,
 		TruncationStrategy: a.config.TruncationStrategy,
 		MaxContextTokens:   a.maxContextTokens,
@@ -185,14 +188,13 @@ func (a *Agent) initAgentContext() {
 }
 
 // ensureSystemPrompt rebuilds the system prompt and updates promptBuilder.
-// Called when tools or sub-agents change.
+// Called when tools change.
 func (a *Agent) ensureSystemPrompt() {
 	a.promptBuilder.UpdateConfig(prompts.Config{
 		SystemPrompt: a.config.SystemPrompt,
 		MainAgent:    a.config.MainAgent,
 		Tone:         a.config.Tone,
 		Tools:        a.tools,
-		SubAgents:    a.subAgents,
 	})
 	a.systemPrompt = a.promptBuilder.Build()
 }
@@ -227,26 +229,14 @@ func (a *Agent) createExecutor() ExecutionEngine {
 		a.tools,
 		a.agentContext,
 		execution.Config{
-			MaxToolIterations: a.config.MaxToolIterations,
-			AgentName:         a.config.AgentName,
-			Tracer:            a.config.Tracer,
-			TruncateHistory:   truncateHistory,
+			MaxToolIterations:    a.config.MaxToolIterations,
+			AgentName:            a.config.AgentName,
+			Tracer:               a.config.Tracer,
+			TruncateHistory:      truncateHistory,
+			HeartbeatAckMaxChars: a.config.HeartbeatAckMaxChars,
 		},
 		hooks,
 	)
-}
-
-func (a *Agent) addSystemAgents() {
-	var systemAgents []core.SubAgent
-
-	if a.config.Reasoning {
-		// Create reasoning agent from template
-		raAsSubAgent := ReasoningAgent(a.config.LLMEngine)
-		systemAgents = append(systemAgents, raAsSubAgent)
-	}
-
-	// Append system agents to subagents
-	a.subAgents = append(a.subAgents, systemAgents...)
 }
 
 func (a *Agent) registerPlugins() {
@@ -297,6 +287,13 @@ func (a *Agent) createPluginInitializationHandler() OnAgentInitializationHook {
 				ia.SetInbox(agent.inbox)
 			}
 
+			// Inject LLM engine if the plugin supports it (e.g. brain dreaming runner).
+			// Use config.LLMEngine: ensureConfig() has not run yet, so agent.llmEngine is still nil.
+			if la, ok := plugin.(core.LLMEngineAware); ok {
+				agentforge.Debug("🔌 [handlePluginInitialization] Injecting LLM engine to plugin %s", plugin.Name())
+				la.SetLLMEngine(agent.config.LLMEngine)
+			}
+
 			// Check if plugin provides hooks
 			if hp, ok := plugin.(core.HookProvider); ok {
 				hooks := hp.Hooks()
@@ -339,25 +336,14 @@ func (a *Agent) createPluginInitializationHandler() OnAgentInitializationHook {
 
 // / ========= SYSTEM HOOKS ========= ///
 func (a *Agent) registerSystemCallbacks() {
-	// Create system handlers and register them with the hook system
 	systemHandlers := handlers.NewSystemHandlers()
 
-	// Create adapter functions that bridge between the hook system and the interface-based handlers
-	registerSystemAgentHook := func(handler func(handlers.AgentOperations, core.SubAgent) error) {
-		// Create a hook with the correct signature for the hook system
-		hook := OnAddedSystemAgentHook(func(agent *Agent, subAgent core.SubAgent) error {
-			return handler(agent, subAgent)
-		})
-		a.hooks.on(core.EventAddedSystemAgent, hook)
-	}
-
 	registerToolsHook := func(handler func(handlers.AgentOperations, []llms.Tool) error) {
-		// Create a hook with the correct signature for the hook system
 		hook := OnAddedToolsHook(func(agent *Agent, tools []llms.Tool) error {
 			return handler(agent, tools)
 		})
 		a.hooks.on(core.EventAddedTools, hook)
 	}
 
-	systemHandlers.RegisterWith(registerSystemAgentHook, registerToolsHook)
+	systemHandlers.RegisterWith(registerToolsHook)
 }

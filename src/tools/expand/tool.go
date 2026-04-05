@@ -5,13 +5,13 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/llms"
 )
 
-// Expand represents a tool that allows progressive discovery of tools and agents.
+// Expand represents a tool that allows progressive discovery of tools.
 type Expand struct{}
 
-// NewExpandTool creates a tool that allows progressive discovery of tools and agents.
+// NewExpandTool creates a tool that allows progressive discovery of tools.
 //
 // This tool enables agents to retrieve detailed information (AdvanceDescription and
-// Troubleshooting) about tools and sub-agents that are available in their context.
+// Troubleshooting) about tools that are available in their context.
 //
 // Progressive discovery pattern:
 //   - BasicDescription: what the tool does and which actions are available
@@ -20,17 +20,16 @@ type Expand struct{}
 //
 // The tool expects the following items in agentContext:
 //   - "tools": []llms.Tool - list of available tools
-//   - "subAgents": []core.SubAgent - list of available sub-agents
 func NewExpandTool() llms.Tool {
 	expand := &Expand{}
 
-	return &core.Tool{
+	return core.NewTool(core.ToolConfig{
 		Name:        "expand",
-		Description: "Get detailed information about a tool or sub-agent. Use this to discover advanced capabilities, troubleshooting information, or per-action details.",
+		Description: "Get detailed information about a tool. Use this to discover advanced capabilities, troubleshooting information, or per-action details.",
 		AdvanceDesc: `Advanced Details:
 - Parameters:
-  * subject_type (string, required): Either "tool" or "agent"
-  * subject_name (string, required): The exact name of the tool or agent
+  * subject_type (string, required): Must be "tool"
+  * subject_name (string, required): The exact name of the tool
   * details_about (string, optional): Name of a specific action/operation/endpoint to get deep details about
   * troubleshoot (boolean, optional): Include troubleshooting information (default: false, ignored when details_about is set)
 - Progressive discovery:
@@ -40,21 +39,21 @@ func NewExpandTool() llms.Tool {
 - Integration: Can be added to any agent that needs discovery capabilities`,
 		TroubleshootingInfo: `Troubleshooting:
 - "Not found" errors: Verify subject_name matches exactly (case-sensitive)
-- "Invalid subject_type": Must be exactly "tool" or "agent"
-- "Does not implement Discoverable": The tool/agent doesn't support discovery
-- Empty descriptions: The tool/agent may not have advanced descriptions configured
+- "Invalid subject_type": Must be exactly "tool"
+- "Does not implement Discoverable": The tool doesn't support discovery
+- Empty descriptions: The tool may not have advanced descriptions configured
 - Tool not in context: Ensure the tool is added to the agent's tool list`,
 		Parameters: []core.Parameter{
 			{
 				Name:        "subject_type",
 				Type:        "string",
-				Description: "The type of subject to expand: 'tool' or 'agent'",
+				Description: "Must be 'tool'",
 				Required:    true,
 			},
 			{
 				Name:        "subject_name",
 				Type:        "string",
-				Description: "The exact name of the tool or agent to get information about",
+				Description: "The exact name of the tool to get information about",
 				Required:    true,
 			},
 			{
@@ -83,5 +82,5 @@ func NewExpandTool() llms.Tool {
 
 			return expand.expand(agentContext, subjectType, subjectName, troubleshoot, detailsAbout)
 		},
-	}
+	})
 }

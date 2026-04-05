@@ -5,13 +5,39 @@ agent:
   system_prompt: |
     You are a helpful assistant. Customize this prompt for your use case.
   model: "togetherai::moonshotai/Kimi-K2.5"
+  # OpenRouter: set AP_OPENROUTER_API_KEY in .env, then e.g. model: "openrouter::openai/gpt-4o"
   working_dir: "${AGENT_WORKING_DIR}"
   persistence: "json"
   tools:
     - name: fs
     - name: web
-  subagents:
-    reasoning: "deepseek::deepseek-reasoner"
+      # headless: true   # default when omitted: WEB_TOOL_HEADLESS env, else true; false = visible browser
+    # Telegram bot setup helper (register token + start ngrok tunnel):
+    # - name: telegram
+    #   port: "8080"   # local server port ngrok will tunnel (default: 8080)
+  # Set WEBHOOK_SECRET_TELEGRAM in .env before start_ngrok/set_webhook; Localforge requires it for Telegram webhooks.
+  # In Telegram, send /new_conversation to start a fresh JSON thread (map stored under data/telegram_thread_map.json).
+  # Telegram access control: comma-separated chat/user IDs allowed to talk to the agent.
+  # Leave unset (or empty) to allow all senders. Set TELEGRAM_ALLOWED_CHAT_IDS in your .env.
+  # To find your chat ID: send any message to the bot and check the Localforge debug logs.
+  # Optional: ephemeral sub-tasks with spawn_subagent (subset of parent tools):
+  # spawn_subagent: true
+  # brain is loaded by default (no need to list it here).
+  # To disable: uncomment the line below.
+  # brain: false
+  # Optional dreaming (distil conversations → brain/persistence/):
+  # brain_plugin:
+  #   dream: "on"       # or "off"
+  #   dreamTime: "02:00" # local time HH:MM when RunPending runs daily
   plugins:
     - "todo"
     - "vault"
+    # - "heartbeat"
+  # Optional: only applies when "heartbeat" is listed under plugins.
+  # heartbeat:
+  #   every: "30m"
+  #   ack_max_chars: 300
+  #   active_hours:
+  #     start: "08:00"
+  #     end: "22:00"
+  #     timezone: "America/New_York"

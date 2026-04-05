@@ -102,17 +102,9 @@ func (p *ProceduresPlugin) SystemPrompt() string {
 	var sb strings.Builder
 	sb.WriteString("[PROCEDURES]\n")
 	sb.WriteString("- Tool: procedure\n")
-	sb.WriteString("- Structured multi-step tasks. Actions: start_procedure, next_step, goto_step (jump to step by number).\n")
-	sb.WriteString("- User-created and repository-installed procedures live in procedures/. When creating procedures, always use paths under procedures/ (e.g. procedures/my-procedure/).\n\n")
-	sb.WriteString("[PROCEDURE EXECUTION RULE — MANDATORY]\n")
-	sb.WriteString("At ANY step or tool call, if the outcome is not exactly what the step describes, or a Tool returne any error or unexpected result as expected:\n")
-	sb.WriteString("1. STOP immediately. Do not continue, retry, guess, or attempt to work around the problem.\n")
-	sb.WriteString("2. Report to the user with:\n")
-	sb.WriteString("   - Step: which step you were on\n")
-	sb.WriteString("   - Expected: what you expected to happen or find\n")
-	sb.WriteString("   - Found: what actually happened or was present\n")
-	sb.WriteString("   - Evidence: any tool output, error message, or file path relevant to the failure\n")
-	sb.WriteString("This rule is absolute and overrides any instinct to recover autonomously.\n\n")
+	sb.WriteString("- Use for structured multi-step tasks and procedure installation.\n")
+	sb.WriteString("- Create local procedures only under procedures/.\n")
+	sb.WriteString("- If a procedure step or required tool result does not match the instructions, stop and report the mismatch instead of improvising.\n\n")
 	sb.WriteString("[AVAILABLE]\n")
 
 	// Sort names for deterministic output
@@ -124,7 +116,7 @@ func (p *ProceduresPlugin) SystemPrompt() string {
 
 	for _, name := range names {
 		proc := p.procedures[name]
-		fmt.Fprintf(&sb, "- %s (%d phases): %s\n", proc.Name, proc.PhaseCount, proc.Description)
+		fmt.Fprintf(&sb, "- %s: %s\n", proc.Name, proc.Description)
 	}
 
 	return sb.String()
@@ -181,6 +173,10 @@ func (p *ProceduresPlugin) loadProceduresFromDir(dir string) error {
 
 // loadProcedure parses a single procedure directory.
 func loadProcedure(dir string) (*Procedure, error) {
+	if err := maybeAdaptSkill(dir); err != nil {
+		return nil, err
+	}
+
 	manifestPath := filepath.Join(dir, "manifest.yaml")
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {

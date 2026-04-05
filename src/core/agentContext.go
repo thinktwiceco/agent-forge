@@ -10,8 +10,8 @@ import (
 // at agent instantiation. This avoids rebuilding the context on every tool execution.
 //
 // Field Mutability:
-//   - Immutable fields (set at initialization, never change): AgentName, Trace, Model, Tools, SubAgents, ResponseCh
-//   - Mutable fields (can change during tool execution): LastSubagentMessage, SessionStorage, PluginFields
+//   - Immutable fields (set at initialization, never change): AgentName, Trace, Model, Tools, ResponseCh
+//   - Mutable fields (can change during tool execution): SessionStorage, PluginFields
 type AgentContext struct {
 	// AgentName is the name of the agent (immutable)
 	AgentName string
@@ -23,12 +23,8 @@ type AgentContext struct {
 	Tools []llms.Tool
 	// WorkingDir is the agent's working directory, accessible to tools (immutable)
 	WorkingDir string
-	// SubAgents is the list of sub-agents available for delegation (immutable)
-	SubAgents []SubAgent
 	// ResponseCh is the response channel for the current chat session (immutable per session)
 	ResponseCh *ResponseCh
-	// LastSubagentMessage stores the last message from a subagent (mutable)
-	LastSubagentMessage string
 	// SessionStorage is a map that persists state across tool calls (mutable, shared by reference)
 	SessionStorage map[string]any
 	// PluginFields is a map for plugins to store custom context data that persists across tool calls (mutable)
@@ -36,8 +32,8 @@ type AgentContext struct {
 }
 
 // Snapshot returns a new AgentContext for a single ChatStream call.
-// Immutable fields are copied by value; mutable fields (SessionStorage, PluginFields,
-// LastSubagentMessage) start fresh so concurrent calls cannot bleed state into each other.
+// Immutable fields are copied by value; mutable fields (SessionStorage, PluginFields)
+// start fresh so concurrent calls cannot bleed state into each other.
 func (ac *AgentContext) Snapshot() *AgentContext {
 	return &AgentContext{
 		AgentName:  ac.AgentName,
@@ -45,7 +41,6 @@ func (ac *AgentContext) Snapshot() *AgentContext {
 		Model:      ac.Model,
 		Tools:      ac.Tools,
 		WorkingDir: ac.WorkingDir,
-		SubAgents:  ac.SubAgents,
 		// mutable fields start empty for each call
 		SessionStorage: make(map[string]any),
 		PluginFields:   make(map[string]any),
@@ -73,8 +68,6 @@ func (ac *AgentContext) BuildContext(responseCh *ResponseCh) map[string]any {
 	context["chatId"] = chatId
 	context["tools"] = ac.Tools
 	context["workingDir"] = ac.WorkingDir
-	context["subAgents"] = ac.SubAgents
-	context["lastSubagentMessage"] = ac.LastSubagentMessage
 
 	// SessionStorage should always be initialized (never nil)
 	// This ensures the same map reference is shared across all tool calls
@@ -119,12 +112,6 @@ func RehydrateContext(contextMap map[string]any) (*AgentContext, error) {
 		return nil, err
 	}
 	if err := ac.validateTools(contextMap); err != nil {
-		return nil, err
-	}
-	if err := ac.validateSubAgents(contextMap); err != nil {
-		return nil, err
-	}
-	if err := ac.validateLastSubagentMessage(contextMap); err != nil {
 		return nil, err
 	}
 	if err := ac.validateSessionStorage(contextMap); err != nil {
@@ -201,67 +188,16 @@ func (ac *AgentContext) validateTools(contextMap map[string]any) error {
 		return fmt.Errorf("tools must be []llms.Tool, got %T", toolsRaw)
 	}
 
-	tools := make([]llms.Tool, 0, len(toolsSlice))
+	out := make([]llms.Tool, 0, len(toolsSlice))
 	for i, toolRaw := range toolsSlice {
 		tool, ok := toolRaw.(llms.Tool)
 		if !ok {
 			return fmt.Errorf("tools[%d] must implement llms.Tool, got %T", i, toolRaw)
 		}
-		tools = append(tools, tool)
+		out = append(out, tool)
 	}
-	ac.Tools = tools
+	ac.Tools = out
 	return nil
-}
-
-// validateSubAgents extracts and validates the subAgents field from the context map.
-func (ac *AgentContext) validateSubAgents(contextMap map[string]any) error {
-	subAgentsRaw, exists := contextMap["subAgents"]
-	if !exists {
-		return nil
-	}
-
-	if subAgents, ok := subAgentsRaw.([]SubAgent); ok {
-		ac.SubAgents = subAgents
-		return nil
-	}
-
-	// Handle case where subAgents might be []interface{} from JSON unmarshaling
-	subAgentsSlice, ok := subAgentsRaw.([]interface{})
-	if !ok {
-		return fmt.Errorf("subAgents must be []*SubAgent or []interface{}, got %T", subAgentsRaw)
-	}
-
-	subAgents := make([]SubAgent, 0, len(subAgentsSlice))
-	for i, subAgentRaw := range subAgentsSlice {
-		// Try to assert as SubAgent directly
-		subAgent, ok := subAgentRaw.(SubAgent)
-		if !ok {
-			return fmt.Errorf("subAgents[%d] must be SubAgent, got %T", i, subAgentRaw)
-		}
-		subAgents = append(subAgents, subAgent)
-	}
-	ac.SubAgents = subAgents
-	return nil
-}
-
-// validateLastSubagentMessage extracts and validates the lastSubagentMessage field from the context map.
-func (ac *AgentContext) validateLastSubagentMessage(contextMap map[string]any) error {
-	if lastSubagentMessage, ok := contextMap["lastSubagentMessage"].(string); ok {
-		ac.LastSubagentMessage = lastSubagentMessage
-	} else if lastSubagentMessage, exists := contextMap["lastSubagentMessage"]; exists {
-		return fmt.Errorf("lastSubagentMessage must be a string, got %T", lastSubagentMessage)
-	}
-	return nil
-}
-
-// GetLastSubagentMessage returns the last subagent message
-func (ac *AgentContext) GetLastSubagentMessage() string {
-	return ac.LastSubagentMessage
-}
-
-// SetLastSubagentMessage sets the last subagent message
-func (ac *AgentContext) SetLastSubagentMessage(message string) {
-	ac.LastSubagentMessage = message
 }
 
 // validateSessionStorage extracts and validates the sessionStorage field from the context map.
@@ -298,9 +234,7 @@ func (ac *AgentContext) SetSessionStorage(sessionStorage map[string]any) {
 // This ensures changes made by tools persist across tool calls.
 //
 // Mutable fields that are synced:
-//   - LastSubagentMessage: Updated from context map
 //   - PluginFields: Merged from context map (if present)
-//   - SessionStorage: Already shared by reference, no sync needed
 //
 // Immutable fields are not synced as they should never change after initialization.
 //
@@ -310,11 +244,6 @@ func (ac *AgentContext) SetSessionStorage(sessionStorage map[string]any) {
 // Returns:
 //   - error: An error if sync fails (should not happen in normal operation)
 func (ac *AgentContext) SyncFromMap(contextMap map[string]any) error {
-	// Sync LastSubagentMessage
-	if msg, ok := contextMap["lastSubagentMessage"].(string); ok {
-		ac.LastSubagentMessage = msg
-	}
-
 	// Sync PluginFields
 	if pluginFields, ok := contextMap["pluginFields"].(map[string]any); ok {
 		if ac.PluginFields == nil {

@@ -3,6 +3,7 @@ package agents
 import (
 	"context"
 
+	"github.com/thinktwiceco/agent-forge/src/agents/execution"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/history"
 	"github.com/thinktwiceco/agent-forge/src/llms"
@@ -33,8 +34,7 @@ type HistoryManager interface {
 //
 // The prompt builder is responsible for:
 // - Building the base system prompt
-// - Adding tool descriptions to the prompt
-// - Adding sub-agent descriptions to the prompt
+// - Adding concise tool-use guidance when tools are configured
 // - Applying tone and style configurations
 // - Normalizing prompt formatting
 type PromptBuilder interface {
@@ -42,7 +42,7 @@ type PromptBuilder interface {
 	Build() string
 
 	// UpdateConfig updates the builder's configuration
-	// Call when tools or sub-agents change to rebuild the prompt
+	// Call when tools change to rebuild the prompt
 	UpdateConfig(config interface{})
 }
 
@@ -60,7 +60,7 @@ type ExecutionEngine interface {
 	// - The LLM provides a final response (no tool calls)
 	// - Maximum iterations are reached
 	// - An error occurs
-	ExecuteChatWithTools(ctx context.Context, hm history.Manager, responseCh *core.ResponseCh) error
+	ExecuteChatWithTools(ctx context.Context, hm history.Manager, responseCh *core.ResponseCh) (execution.ExecuteResult, error)
 
 	// ExecuteTool finds and executes a specific tool by its call details
 	// Returns a ToolResult containing the execution outcome
@@ -82,7 +82,6 @@ type ExecutionEngine interface {
 // - Context building
 // - Tool execution (before and after)
 // - Message events (user, assistant, chunks)
-// - Sub-agent management
 //
 // The registry allows plugins and external code to observe and modify
 // agent behavior without directly coupling to implementation details.
@@ -99,12 +98,11 @@ type HookRegistry interface {
 	newUserMessageEvent(a *Agent, message string) []error
 	newAssistantMessageEvent(a *Agent, message string, promptTokens, completionTokens, totalTokens int) []error
 	newAssistantMessageWithToolCallsEvent(a *Agent, message string, toolCalls []llms.ToolCall, promptTokens, completionTokens, totalTokens int) []error
-	addSystemAgentEvent(a *Agent, subAgent core.SubAgent) []error
-	addedSystemAgentEvent(a *Agent, subAgent core.SubAgent) []error
 	addedToolsEvent(a *Agent, tools []llms.Tool) []error
 	agentInitializationEvent(a *Agent, config *AgentConfig) []error
 	agentInitializedEvent(a *Agent) []error
 	newChunkEvent(a *Agent, chunk *core.ExtendedChunkResponse) []error
+	chatStartEvent(a *Agent, chatId string) []error
 }
 
 // ContextManager manages agent context lifecycle and operations.
@@ -113,7 +111,7 @@ type HookRegistry interface {
 // - Creating and maintaining the AgentContext
 // - Building context maps for tool execution
 // - Syncing changes back after tool execution
-// - Updating context when tools or sub-agents change
+// - Updating context when tools change
 // - Managing session storage across requests
 // - Managing plugin fields
 // - Truncating message history (if configured)
@@ -135,14 +133,11 @@ type ContextManager interface {
 	TruncateHistory(messages []*llms.UnifiedMessage) []*llms.UnifiedMessage
 
 	// UpdateConfig updates the manager configuration and rebuilds context
-	// Call when tools or sub-agents change
+	// Call when tools change
 	UpdateConfig(config interface{})
 
 	// UpdateTools updates just the tools without rebuilding entire config
 	UpdateTools(tools []llms.Tool)
-
-	// UpdateSubAgents updates just the sub-agents without rebuilding entire config
-	UpdateSubAgents(agents []core.SubAgent)
 }
 
 // ===== Compile-time Interface Assertions =====

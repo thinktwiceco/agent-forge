@@ -22,54 +22,81 @@ type Parameter struct {
 	Validator   func(value any) error  // Optional custom validation
 }
 
-// Tool is a universal tool implementation that satisfies both llms.Tool and agentforge.Discoverable interfaces
-type Tool struct {
+// ToolConfig holds the configuration for creating a new Tool
+type ToolConfig struct {
 	Name                string
 	Description         string
-	AdvanceDesc         string                   // Public field - use AdvanceDescription() method to access via interface
-	TroubleshootingInfo string                   // Public field - use Troubleshooting() method to access via interface
-	DetailsAboutFunc    func(item string) string // Optional; returns per-item details for DetailsAbout
+	AdvanceDesc         string
+	TroubleshootingInfo string
+	DetailsAboutFunc    func(item string) string
 	Parameters          []Parameter
 	Handler             func(agentContext map[string]any, args map[string]any) llms.ToolReturn
-	Hooks               Hooks // Optional external validation hooks
+	Hooks               Hooks
+}
+
+// Tool is a universal tool implementation that satisfies both llms.Tool and agentforge.Discoverable interfaces.
+// All fields are private to enforce the use of accessor methods.
+type Tool struct {
+	name                string
+	description         string
+	advanceDesc         string
+	troubleshootingInfo string
+	detailsAboutFunc    func(item string) string
+	parameters          []Parameter
+	handler             func(agentContext map[string]any, args map[string]any) llms.ToolReturn
+	hooks               Hooks // Optional external validation hooks
+}
+
+// NewTool creates a new Tool instantiating the private fields from a ToolConfig
+func NewTool(cfg ToolConfig) *Tool {
+	return &Tool{
+		name:                cfg.Name,
+		description:         cfg.Description,
+		advanceDesc:         cfg.AdvanceDesc,
+		troubleshootingInfo: cfg.TroubleshootingInfo,
+		detailsAboutFunc:    cfg.DetailsAboutFunc,
+		parameters:          cfg.Parameters,
+		handler:             cfg.Handler,
+		hooks:               cfg.Hooks,
+	}
 }
 
 // GetName returns the name of the tool (implements llms.Tool)
 func (t *Tool) GetName() string {
-	return t.Name
+	return t.name
 }
 
 // BasicDescription returns a short one-line description of the tool (implements agentforge.Discoverable)
 func (t *Tool) BasicDescription() string {
-	return t.Description
+	return t.description
 }
 
 // AdvanceDescription returns detailed information about the tool's capabilities (implements agentforge.Discoverable)
 func (t *Tool) AdvanceDescription() string {
-	return t.AdvanceDesc
+	return t.advanceDesc
 }
 
 // Troubleshooting returns information about common issues and debugging tips (implements agentforge.Discoverable)
 func (t *Tool) Troubleshooting() string {
-	return t.TroubleshootingInfo
+	return t.troubleshootingInfo
 }
 
 // DetailsAbout returns detailed information about a specific item (implements agentforge.Discoverable)
 func (t *Tool) DetailsAbout(item string) string {
-	if t.DetailsAboutFunc != nil {
-		return t.DetailsAboutFunc(item)
+	if t.detailsAboutFunc != nil {
+		return t.detailsAboutFunc(item)
 	}
 	return fmt.Sprintf("Nothing to add about %s", item)
 }
 
 // GetHooks returns the hooks interface for external validation (can be nil)
 func (t *Tool) GetHooks() Hooks {
-	return t.Hooks
+	return t.hooks
 }
 
 // SetHooks sets the hooks interface for external validation
 func (t *Tool) SetHooks(hooks Hooks) {
-	t.Hooks = hooks
+	t.hooks = hooks
 }
 
 // GetFunctionDefinition returns the function definition for LLM API calls (implements llms.Tool)
@@ -77,7 +104,7 @@ func (t *Tool) GetFunctionDefinition() llms.FunctionDefinition {
 	properties := make(map[string]llms.FunctionObjectParameter)
 	var required []string
 
-	for _, param := range t.Parameters {
+	for _, param := range t.parameters {
 		prop := llms.FunctionObjectParameter{
 			Type_:       param.Type,
 			Description: param.Description,
@@ -94,8 +121,8 @@ func (t *Tool) GetFunctionDefinition() llms.FunctionDefinition {
 	}
 
 	return llms.FunctionDefinition{
-		Name:        t.Name,
-		Description: t.Description,
+		Name:        t.name,
+		Description: t.description,
 		Parameters: llms.FunctionParameters{
 			Type_:      "object",
 			Properties: properties,
@@ -109,12 +136,8 @@ func (t *Tool) GetFunctionDefinition() llms.FunctionDefinition {
 // Tool Usage Guidelines:
 //   - Tools receive agentContext as a map[string]any for read access
 //   - Tools can read any field from the context map directly
-//   - Tools that need to modify context should:
-//     1. Use RehydrateContext() to get the struct
-//     2. Use helper methods (e.g., SetLastSubagentMessage()) to modify fields
-//     3. Update the context map with changes (e.g., ctx["lastSubagentMessage"] = value)
-//   - Changes to mutable fields (LastSubagentMessage, PluginFields) will be synced back
-//     to the struct automatically after tool execution
+//   - Tools that need to modify context should use RehydrateContext(), update mutable
+//     fields (e.g. PluginFields), and rely on SyncFromMap after execution
 //   - SessionStorage is shared by reference - modifications persist automatically
 //
 // Parameters:
@@ -131,19 +154,19 @@ func (t *Tool) Call(agentContext map[string]any, args map[string]any) llms.ToolR
 	}
 
 	// Call handler with validated args
-	return t.Handler(agentContext, validated)
+	return t.handler(agentContext, validated)
 }
 
 // validateAndExtractArgs validates arguments and extracts them with proper types
 func (t *Tool) validateAndExtractArgs(args map[string]any) (map[string]any, llms.ToolReturn) {
 	validated := make(map[string]any)
 
-	for _, param := range t.Parameters {
+	for _, param := range t.parameters {
 		value, exists := args[param.Name]
 
 		// Check if required parameter is missing
 		if param.Required && !exists {
-			return nil, NewErrorResponse(fmt.Sprintf("missing required parameter: %s. Hint: Use the expand tool with subject_name='%s' to get more information about how to use this tool", param.Name, t.Name))
+			return nil, NewErrorResponse(fmt.Sprintf("missing required parameter: %s. Hint: Use the expand tool with subject_name='%s' to get more information about how to use this tool", param.Name, t.name))
 		}
 
 		if exists {

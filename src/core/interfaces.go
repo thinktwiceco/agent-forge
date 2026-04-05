@@ -22,7 +22,6 @@ package core
 import (
 	"context"
 
-	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 	"github.com/thinktwiceco/agent-forge/src/queue"
 )
@@ -34,23 +33,8 @@ type Identifier interface {
 }
 
 // Executable represents an agent that can execute chat requests.
-// Use this when only execution is needed (e.g., delegation).
 type Executable interface {
 	ChatStream(ctx context.Context, message string, chatId string) *ResponseCh
-}
-
-// SubAgent represents an agent that can be used as a sub-agent
-// for delegation. This interface composes smaller focused interfaces:
-// - Identifier: for lookup and display
-// - Discoverable: for progressive discovery (descriptions, troubleshooting)
-// - Executable: for chat execution
-//
-// Use SubAgent when the full contract is needed. Prefer Identifier,
-// agentforge.Discoverable, or Executable where only a subset is required.
-type SubAgent interface {
-	Identifier
-	agentforge.Discoverable
-	Executable
 }
 
 // maybeEphemeralToolCall is a tool call that may be ephemeral.
@@ -106,52 +90,13 @@ type InboxAware interface {
 	SetInbox(q *queue.Queue)
 }
 
-// LegacyPlugin wraps old-style plugins for backward compatibility.
-// This adapter converts the old On(event) pattern to the new Hooks() map pattern.
-type LegacyPlugin struct {
-	plugin interface {
-		Plugin
-		On(event Event) AgentHookFn
-		Tools() []llms.Tool
-		SystemPrompt() string
-	}
-}
-
-// NewLegacyPlugin creates a backward-compatibility adapter for old-style plugins.
-func NewLegacyPlugin(plugin interface {
-	Plugin
-	On(event Event) AgentHookFn
-	Tools() []llms.Tool
-	SystemPrompt() string
-}) *LegacyPlugin {
-	return &LegacyPlugin{plugin: plugin}
-}
-
-// Name implements Plugin interface
-func (lp *LegacyPlugin) Name() string {
-	return lp.plugin.Name()
-}
-
-// Hooks implements HookProvider interface by adapting On() to Hooks()
-func (lp *LegacyPlugin) Hooks() map[Event]AgentHookFn {
-	hooks := make(map[Event]AgentHookFn)
-	for _, event := range Events {
-		hook := lp.plugin.On(event)
-		if hook != nil {
-			hooks[event] = hook
-		}
-	}
-	return hooks
-}
-
-// Tools implements ToolProvider interface
-func (lp *LegacyPlugin) Tools() []llms.Tool {
-	return lp.plugin.Tools()
-}
-
-// SystemPrompt implements PromptProvider interface
-func (lp *LegacyPlugin) SystemPrompt() string {
-	return lp.plugin.SystemPrompt()
+// LLMEngineAware is an optional interface for plugins that need direct LLM
+// access for background tasks. The engine is injected during
+// EventAgentInitialization alongside WorkingDir and Inbox.
+// The canonical use-case is the brain plugin's DreamingRunner, which makes
+// its own LLM calls to distil conversation notes without involving the main agent.
+type LLMEngineAware interface {
+	SetLLMEngine(engine llms.LLMEngine)
 }
 
 // Event represents an agent lifecycle event
@@ -164,12 +109,15 @@ const (
 	EventBeforeToolExecution              Event = "beforeToolExecution"
 	EventToolExecution                    Event = "toolExecution"
 	EventNewUserMessage                   Event = "newUserMessage"
-	EventAddSystemAgent                   Event = "addSystemAgent"
-	EventAddedSystemAgent                 Event = "addedSystemAgent"
 	EventNewAssistantMessage              Event = "newAssistantMessage"
 	EventNewAssistantMessageWithToolCalls Event = "newAssistantMessageWithToolCalls"
 	EventAddedTools                       Event = "addedTools"
 	EventNewChunk                         Event = "newChunk"
+	// EventChatStart fires at the beginning of every ChatStream call, after the
+	// chatId is known and before the executor runs. It carries the conversation ID,
+	// which is pre-generated for new conversations so that plugins (e.g. brain) can
+	// initialise per-conversation resources (files, graph nodes) before any tool calls.
+	EventChatStart Event = "chatStart"
 )
 
 var Events = []Event{
@@ -179,10 +127,9 @@ var Events = []Event{
 	EventBeforeToolExecution,
 	EventToolExecution,
 	EventNewUserMessage,
-	EventAddSystemAgent,
-	EventAddedSystemAgent,
 	EventNewAssistantMessage,
 	EventNewAssistantMessageWithToolCalls,
 	EventAddedTools,
 	EventNewChunk,
+	EventChatStart,
 }

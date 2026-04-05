@@ -20,15 +20,12 @@ src/
 │   ├── agentConfig.go           # Agent configuration
 │   ├── agentHistory.go          # Agent-level history methods (delegates to history pkg)
 │   ├── agentHooks.go            # Hook registration and management
-│   ├── agentSubagent.go         # Subagent handling
 │   ├── agentTruncation.go       # History truncation for context limits
-│   ├── agentChat.go             # Chat execution wrappers (delegates to executor)
+│   ├── agentInit.go            # Plugin initialization and registration
 │   ├── builder.go               # Fluent Builder API
 │   ├── constants.go             # Constants
 │   ├── interfaces.go           # Internal interfaces
-│   ├── systemAgentConstructors.go # System agent factory functions
 │   ├── systemHandlers.go        # System handler registration
-│   ├── testing_helpers.go       # Test utilities
 │   ├── *_test.go                # Test files
 │   │
 │   ├── context/                 # Context management & truncation
@@ -55,17 +52,9 @@ src/
 │   │   ├── builder.go          # Prompt builder (implements PromptBuilder)
 │   │   └── config.go           # Prompt configuration
 │   │
-│   └── system/                  # System agent templates
-│       ├── constants.go        # System agent constants
-│       ├── systemAgentTemplate.go # Template struct & factory
-│       ├── saCodingAgent.go     # Coding agent template
-│       ├── saGitAgent.go        # Git agent template
-│       ├── saOsAgent.go        # OS agent template
-│       ├── saReasoning.go      # Reasoning agent template
-│       └── saWebAgent.go       # Web agent template
 │
 ├── core/                        # Core abstractions
-│   ├── interfaces.go           # SubAgent, Plugin (split interfaces)
+│   ├── interfaces.go           # Plugin, Tool, Executable (split interfaces)
 │   ├── tool.go                 # Tool implementation
 │   ├── agentContext.go         # AgentContext struct
 │   ├── response.go             # Response channels
@@ -90,19 +79,7 @@ src/
 └── plugins/                     # Plugin implementations
 ```
 
-## Key Changes
-
-### 1. System Agents Package
-
-System agent implementations have been moved to `src/agents/system/`:
-
-- **Templates**: Each system agent (`saCodingAgent.go`, `saGitAgent.go`, `saOsAgent.go`, `saReasoning.go`, `saWebAgent.go`) provides a template creation function (e.g., `CreateCodingAgentTemplate()`)
-- **Constants**: Agent names, traces, and tones are defined in `system/constants.go`
-- **Constructors**: Actual agent constructors (e.g., `CodingAgent()`, `GitAgent()`) remain in the agents package in `systemAgentConstructors.go`
-
-This separation breaks circular imports while maintaining clean domain boundaries.
-
-### 2. Context Management
+### 1. Context Management
 
 Context-related code moved to `src/agents/context/`:
 
@@ -110,27 +87,27 @@ Context-related code moved to `src/agents/context/`:
 - **Strategies**: Truncation strategy implementations
 - **Truncation**: Truncation logic and utilities
 
-### 3. Execution Engine
+### 2. Execution Engine
 
 Execution logic moved to `src/agents/execution/`:
 
 - **Executor**: Main chat execution engine
 - **Hooks**: Hook runner interface for executor
 
-### 4. Handlers
+### 3. Handlers
 
 Handler implementations moved to `src/agents/handlers/`:
 
 - **System Handlers**: System-level event handlers
 
-### 5. Prompts
+### 4. Prompts
 
 Prompt building logic moved to `src/agents/prompts/`:
 
 - **Builder**: Prompt construction logic
 - **Config**: Prompt configuration
 
-### 6. Mocks
+### 5. Mocks
 
 Mock implementations for testing moved to `src/agents/mocks/`:
 
@@ -209,17 +186,6 @@ Mock implementations available in `src/agents/mocks/`
 
 ### 4. Split Interfaces (Core Package)
 
-**SubAgent Composition:**
-```go
-type Identifier interface { Name() string }
-type Executable interface { ChatStream(...) *ResponseCh }
-type SubAgent interface {
-    Identifier
-    agentforge.Discoverable
-    Executable
-}
-```
-
 **Plugin Segregation:**
 ```go
 type Plugin interface { Name() string }
@@ -256,7 +222,6 @@ type PromptProvider interface { Plugin; SystemPrompt() string }
 - Configuration
 - LLM interaction
 - Tool registry
-- Sub-agent registry
 - Component orchestration (delegates to interfaces)
 
 **Extracted to:**

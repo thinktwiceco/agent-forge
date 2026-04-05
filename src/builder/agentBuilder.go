@@ -8,7 +8,7 @@ package builder
 // Responsibility split:
 //
 //	builder.Config        — direct YAML→Go mapping; source of truth on disk
-//	builder.AgentBuilder  — validates the config, resolves model strings into
+//	builder.AgentFactory  — validates the config, resolves model strings into
 //	                        LLMEngine instances, instantiates tools and plugins,
 //	                        then produces an agents.AgentConfig ready for
 //	                        agents.NewAgent().
@@ -16,7 +16,6 @@ package builder
 // What belongs here (application concerns):
 //   - Agent name, system prompt, model selection, working directory, persistence
 //   - Tool list with per-tool settings (mode, DB URL, allowed tables…)
-//   - Sub-agent role→model assignments
 //   - Plugin list by name (resolved via registry at build time)
 //   - Vector-storage config (optional)
 //
@@ -33,49 +32,67 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/agents"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
+	"github.com/thinktwiceco/agent-forge/src/plugins/brain"
+	"github.com/thinktwiceco/agent-forge/src/plugins/heartbeat"
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
 	Agent struct {
-		Name         string              `yaml:"name"`
-		SystemPrompt string              `yaml:"system_prompt"`
-		Model        string              `yaml:"model"`
-		WorkingDir   string              `yaml:"working_dir"`
-		Persistence  string              `yaml:"persistence"`
-		Tools        []Tool              `yaml:"tools"`
-		Subagents    map[Subagent]string `yaml:"subagents"`
-		Plugins      []string            `yaml:"plugins"`
+		Name         string                     `yaml:"name"`
+		SystemPrompt string                     `yaml:"system_prompt"`
+		Model        string                     `yaml:"model"`
+		WorkingDir   string                     `yaml:"working_dir"`
+		Persistence  string                     `yaml:"persistence"`
+		Tools        []Tool                     `yaml:"tools"`
+		Plugins      []string                   `yaml:"plugins"`
+		Heartbeat    *heartbeat.HeartbeatConfig `yaml:"heartbeat,omitempty"`
+		// Brain controls whether the brain plugin loads. Omitting the field (nil)
+		// or setting it to true enables brain. Set to false to opt out:
+		//   agent:
+		//     brain: false
+		Brain *bool `yaml:"brain,omitempty"`
+		// BrainPlugin configures scheduled dreaming (dreamTime cron). Only used when brain loads.
+		// Example: brain_plugin: { dream: off, dreamTime: "03:00" }
+		BrainPlugin *brain.PluginConfig `yaml:"brain_plugin,omitempty"`
+		// SpawnSubagent enables the built-in spawn_subagent tool (ephemeral child agent).
+		SpawnSubagent bool `yaml:"spawn_subagent,omitempty"`
 	} `yaml:"agent"`
 	VectorStorage *VectorStorageConfig `yaml:"vector-storage,omitempty"`
 }
 
-type AgentBuilder struct {
+type AgentFactory struct {
 	name               string
 	systemPrompt       string
 	tools              []Tool
-	Subagents          map[Subagent]LLM
 	plugins            []string
+	heartbeatYAML      *heartbeat.HeartbeatConfig
 	llmEngine          llms.LLMEngine
 	workingDir         string
 	persistence        string
 	vectorDB           core.VectorDB
 	embeddingGenerator core.EmbeddingGenerator
+	// brainDisabled suppresses the automatic brain plugin injection.
+	// Set via brain: false in YAML; false by default (brain loads automatically).
+	brainDisabled    bool
+	brainPluginCfg   *brain.PluginConfig
+	modelName        string
+	canSpawnSubagent bool
 }
 
 // Public API methods
 
-func NewAgentBuilder(name string, persistence string) *AgentBuilder {
+func NewAgentFactory(name string, persistence string) (*AgentFactory, error) {
 	if persistence != "" && persistence != "json" {
-		panic("invalid persistence type: " + persistence)
+		return nil, fmt.Errorf("invalid persistence type: %s", persistence)
 	}
-	return &AgentBuilder{
+	return &AgentFactory{
 		name:        name,
 		persistence: persistence,
-	}
+	}, nil
 }
 
-func NewAgentBuilderFromConfig(configPath string) (*AgentBuilder, error) {
+func NewAgentFactoryFromConfig(configPath string) (*AgentFactory, error) {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -86,17 +103,20 @@ func NewAgentBuilderFromConfig(configPath string) (*AgentBuilder, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	return newAgentBuilderFromConfigStruct(cfg)
+	return newAgentFactoryFromConfigStruct(cfg)
 }
 
-// NewAgentBuilderFromConfigStruct creates an agent builder from an already-loaded Config struct.
+// NewAgentFactoryFromConfigStruct creates an agent builder from an already-loaded Config struct.
 // This is useful when the config has been pre-processed (e.g., environment variable interpolation).
-func NewAgentBuilderFromConfigStruct(cfg Config) (*AgentBuilder, error) {
-	return newAgentBuilderFromConfigStruct(cfg)
+func NewAgentFactoryFromConfigStruct(cfg Config) (*AgentFactory, error) {
+	return newAgentFactoryFromConfigStruct(cfg)
 }
 
-func newAgentBuilderFromConfigStruct(cfg Config) (*AgentBuilder, error) {
-	b := NewAgentBuilder(cfg.Agent.Name, cfg.Agent.Persistence)
+func newAgentFactoryFromConfigStruct(cfg Config) (*AgentFactory, error) {
+	b, err := NewAgentFactory(cfg.Agent.Name, cfg.Agent.Persistence)
+	if err != nil {
+		return nil, err
+	}
 	if cfg.Agent.SystemPrompt != "" {
 		b.SetSystemPrompt(cfg.Agent.SystemPrompt)
 	}
@@ -109,73 +129,68 @@ func newAgentBuilderFromConfigStruct(cfg Config) (*AgentBuilder, error) {
 	if len(cfg.Agent.Tools) > 0 {
 		b.AddTools(cfg.Agent.Tools...)
 	}
-	for sub, model := range cfg.Agent.Subagents {
-		b.AddSubagent(sub, model)
-	}
 	for _, plugin := range cfg.Agent.Plugins {
 		b.AddPlugin(plugin)
 	}
+	b.heartbeatYAML = cfg.Agent.Heartbeat
+	// brain: false in YAML opts out of the automatic brain plugin injection.
+	b.brainDisabled = cfg.Agent.Brain != nil && !*cfg.Agent.Brain
+	b.brainPluginCfg = cfg.Agent.BrainPlugin
+	b.canSpawnSubagent = cfg.Agent.SpawnSubagent
 
 	return b, nil
 }
 
-func (b *AgentBuilder) SetSystemPrompt(prompt string) *AgentBuilder {
+func (b *AgentFactory) SetSystemPrompt(prompt string) *AgentFactory {
 	b.systemPrompt = prompt
 	return b
 }
 
-func (b *AgentBuilder) GetName() string {
+func (b *AgentFactory) GetName() string {
 	return b.name
 }
 
-func (b *AgentBuilder) AddTools(tools ...Tool) *AgentBuilder {
+func (b *AgentFactory) AddTools(tools ...Tool) *AgentFactory {
 	b.tools = append(b.tools, tools...)
 	return b
 }
 
-func (b *AgentBuilder) SetModel(model string) *AgentBuilder {
-	llm := fromString(model)
-	llm.model()
-	llmEngine, err := b.createLLMEngine(llm)
-	if err != nil {
-		panic(err)
-	}
-	b.llmEngine = llmEngine
+func (b *AgentFactory) SetModel(model string) *AgentFactory {
+	b.modelName = model
 	return b
 }
 
-func (b *AgentBuilder) AddSubagent(subagent Subagent, model string) *AgentBuilder {
-	llm := fromString(model)
-	llm.model()
-	llm.provider()
-	if b.Subagents == nil {
-		b.Subagents = make(map[Subagent]LLM)
-	}
-	b.Subagents[subagent] = llm
-	return b
-}
-
-func (b *AgentBuilder) AddPlugin(plugin string) *AgentBuilder {
+func (b *AgentFactory) AddPlugin(plugin string) *AgentFactory {
 	b.plugins = append(b.plugins, plugin)
 	return b
 }
 
-func (b *AgentBuilder) SetVectorDB(vectorDB core.VectorDB) *AgentBuilder {
+func (b *AgentFactory) SetVectorDB(vectorDB core.VectorDB) *AgentFactory {
 	b.vectorDB = vectorDB
 	return b
 }
 
-func (b *AgentBuilder) SetEmbeddingGenerator(embeddingGenerator core.EmbeddingGenerator) *AgentBuilder {
+func (b *AgentFactory) SetEmbeddingGenerator(embeddingGenerator core.EmbeddingGenerator) *AgentFactory {
 	b.embeddingGenerator = embeddingGenerator
 	return b
 }
 
-func (b *AgentBuilder) SetWorkingDir(workingDir string) *AgentBuilder {
+func (b *AgentFactory) SetWorkingDir(workingDir string) *AgentFactory {
 	b.workingDir = workingDir
 	return b
 }
 
-func (b *AgentBuilder) Build() (*agents.Agent, error) {
+func (b *AgentFactory) Build() (*agents.Agent, error) {
+	if b.modelName != "" && b.llmEngine == nil {
+		llm := fromString(b.modelName)
+		llm.model() // Ensure it's valid
+		llmEngine, err := b.createLLMEngine(llm)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create llm engine: %w", err)
+		}
+		b.llmEngine = llmEngine
+	}
+
 	err := b.validate()
 	if err != nil {
 		return nil, err
@@ -186,30 +201,32 @@ func (b *AgentBuilder) Build() (*agents.Agent, error) {
 		return nil, err
 	}
 
-	subagents, err := b.buildSubagents(tools)
-	if err != nil {
-		return nil, err
-	}
-
 	plugins, err := b.buildPlugins()
 	if err != nil {
 		return nil, err
 	}
 
 	agentConfig := &agents.AgentConfig{
-		LLMEngine:    b.llmEngine,
-		AgentName:    b.name,
-		Description:  "Main Agent",
-		Tone:         agents.ToneKeepItShort,
-		Trace:        fmt.Sprintf("%s-trace", b.name),
-		CanExpand:    true,
-		MainAgent:    true,
-		Persistence:  b.persistence,
-		WorkingDir:   b.workingDir,
-		SubAgents:    subagents,
-		Tools:        tools,
-		Plugins:      plugins,
-		SystemPrompt: b.systemPrompt,
+		LLMEngine:        b.llmEngine,
+		AgentName:        b.name,
+		Description:      "Main Agent",
+		Tone:             agents.ToneKeepItShort,
+		Trace:            fmt.Sprintf("%s-trace", b.name),
+		CanExpand:        true,
+		CanSpawnSubagent: b.canSpawnSubagent,
+		MainAgent:        true,
+		Persistence:      b.persistence,
+		WorkingDir:       b.workingDir,
+		Tools:            tools,
+		Plugins:          plugins,
+		SystemPrompt:     b.systemPrompt,
+	}
+	for _, p := range plugins {
+		if p.Name() == "heartbeat" {
+			hb := heartbeat.MergeConfig(b.heartbeatYAML)
+			agentConfig.HeartbeatAckMaxChars = hb.AckMaxChars
+			break
+		}
 	}
 
 	agent := agents.NewAgent(agentConfig)
@@ -219,7 +236,7 @@ func (b *AgentBuilder) Build() (*agents.Agent, error) {
 
 // Private helper methods
 
-func (b *AgentBuilder) validate() error {
+func (b *AgentFactory) validate() error {
 	if b.name == "" {
 		return fmt.Errorf("`name` is required to build an agent")
 	}
@@ -231,8 +248,11 @@ func (b *AgentBuilder) validate() error {
 	return nil
 }
 
-func (b *AgentBuilder) createLLMEngine(l LLM) (llms.LLMEngine, error) {
-	llmBuilder := llms.NewOpenAILLMBuilder(l.provider())
+func (b *AgentFactory) createLLMEngine(l LLM) (llms.LLMEngine, error) {
+	llmBuilder, err := llms.NewOpenAILLMBuilder(l.provider())
+	if err != nil {
+		return nil, err
+	}
 	llmBuilder.SetModel(l.model())
 	mmEngine, err := llmBuilder.Build()
 	if err != nil {
@@ -241,42 +261,7 @@ func (b *AgentBuilder) createLLMEngine(l LLM) (llms.LLMEngine, error) {
 	return mmEngine.MainModel(), nil
 }
 
-func (b *AgentBuilder) buildSubagents(builtTools []llms.Tool) ([]core.SubAgent, error) {
-	// Collect tools that should be forwarded to specific subagents.
-	// The API tool is given to the web agent so it can make API calls during browsing tasks.
-	var apiTools []llms.Tool
-	for _, t := range builtTools {
-		if t.GetName() == API_TOOL {
-			apiTools = append(apiTools, t)
-		}
-	}
-
-	subagents := []core.SubAgent{}
-	for subagent, llm := range b.Subagents {
-		llmEngine, err := b.createLLMEngine(llm)
-		if err != nil {
-			return nil, err
-		}
-
-		var extra []llms.Tool
-
-		// This should become a configuration
-		// in the subagent template where we can
-		// specify what tools a subagent should have.
-		if subagent == WEB_AGENT {
-			extra = apiTools
-		}
-
-		subagentInstance, err := subagent.getSubagent(llmEngine, b.vectorDB, b.embeddingGenerator, b.workingDir, extra...)
-		if err != nil {
-			return nil, err
-		}
-		subagents = append(subagents, subagentInstance)
-	}
-	return subagents, nil
-}
-
-func (b *AgentBuilder) buildTools() ([]llms.Tool, error) {
+func (b *AgentFactory) buildTools() ([]llms.Tool, error) {
 	tools := []llms.Tool{}
 	for _, tool := range b.tools {
 		t, err := tool.getTool(b.workingDir, b.vectorDB, b.embeddingGenerator)
@@ -288,9 +273,47 @@ func (b *AgentBuilder) buildTools() ([]llms.Tool, error) {
 	return tools, nil
 }
 
-func (b *AgentBuilder) buildPlugins() ([]core.Plugin, error) {
+func (b *AgentFactory) buildPlugins() ([]core.Plugin, error) {
+	// Brain is a default plugin: it loads automatically unless disabled.
+	// Build an effective name list: start with "brain" (if enabled), then
+	// append user-configured plugins skipping any duplicate "brain" entry.
+	//
+	// This means agents do not need to list brain in their YAML config at all.
+	// To disable: set `agent: brain: false` in config.
+	effective := []string{}
+	if !b.brainDisabled {
+		effective = append(effective, "brain")
+	}
+	// Auto-activate heartbeat when the heartbeat section is configured, so
+	// users don't need to list "heartbeat" explicitly under plugins:.
+	heartbeatInPlugins := false
+	for _, name := range b.plugins {
+		if name == "heartbeat" {
+			heartbeatInPlugins = true
+			break
+		}
+	}
+	if b.heartbeatYAML != nil && !heartbeatInPlugins {
+		effective = append(effective, "heartbeat")
+	}
+	for _, name := range b.plugins {
+		if name == "brain" {
+			continue // already included by default; skip to avoid double-init
+		}
+		effective = append(effective, name)
+	}
+
 	plugins := []core.Plugin{}
-	for _, plugin := range b.plugins {
+	for _, plugin := range effective {
+		if plugin == "heartbeat" {
+			cfg := heartbeat.MergeConfig(b.heartbeatYAML)
+			plugins = append(plugins, heartbeat.NewHeartbeatPlugin(cfg))
+			continue
+		}
+		if plugin == "brain" {
+			plugins = append(plugins, brain.NewBrainPluginWithConfig(b.workingDir, b.brainPluginCfg))
+			continue
+		}
 		p, err := getPlugin(plugin, b.workingDir)
 		if err != nil {
 			return nil, err

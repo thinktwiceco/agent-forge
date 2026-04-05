@@ -36,7 +36,6 @@ type AgentConfigResponse struct {
 	WorkingDir   string               `json:"workingDir"`
 	Persistence  string               `json:"persistence"`
 	Tools        []ToolConfigResponse `json:"tools"`
-	Subagents    map[string]string    `json:"subagents"`
 	Plugins      []string             `json:"plugins"`
 }
 
@@ -46,6 +45,7 @@ type ToolConfigResponse struct {
 	Mode           string   `json:"mode,omitempty"`
 	AllowedTables  []string `json:"allowedTables,omitempty"`
 	AllowedSchemas []string `json:"allowedSchemas,omitempty"`
+	Headless       *bool    `json:"headless,omitempty"`
 }
 
 // ─── Agent config – write ─────────────────────────────────────────────────────
@@ -63,11 +63,6 @@ type UpdateAgentRequest struct {
 // UpdatePluginsRequest replaces the full plugin list.
 type UpdatePluginsRequest struct {
 	Plugins []string `json:"plugins" binding:"required"`
-}
-
-// UpdateSubagentsRequest replaces the full subagents map (role → model string).
-type UpdateSubagentsRequest struct {
-	Subagents map[string]string `json:"subagents" binding:"required"`
 }
 
 // ─── Provider / API key config ────────────────────────────────────────────────

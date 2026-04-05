@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 )
@@ -241,12 +242,14 @@ func (sm *SessionManager) GetOrCreateBrowser(agentContext map[string]any, headle
 		headlessMode = headless[0]
 	}
 
-	// Create new browser context
+	// Create new browser context (stealth-oriented flags reduce trivial headless detection).
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", headlessMode),
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("disable-dev-shm-usage", true),
 		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-blink-features", "AutomationControlled"),
+		chromedp.UserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"),
 	)
 
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
@@ -262,6 +265,16 @@ func (sm *SessionManager) GetOrCreateBrowser(agentContext map[string]any, headle
 		cancelAlloc()
 		sm.recordOperation(false)
 		return nil, fmt.Errorf("failed to initialize browser: %v", initErr)
+	}
+
+	if err := chromedp.Run(ctx, chromedp.ActionFunc(func(c context.Context) error {
+		_, err := page.AddScriptToEvaluateOnNewDocument(getScript("stealth_patch")).Do(c)
+		return err
+	})); err != nil {
+		cancelCtx()
+		cancelAlloc()
+		sm.recordOperation(false)
+		return nil, fmt.Errorf("failed to install stealth script: %w", err)
 	}
 
 	agentforge.Info("Created new browser context %s (headless=%v)", sessionKey, headlessMode)

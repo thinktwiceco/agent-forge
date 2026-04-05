@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/history"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 	"github.com/thinktwiceco/agent-forge/src/mocks"
@@ -41,7 +42,8 @@ func TestAgent_ToolError_InHistory(t *testing.T) {
 	}
 
 	// Execute the tool (this is what the agent does internally)
-	toolResult := agent.executeTool(toolCall)
+	agent.responseCh = core.NewResponseCh("test_agent", "", "test", nil)
+	toolResult := agent.executor.ExecuteTool(toolCall, agent.responseCh)
 
 	// Verify the tool execution failed
 	if toolResult.Success {

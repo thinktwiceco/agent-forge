@@ -2,7 +2,6 @@ package agentforge
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -54,6 +53,11 @@ type Config struct {
 	// Optional - only required if using OpenAI models
 	AFOpenAIAPIKey string
 
+	// AP_OPENROUTER_API_KEY is the API key for OpenRouter (OpenAI-compatible gateway).
+	// Optional - only required if using openrouter:: models.
+	// AF_OPENROUTER_API_KEY is accepted as a fallback (same value; many users expect the AF_ prefix).
+	AFOpenRouterAPIKey string
+
 	// AF_BRAVE_API_KEY is the API key for the Brave Search API.
 	// Optional - only required when using the web_search action of the web tool.
 	AFBraveAPIKey string
@@ -69,31 +73,14 @@ type Config struct {
 //   - *Config: The loaded configuration
 //   - error: An error if configuration loading fails
 func NewConfig() (*Config, error) {
-	// Check if AF_LOG_LEVEL was set before loading .env
-	// This allows tests to unset it and use the default value
-	// even if .env file sets it
-	logLevelWasSet := os.Getenv("AF_LOG_LEVEL") != ""
-
-	// Try to load .env file (ignore error if file doesn't exist)
-	// godotenv.Load() doesn't override existing env vars, but will set unset ones
+	// .env file overrides will be handled by godotenv (doesn't override existing env vars)
 	_ = godotenv.Load()
 
-	// If log level wasn't set before loading .env, use default even if .env set it
-	// This ensures tests can test default behavior by unsetting the variable
-	var logLevel string
-	if !logLevelWasSet {
-		// Variable wasn't set before loading .env
-		// If .env set it, ignore it and use default to allow tests to test defaults
-		if os.Getenv("AF_LOG_LEVEL") != "" {
-			// .env set it, but we want to use default for tests
-			logLevel = "INFO"
-		} else {
-			// Not set by .env either, use default
-			logLevel = "INFO"
-		}
-	} else {
-		// Variable was set before loading .env, use it (or from .env if it overrides)
-		logLevel = getEnv("AF_LOG_LEVEL", "INFO")
+	logLevel := getEnv("AF_LOG_LEVEL", "INFO")
+
+	openRouterKey := getEnv("AP_OPENROUTER_API_KEY", "")
+	if openRouterKey == "" {
+		openRouterKey = getEnv("AF_OPENROUTER_API_KEY", "")
 	}
 
 	config := &Config{
@@ -102,6 +89,7 @@ func NewConfig() (*Config, error) {
 		AFDeepSeekAPIKey:   getEnv("AF_DEEPSEEK_API_KEY", ""),
 		AFTogetherAIAPIKey: getEnv("AF_TOGETHERAI_API_KEY", ""),
 		AFOpenAIAPIKey:     getEnv("AF_OPENAI_API_KEY", ""),
+		AFOpenRouterAPIKey: openRouterKey,
 		AFBraveAPIKey:      getEnv("AF_BRAVE_API_KEY", ""),
 	}
 
