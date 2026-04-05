@@ -49,6 +49,13 @@ func (t *telegramTool) actStartNgrok(args map[string]any) llms.ToolReturn {
 		port = p
 	}
 
+	webhookSecret := webhookSecretFromArgsOrEnv(args)
+	if webhookSecret == "" {
+		return core.NewErrorResponse(
+			"WEBHOOK_SECRET_TELEGRAM is required. Set it in the environment (e.g. .env) or pass webhook_secret.",
+		)
+	}
+
 	if _, err := exec.LookPath("ngrok"); err != nil {
 		return core.NewErrorResponse(
 			"ngrok not found in PATH. Install it from https://ngrok.com/download and ensure it is in PATH.",
@@ -67,14 +74,6 @@ func (t *telegramTool) actStartNgrok(args map[string]any) llms.ToolReturn {
 	}
 
 	webhookURL := publicURL + "/api/webhooks/telegram"
-
-	webhookSecret := webhookSecretFromArgsOrEnv(args)
-	if webhookSecret == "" {
-		_ = cmd.Process.Kill()
-		return core.NewErrorResponse(
-			"WEBHOOK_SECRET_TELEGRAM is required. Set it in the environment (e.g. .env) or pass webhook_secret.",
-		)
-	}
 
 	if err := registerWebhook(token, webhookURL, webhookSecret); err != nil {
 		_ = cmd.Process.Kill()
