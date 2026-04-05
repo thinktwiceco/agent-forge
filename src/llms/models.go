@@ -138,17 +138,20 @@ func (rc *ResponseCh) Start() <-chan ChunkResponse {
 					return
 				}
 
-			case err := <-rc.Error:
-				if err != nil {
-					// Send error as chunk
+			case err, ok := <-rc.Error:
+				if ok && err != nil {
 					chunkChan <- ChunkResponse{
 						Status:  StatusError,
 						Content: err.Error(),
 					}
 					return
 				}
-				// Error channel closed without error, stream is complete
-				return
+				if !ok {
+					// Error channel closed; Response may still have chunks (Close() closes both).
+					// Do not exit here or a racing select can skip the last Response payload.
+					continue
+				}
+				// ok && err == nil — ignore and keep draining Response
 			}
 		}
 	}()
