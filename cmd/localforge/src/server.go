@@ -55,7 +55,7 @@ func NewServer(agentMgr *AgentManager, configMgr *ConfigManager, todoMgr *TodoMa
 	// Register Telegram provider if token exists
 	if token := os.Getenv("TELEGRAM_BOT_TOKEN"); token != "" {
 		var allowedIDs []string
-		if raw := os.Getenv("TELEGRAM_ALLOWED_CHAT_IDS"); raw != "" {
+		if raw := os.Getenv("TELEGRAM_ALLOWED_USER_IDS"); raw != "" {
 			for _, id := range strings.Split(raw, ",") {
 				allowedIDs = append(allowedIDs, strings.TrimSpace(id))
 			}

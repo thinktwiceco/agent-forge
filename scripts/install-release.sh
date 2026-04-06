@@ -68,6 +68,43 @@ for a in data.get('assets', []):
   esac
 }
 
+# Download all files under docs/ from the main branch (raw.githubusercontent.com).
+download_docs_from_github() {
+  local dest="$1"
+  local api_url="https://api.github.com/repos/${REPO}/git/trees/main?recursive=1"
+  local tree_json paths
+  tree_json="$(curl -fsSL "$api_url")" || return 1
+  case "$JSON_TOOL" in
+    jq)
+      paths="$(echo "$tree_json" | jq -r '.tree[] | select(.type == "blob") | select(.path | startswith("docs/")) | .path')"
+      ;;
+    python3|python)
+      paths="$(echo "$tree_json" | "$JSON_TOOL" -c "
+import sys, json
+d = json.load(sys.stdin)
+for t in d.get('tree', []):
+    if t.get('type') == 'blob':
+        p = t.get('path', '')
+        if p.startswith('docs/'):
+            print(p)
+")"
+      ;;
+  esac
+  if [ -z "$paths" ]; then
+    return 1
+  fi
+  mkdir -p "$dest"
+  while IFS= read -r path; do
+    [ -z "$path" ] && continue
+    local rel="${path#docs/}"
+    local outfile="$dest/$rel"
+    mkdir -p "$(dirname "$outfile")"
+    local raw_url="https://raw.githubusercontent.com/${REPO}/main/${path}"
+    curl -fsSL "$raw_url" -o "$outfile" || return 1
+  done <<< "$paths"
+  return 0
+}
+
 # ─── OS / arch detection ─────────────────────────────────────────────────────
 
 RAW_OS="$(uname -s 2>/dev/null || echo "unknown")"
@@ -176,6 +213,31 @@ else
   fi
   if [ "$README_OK" = true ]; then
     echo "README.md placed in workspace."
+  fi
+fi
+
+# ─── docs/ (framework reference; full tree from repo or GitHub main) ─────────
+
+DOCS_DEST="$INSTALL_DIR/docs"
+if [ -d "$DOCS_DEST" ] && [ -n "$(ls -A "$DOCS_DEST" 2>/dev/null)" ]; then
+  echo "docs/ already present — skipping."
+else
+  DOCS_OK=false
+  if [ -n "${BASH_SOURCE[0]:-}" ]; then
+    _INSTALL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -d "$_INSTALL_SCRIPT_DIR/../docs" ]; then
+      mkdir -p "$DOCS_DEST"
+      cp -a "$_INSTALL_SCRIPT_DIR/../docs/." "$DOCS_DEST/"
+      DOCS_OK=true
+      echo "docs/ copied into workspace."
+    fi
+  fi
+  if [ "$DOCS_OK" = false ]; then
+    if download_docs_from_github "$DOCS_DEST"; then
+      echo "docs/ downloaded from GitHub (main)."
+    else
+      echo "WARNING: Could not copy or download docs/ into workspace (skipped)."
+    fi
   fi
 fi
 
@@ -305,6 +367,7 @@ echo ""
 echo "Install complete ($TAG):"
 echo "  $BINARY_PATH"
 echo "  $INSTALL_DIR/README.md     — framework capabilities (agent workspace entrypoint)"
+echo "  $INSTALL_DIR/docs/         — framework reference (from install-release.sh)"
 echo "  $INSTALL_DIR/config.yaml  — edit model, system_prompt, tools"
 echo "  $INSTALL_DIR/.env         — add your API keys"
 echo "  $UPDATE_SCRIPT            — run to update to latest version"

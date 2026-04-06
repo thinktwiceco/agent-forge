@@ -97,8 +97,13 @@ func (s *Server) handleWebhook(c *gin.Context) {
 			return
 		}
 
-		if ap, ok := providerInst.(AllowlistProvider); ok && !ap.IsAllowed(recipientID) {
-			agentforge.Debug("Blocked webhook from %s (chat ID %s not in allowlist)", provider, recipientID)
+		if tp, ok := providerInst.(*providers.TelegramProvider); ok {
+			if !tp.AllowlistPermits(payload) {
+				agentforge.Debug("Blocked webhook from telegram: set TELEGRAM_ALLOWED_USER_IDS or sender username not in allowlist")
+				return
+			}
+		} else if ap, ok := providerInst.(AllowlistProvider); ok && !ap.IsAllowed(recipientID) {
+			agentforge.Debug("Blocked webhook from %s (recipient %s not in allowlist)", provider, recipientID)
 			return
 		}
 
@@ -635,7 +640,12 @@ func (s *Server) handleWebhookSync(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "could not extract recipient"})
 			return
 		}
-		if ap, ok := providerInst.(AllowlistProvider); ok && !ap.IsAllowed(recipientID) {
+		if tp, ok := providerInst.(*providers.TelegramProvider); ok {
+			if !tp.AllowlistPermits(payload) {
+				c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+				return
+			}
+		} else if ap, ok := providerInst.(AllowlistProvider); ok && !ap.IsAllowed(recipientID) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}

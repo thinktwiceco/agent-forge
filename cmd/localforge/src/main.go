@@ -73,7 +73,7 @@ func main() {
 
 	// After each heartbeat turn, send the full response to all known Telegram recipients.
 	// Recipients are discovered from conversation files and the telegram thread store —
-	// no TELEGRAM_ALLOWED_CHAT_IDS env var required.
+	// no TELEGRAM_ALLOWED_USER_IDS env var required.
 	agentMgr.SetTurnCompleteRouter(func(chatId, fullContent string) {
 		if !strings.HasPrefix(chatId, "heartbeat-") {
 			return
