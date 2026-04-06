@@ -1,3 +1,12 @@
+## [Unreleased]
+
+## [0.7.0] - 2026-04-06
+- [4627843](http://github.com/thinktwiceco/agent-forge/commit/4627843ba6c0701259d1b22eed7212cf3643fa07) - fix(tools): validate webhook secret before ngrok in start_ngrok
+- [14d81a1](http://github.com/thinktwiceco/agent-forge/commit/14d81a1584cf2cad39f3f24459e685f6fda50ea4) - fix(llms): avoid losing Response payload when Error channel closes in Start()
+- [382856d](http://github.com/thinktwiceco/agent-forge/commit/382856df4642a01217e91ec446931a1fb2b3b466) - chore(release): prepare release v0.7.0 (#48)
+- [b3c4203](http://github.com/thinktwiceco/agent-forge/commit/b3c4203f48a93832c163475be2bb272f6f7d8c3c) - chore: update changelog for v0.6.2 [skip ci] (#47)
+
+
 ## [0.7.0] - 2026-04-05
 
 Summary: working tree vs `HEAD` (v0.6.2) — ~192 files, large net deletion from removed plugins/subagent stack; new spawn, Telegram, heartbeat, and web automation pieces.
