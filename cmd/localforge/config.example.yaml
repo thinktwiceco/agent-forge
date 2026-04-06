@@ -18,7 +18,8 @@ agent:
   # Set WEBHOOK_SECRET_TELEGRAM in .env before start_ngrok/set_webhook; Localforge requires it for Telegram webhooks.
   # In Telegram, send /new_conversation to start a fresh JSON thread (map stored under data/telegram_thread_map.json).
   # Telegram access control: comma-separated chat/user IDs allowed to talk to the agent.
-  # Leave unset (or empty) to allow all senders. Set TELEGRAM_ALLOWED_CHAT_IDS in your .env.
+  # Leave unset (or empty) to allow all senders. TELEGRAM_ALLOWED_USER_IDS: comma-separated Telegram
+  # usernames (e.g. @yourname,@friend). Leading @ is optional; matching is case-insensitive.
   # To find your chat ID: send any message to the bot and check the Localforge debug logs.
   # Optional: ephemeral sub-tasks with spawn_subagent (subset of parent tools):
   # spawn_subagent: true

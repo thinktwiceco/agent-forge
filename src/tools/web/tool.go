@@ -47,7 +47,9 @@ func NewWebTool(dir string, defaultHeadless *bool) llms.Tool {
 		case "click":
 			return `click: Click an element by CSS selector.
 - Required: selector (string) — CSS selector for the element to click
-- Optional: wait_visible (boolean, default true) — wait for element to be visible before clicking
+- Optional: wait_visible (boolean, default true) — poll until the element exists and is visible (or timeout)
+- Optional: timeout (number, default 60) — seconds; increase if the page is slow or the element appears late
+- Implementation searches the main document, open shadow roots, and same-origin iframes (not cross-origin frames).
 - Optional: session (string) — browser session name`
 		case "fill":
 			return `fill: Clear and type text into a form input by CSS selector.

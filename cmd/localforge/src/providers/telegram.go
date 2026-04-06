@@ -12,42 +12,88 @@ import (
 
 // TelegramProvider implements the Provider interface for Telegram messaging
 type TelegramProvider struct {
-	botToken       string
-	client         *http.Client
-	allowedChatIDs map[string]struct{} // empty = allow all
+	botToken         string
+	client           *http.Client
+	allowedUsernames map[string]struct{} // lowercase, no @; empty = deny all (TELEGRAM_ALLOWED_USER_IDS required)
 }
 
 // NewTelegramProvider creates a new Telegram provider.
-// allowedChatIDs is an optional set of Telegram chat/user IDs that are
-// permitted to interact with the agent. Pass nil or an empty slice to allow
-// all senders (default / backward-compatible behaviour).
-func NewTelegramProvider(botToken string, allowedChatIDs []string) *TelegramProvider {
-	allowed := make(map[string]struct{}, len(allowedChatIDs))
-	for _, id := range allowedChatIDs {
-		if id != "" {
-			allowed[id] = struct{}{}
+// allowlistEntries (TELEGRAM_ALLOWED_USER_IDS) must contain at least one Telegram username
+// (with or without @), matched case-insensitively against message.from.username.
+// An empty list blocks all incoming webhooks.
+func NewTelegramProvider(botToken string, allowlistEntries []string) *TelegramProvider {
+	allowed := make(map[string]struct{}, len(allowlistEntries))
+	for _, raw := range allowlistEntries {
+		u := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(raw), "@")))
+		if u != "" {
+			allowed[u] = struct{}{}
 		}
 	}
 	return &TelegramProvider{
-		botToken:       botToken,
-		client:         &http.Client{Timeout: 30 * time.Second},
-		allowedChatIDs: allowed,
+		botToken:         botToken,
+		client:           &http.Client{Timeout: 30 * time.Second},
+		allowedUsernames: allowed,
 	}
 }
 
-// IsAllowed returns true when the given chat/user ID is in the allowlist, or
-// when no allowlist is configured (len == 0 means allow all).
-func (p *TelegramProvider) IsAllowed(chatID string) bool {
-	if len(p.allowedChatIDs) == 0 {
-		return true
+// AllowlistPermits returns true when the sender's username (message.from.username /
+// callback_query.from.username) is listed in TELEGRAM_ALLOWED_USER_IDS.
+// Matching is case-insensitive; leading @ is ignored.
+// Returns false when the allowlist is empty (TELEGRAM_ALLOWED_USER_IDS not set).
+func (p *TelegramProvider) AllowlistPermits(payload map[string]interface{}) bool {
+	if len(p.allowedUsernames) == 0 {
+		return false
 	}
-	_, ok := p.allowedChatIDs[chatID]
+	from, ok := telegramFromPayload(payload)
+	if !ok {
+		return false
+	}
+	username, _ := from["username"].(string)
+	if username == "" {
+		return false
+	}
+	_, ok = p.allowedUsernames[strings.ToLower(username)]
 	return ok
+}
+
+func telegramFromPayload(payload map[string]interface{}) (map[string]interface{}, bool) {
+	if cbq, ok := payload["callback_query"].(map[string]interface{}); ok {
+		if from, ok := cbq["from"].(map[string]interface{}); ok {
+			return from, true
+		}
+	}
+	var msg map[string]interface{}
+	if m, ok := payload["message"].(map[string]interface{}); ok {
+		msg = m
+	} else if m, ok := payload["edited_message"].(map[string]interface{}); ok {
+		msg = m
+	}
+	if msg == nil {
+		return nil, false
+	}
+	if from, ok := msg["from"].(map[string]interface{}); ok {
+		return from, true
+	}
+	return nil, false
 }
 
 // Name returns the provider name
 func (p *TelegramProvider) Name() string {
 	return "telegram"
+}
+
+// formatTelegramScalarID formats a user or chat id from JSON-decoded Update objects.
+func formatTelegramScalarID(id interface{}) (string, error) {
+	switch v := id.(type) {
+	case float64:
+		return fmt.Sprintf("%.0f", v), nil
+	case int:
+		return fmt.Sprintf("%d", v), nil
+	case string:
+		return v, nil
+	default:
+		return "", fmt.Errorf("invalid id type: %T", id)
+	}
 }
 
 // extractChatID parses a chat.id value from a Telegram message map.
@@ -60,16 +106,7 @@ func extractChatID(message map[string]interface{}) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("missing chat 'id'")
 	}
-	switch v := chatID.(type) {
-	case float64:
-		return fmt.Sprintf("%.0f", v), nil
-	case int:
-		return fmt.Sprintf("%d", v), nil
-	case string:
-		return v, nil
-	default:
-		return "", fmt.Errorf("invalid chat id type: %T", chatID)
-	}
+	return formatTelegramScalarID(chatID)
 }
 
 // ExtractRecipient extracts the chat ID from a Telegram webhook payload.

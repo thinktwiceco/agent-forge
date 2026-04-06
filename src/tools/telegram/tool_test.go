@@ -307,6 +307,7 @@ func TestHealthStatus_AllGreen_NoBrainNudge(t *testing.T) {
 	resetEnv(t)
 	_ = os.Setenv("TELEGRAM_BOT_TOKEN", "t")
 	_ = os.Setenv("WEBHOOK_SECRET_TELEGRAM", "s")
+	_ = os.Setenv("TELEGRAM_ALLOWED_USER_IDS", "@testuser")
 
 	ngrokSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
