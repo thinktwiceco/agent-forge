@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
 	"github.com/thinktwiceco/agent-forge/src/agents"
@@ -50,6 +51,7 @@ type Skill struct {
 // skills, and inspect references on demand.
 type SkillsPlugin struct {
 	dir    string
+	mu     sync.RWMutex
 	skills map[string]*Skill
 }
 
@@ -90,6 +92,9 @@ func (p *SkillsPlugin) Hooks() map[core.Event]core.AgentHookFn {
 // SystemPrompt implements core.PromptProvider.
 // Returns a prompt section listing all discovered skills.
 func (p *SkillsPlugin) SystemPrompt() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	if len(p.skills) == 0 {
 		return ""
 	}
@@ -130,6 +135,9 @@ func (p *SkillsPlugin) Tools() []llms.Tool {
 
 // loadSkills scans skills/ for SKILL.md-based skill packages.
 func (p *SkillsPlugin) loadSkills() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.skills = make(map[string]*Skill)
 
 	entries, err := os.ReadDir(p.dir)
@@ -167,6 +175,10 @@ func (p *SkillsPlugin) getSkill(name string) (*Skill, error) {
 	if err := p.loadSkills(); err != nil {
 		return nil, err
 	}
+
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	skill, exists := p.skills[name]
 	if !exists {
 		return nil, fmt.Errorf("skill '%s' not found", name)

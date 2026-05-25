@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [0.8.1] - 2026-05-25
+
+### Fixed
+
+- **skills plugin**: guard skill cache with `sync.RWMutex` so parallel tool calls no longer crash with `fatal error: concurrent map writes` ([#53](https://github.com/thinktwiceco/agent-forge/issues/53))
+
 ## [0.8.0] - 2026-05-25
 - [f9fe70a](http://github.com/thinktwiceco/agent-forge/commit/f9fe70ad04f1272d7e7d17d510c7cca041f5ed66) - chore(release): prepare release v0.8.0
 

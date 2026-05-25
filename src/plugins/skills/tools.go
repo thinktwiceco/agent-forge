@@ -142,6 +142,10 @@ func (p *SkillsPlugin) handleListSkills() llms.ToolReturn {
 	if err := p.loadSkills(); err != nil {
 		return core.NewErrorResponse(fmt.Sprintf("failed to load skills: %v", err))
 	}
+
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	if len(p.skills) == 0 {
 		return core.NewEphemeralResponse("No skills found under skills/.")
 	}
