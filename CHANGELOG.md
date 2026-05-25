@@ -1,6 +1,14 @@
 ## [Unreleased]
 
 ## [0.8.1] - 2026-05-25
+- [4c3119e](http://github.com/thinktwiceco/agent-forge/commit/4c3119e85ccd5daed88d3ad8fa011d5e3da0050f) - Merge pull request #54 from thinktwiceco/fix/issue-53-skills-concurrent-map-writes
+- [934dd1f](http://github.com/thinktwiceco/agent-forge/commit/934dd1f1ecf78f29aee59d7c418245cf5c60f4c6) - fix(skills): guard skill cache with RWMutex for parallel tool calls
+- [3ac8f48](http://github.com/thinktwiceco/agent-forge/commit/3ac8f485f74b0ab4ed296c3c5214085d8cc77c51) - Merge pull request #52 from thinktwiceco/changelog-v0.8.0
+- [c9ac5c6](http://github.com/thinktwiceco/agent-forge/commit/c9ac5c6c3d38f9b419814c1eb9bb9f701d73b166) - chore: update changelog for v0.8.0 [skip ci]
+
+
+## [Unreleased]
+## [0.8.1] - 2026-05-25
 
 ### Fixed
 
