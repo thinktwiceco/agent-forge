@@ -526,6 +526,48 @@ func TestSkillToolInstallRemoteSkill(t *testing.T) {
 	}
 }
 
+func TestGetSkill_ConcurrentNoRace(t *testing.T) {
+	root := t.TempDir()
+	skillDir := filepath.Join(root, "skills", "concurrent-skill")
+	if err := os.MkdirAll(filepath.Join(skillDir, "references"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestSkill(t, skillDir, "concurrent-skill", "Concurrent access test", "Use when testing parallel skill lookups.")
+	if err := os.WriteFile(filepath.Join(skillDir, "references", "notes.md"), []byte("reference body"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	plugin := NewSkillsPlugin(root)
+	tool := newSkillTool(plugin)
+
+	const workers = 32
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			skill, err := plugin.getSkill("concurrent-skill")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			if skill.Name != "concurrent-skill" {
+				t.Errorf("unexpected skill name: %q", skill.Name)
+			}
+
+			refResp := tool.Call(nil, map[string]any{
+				"action":        "load_skill_reference",
+				"name":          "concurrent-skill",
+				"referencePath": "notes.md",
+			})
+			if !refResp.Success() || !strings.Contains(refResp.Data(), "reference body") {
+				t.Errorf("load_skill_reference response: success=%v data=%q err=%q", refResp.Success(), refResp.Data(), refResp.Error())
+			}
+		}()
+	}
+	wg.Wait()
+}
+
 func writeTestSkill(t *testing.T, dir, name, description, usage string) {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0755); err != nil {
