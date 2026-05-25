@@ -1,3 +1,9 @@
+## [Unreleased]
+
+## [0.8.0] - 2026-05-25
+- [f9fe70a](http://github.com/thinktwiceco/agent-forge/commit/f9fe70ad04f1272d7e7d17d510c7cca041f5ed66) - chore(release): prepare release v0.8.0
+
+
 ## [0.7.0] - 2026-04-05
 
 Summary: working tree vs `HEAD` (v0.6.2) — ~192 files, large net deletion from removed plugins/subagent stack; new spawn, Telegram, heartbeat, and web automation pieces.
