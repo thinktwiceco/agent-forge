@@ -34,7 +34,7 @@ cmd/localforge/bin/*
 !cmd/localforge/bin/.gitkeep
 cmd/localforge/sandbox/*
 !cmd/localforge/sandbox/.gitkeep
-cmd/localforge/procedures/
+cmd/localforge/skills/
 cmd/localforge/data/
 cmd/localforge/vault/
 cmd/localforge/uploaded/

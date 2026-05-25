@@ -274,30 +274,30 @@ func (b *AgentFactory) buildTools() ([]llms.Tool, error) {
 }
 
 func (b *AgentFactory) buildPlugins() ([]core.Plugin, error) {
-	// Brain is a default plugin: it loads automatically unless disabled.
-	// Build an effective name list: start with "brain" (if enabled), then
-	// append user-configured plugins skipping any duplicate "brain" entry.
+	// Brain and skills are default plugins: they load automatically.
+	// Build an effective name list starting with defaults, then append
+	// user-configured plugins while skipping duplicate entries.
 	//
-	// This means agents do not need to list brain in their YAML config at all.
+	// This means agents do not need to list brain or skills in their YAML config.
 	// To disable: set `agent: brain: false` in config.
 	effective := []string{}
 	if !b.brainDisabled {
 		effective = append(effective, "brain")
 	}
+	effective = append(effective, "skills")
 	// Auto-activate heartbeat when the heartbeat section is configured, so
 	// users don't need to list "heartbeat" explicitly under plugins:.
 	heartbeatInPlugins := false
 	for _, name := range b.plugins {
 		if name == "heartbeat" {
 			heartbeatInPlugins = true
-			break
 		}
 	}
 	if b.heartbeatYAML != nil && !heartbeatInPlugins {
 		effective = append(effective, "heartbeat")
 	}
 	for _, name := range b.plugins {
-		if name == "brain" {
+		if name == "brain" || name == "skills" {
 			continue // already included by default; skip to avoid double-init
 		}
 		effective = append(effective, name)

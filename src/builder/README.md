@@ -192,7 +192,7 @@ Plugins extend agent functionality with additional features and behaviors.
 | `todo` | Task list CRUD for the agent |
 | `vault` | Encrypted secret storage under the working directory |
 | `scheduler` | Scheduled jobs |
-| `procedures` | Procedure / checklist manifests |
+| `skills` | Native `SKILL.md` packages under `working_dir/skills/`; `name` and `description` frontmatter are required, and the `skill` tool can install/delete/list remote packages |
 | `heartbeat` | Proactive timed agent turns; optional `agent.heartbeat` YAML |
 | `brain` | Memory graph + optional dreaming; omit `brain: false` to keep default on |
 

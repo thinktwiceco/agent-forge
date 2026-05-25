@@ -190,7 +190,8 @@ agent.AddTools([]llms.Tool{tool})
 
 #### Plugins
 
-Plugins extend agents with tools, hooks, and system prompts. Available plugins: `logger`, `todo`, `vault`, `procedures`, `brain`.
+Plugins extend agents with tools, hooks, and system prompts. Available plugins: `logger`, `todo`, `vault`, `skills`, `brain`.
+The `brain` and `skills` plugins are enabled by default; `skills` seeds a built-in `web-navigation` skill for browser tasks.
 
 ```yaml
 agent:
@@ -364,7 +365,7 @@ This creates:
 - `config.yaml` - Agent configuration
 - `.env` - API keys and secrets
 - `data/` - Conversation history
-- `procedures/` - Multi-phase workflows
+- `skills/` - Local skill packages
 - `start.sh` - Convenience launcher
 
 #### Option B: From Source
@@ -479,7 +480,7 @@ working_dir/
 ├── repos/              # Git tool cloned repos
 ├── web/                # Web tool saved content
 ├── vault/              # Vault plugin encrypted secrets
-└── procedures/         # Procedures plugin manifests
+└── skills/             # Skills plugin packages
 ```
 
 ### YAML Configuration Reference
@@ -552,7 +553,7 @@ The old YAML `subagents` map and fixed system-agent roster are **removed**. For 
 | Logger | `logger` | Formatted output with colors | None |
 | Todo | `todo` | Task management | None |
 | Vault | `vault` | Encrypted secret storage | Requires `VAULT_MASTER_KEY` env var |
-| Procedures | `procedures` | Multi-phase workflows | Auto-scans `procedures/` directory |
+| Skills | `skills` | Local `SKILL.md` packages with install/delete/list support | Auto-scans `skills/` directory |
 | Scheduler | `scheduler` | Scheduled jobs | None |
 | Heartbeat | `heartbeat` | Proactive timed agent turns | Optional `agent.heartbeat` YAML |
 | Brain | *(default)* | Long-term memory graph; opt out with `brain: false` | Optional `agent.brain_plugin` for dreaming |

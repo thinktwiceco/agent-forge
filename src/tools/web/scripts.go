@@ -16,6 +16,9 @@ var clearInputScript string
 //go:embed scripts/network_idle.js
 var networkIdleScript string
 
+//go:embed scripts/click_element.js
+var clickElementScript string
+
 //go:embed scripts/stealth_patch.js
 var stealthPatchScript string
 
@@ -31,6 +34,8 @@ func getScript(name string) string {
 		return clearInputScript
 	case "network_idle":
 		return networkIdleScript
+	case "click_element":
+		return clickElementScript
 	case "stealth_patch":
 		return stealthPatchScript
 	default:

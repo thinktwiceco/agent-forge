@@ -148,7 +148,7 @@ type LLMEngineAware interface {
 
 ### Best Practices
 
-- **Folder-based plugins**: If a plugin operates inside a folder (e.g. `vault/`, `procedures/`), it should auto-create that folder at initialization time (e.g. in `EventAgentInitialized` or when the plugin is constructed). This avoids errors when the agent first uses the plugin.
+- **Folder-based plugins**: If a plugin operates inside a folder (e.g. `vault/`, `skills/`), it should auto-create that folder at initialization time (e.g. in `EventAgentInitialized` or when the plugin is constructed). This avoids errors when the agent first uses the plugin.
 - **Paths are relative to working_dir**: All plugin folder paths are relative to the agent's `working_dir`. The factory receives `workingDir` and should use it as the base (e.g. `filepath.Join(workingDir, "vault")`).
 - **Goroutine lifecycle**: Plugins that start goroutines (e.g. tickers) must pair `context.WithCancel` with a stored `cancel` func so the goroutine stops cleanly on plugin teardown or config reload.
 - **Inbox-injecting plugins**: Use `core.InboxAware` to receive the queue reference. Check `q.Len() > 0` before enqueueing to avoid flooding a busy agent.
@@ -159,7 +159,7 @@ type LLMEngineAware interface {
 |--------|-----------|-------------|
 | [Logger](./logger/README.md) | `HookProvider` | Configurable output formatting for agent responses |
 | [Todo](./todo/README.md) | `ToolProvider`, `PromptProvider` | Task management and todo list functionality |
-| [Procedures](./procedures/plugin.go) | `ToolProvider`, `PromptProvider`, `WorkingDirAware` | Structured multi-phase procedures from `working_dir/procedures/` |
+| [Skills](./skills/plugin.go) | `HookProvider`, `ToolProvider`, `PromptProvider` | **Default plugin** — native `SKILL.md` packages from `working_dir/skills/`; `name` and `description` frontmatter are required, `references/` is optional, the `skill` tool can list/install/delete packages, and a built-in `web-navigation` skill is seeded automatically |
 | [Vault](./vault/plugin.go) | `ToolProvider`, `PromptProvider`, `WorkingDirAware` | Encrypted secret storage in `working_dir/vault/` |
 | [Brain](./brain/plugin.go) | `HookProvider`, `ToolProvider`, `PromptProvider`, `LLMEngineAware` | **Default plugin** — see [Brain plugin](#brain-plugin) below. |
 | [Scheduler](./scheduler/plugin.go) | `HookProvider`, `ToolProvider`, `PromptProvider`, `WorkingDirAware`, `InboxAware` | One-shot task scheduling; fires reminders into the agent inbox |

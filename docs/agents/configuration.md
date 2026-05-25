@@ -67,9 +67,15 @@ agent:
 
 If `heartbeat` is not listed in `plugins`, `agent.heartbeat` is ignored. Merge rules are implemented in [`MergeConfig`](../../src/plugins/heartbeat/config.go) in the heartbeat package.
 
+## Default plugins
+
+The **brain** and **skills** plugins load by default, so you do not need to list either one under `plugins`.
+
+The default `skills` package seeds a built-in `web-navigation` skill into `working_dir/skills/web-navigation/`. Agents are instructed to load it before browser-driven tasks that use the `web` tool.
+
 ## Brain plugin (YAML)
 
-The **brain** plugin loads by default (you do not need to list it under `plugins`). Opt out with `brain: false`.
+Opt out of **brain** with `brain: false`.
 
 Optional **dreaming** (distils `data/conversations/**/*.json`, recategorizes conversations that are only on topic `pending`, then cleans `brain/MEMORY.md` when that file has content; writes `brain/persistence/` and updates graph nodes when the model returns retainable JSON) is configured under `brain_plugin`. Defaults: dreaming **on**, daily at **02:00** local time.
 

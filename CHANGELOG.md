@@ -16,7 +16,7 @@ Summary: working tree vs `HEAD` (v0.6.2) — ~192 files, large net deletion from
 - **`telegram`** tool for Localforge (ngrok, webhook secret, register/health); Telegram **`/new_conversation`** and **`telegram_thread_map.json`** via `telegram_thread_store`; provider/webhook updates and tests.
 - **`heartbeat`** plugin and **`heartbeatack`**: interval synthetic inbox turns; executor and tests updated.
 - **Web** tool: fetch and snapshot-style actions, accessibility snapshot helpers (`ax_snapshot`), `network_idle.js`, `stealth_patch.js`; browser session and search/navigation updates.
-- **Procedures** plugin: **`adapt_skill`** (`adapt_skill.go` + tests); vault **`fill_secret_args`** tests; agent prompt-injection and prompts-builder tests; executor heartbeat test; Localforge Telegram command tests.
+- **Skills** plugin: skill loading helpers and tests; vault **`fill_secret_args`** tests; agent prompt-injection and prompts-builder tests; executor heartbeat test; Localforge Telegram command tests.
 
 ### Changed
 
@@ -25,7 +25,7 @@ Summary: working tree vs `HEAD` (v0.6.2) — ~192 files, large net deletion from
 - **Core** / **persistence**: `agentContext`, tool hooks, JSON persistence.
 - **LLMs**: factory, models, OpenAI and tool-call tests.
 - **Localforge**: config, server, push and provider registry, static UI (HTML/CSS/JS).
-- **Plugins**: logger, procedures, scheduler, todo, vault; **`src/plugins/README.md`**.
+- **Plugins**: logger, skills, scheduler, todo, vault; **`src/plugins/README.md`**.
 - **Scripts** (`install.sh`, `install-release.sh`), **`.gitignore`**, **`go.mod`** / **`go.sum`**.
 
 ### Docs

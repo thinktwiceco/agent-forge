@@ -22,6 +22,7 @@ R2|error handling,interfaces,conventions|docs/agents/patterns.md
 R2|formatting,naming,style|docs/agents/code-style.md
 R3|add tool,package,impl|docs/agents/how-to-tools.md
 R3|plugin,hook,tool provider|docs/agents/how-to-plugins.md
+R3|create,author,install skill|docs/agents/create-new-skill.md,src/plugins/skills/tools.go,src/plugins/README.md
 R4|boundaries,permissions,ask-before|docs/agents/safety.md
 R4|debug,common issues|docs/agents/troubleshooting.md
 R2|unit,mocks,coverage|docs/agents/testing.md

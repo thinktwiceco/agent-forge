@@ -2,6 +2,7 @@ package web
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -116,4 +117,14 @@ func TestDefaultHeadlessMode(t *testing.T) {
 			t.Fatalf("defaultHeadlessMode() = %v, want true", got)
 		}
 	})
+}
+
+func TestEmbeddedScriptsIncludeClickElement(t *testing.T) {
+	script := getScript("click_element")
+	if strings.TrimSpace(script) == "" {
+		t.Fatal("click_element script should be embedded")
+	}
+	if !strings.Contains(script, "findEverywhere") {
+		t.Fatalf("unexpected click_element script contents: %q", script)
+	}
 }

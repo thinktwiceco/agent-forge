@@ -183,7 +183,7 @@ fi
 # ─── create folder structure ─────────────────────────────────────────────────
 
 mkdir -p "$BIN_DIR"
-mkdir -p "$INSTALL_DIR/procedures"
+mkdir -p "$INSTALL_DIR/skills"
 mkdir -p "$INSTALL_DIR/data"
 
 echo "Created folder structure."
