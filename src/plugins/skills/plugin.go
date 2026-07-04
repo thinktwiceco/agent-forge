@@ -30,6 +30,10 @@ var defaultSkillSeeds = []struct {
 		embedDir: "seeds/web-navigation",
 		destName: "web-navigation",
 	},
+	{
+		embedDir: "seeds/create-skill",
+		destName: "create-skill",
+	},
 }
 
 const PLUGIN_NAME = "skills"

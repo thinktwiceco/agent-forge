@@ -256,7 +256,7 @@ func TestLoadSkills_DuplicateNamesFail(t *testing.T) {
 	}
 }
 
-func TestNewSkillsPlugin_SeedsWebNavigationSkill(t *testing.T) {
+func TestNewSkillsPlugin_SeedsDefaultSkills(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 
@@ -265,25 +265,45 @@ func TestNewSkillsPlugin_SeedsWebNavigationSkill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	skill, err := plugin.getSkill("web-navigation")
+	webNav, err := plugin.getSkill("web-navigation")
 	if err != nil {
 		t.Fatalf("expected seeded web-navigation skill, got %v", err)
 	}
-	if !strings.Contains(skill.Description, "web tool") {
-		t.Fatalf("unexpected description: %q", skill.Description)
+	if !strings.Contains(webNav.Description, "web tool") {
+		t.Fatalf("unexpected description: %q", webNav.Description)
 	}
 
-	refs, err := listReferenceFiles(skill)
+	webRefs, err := listReferenceFiles(webNav)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantRefs := []string{
+	wantWebRefs := []string{
 		"failures-and-recovery.md",
 		"forms-and-auth.md",
 		"navigation-basics.md",
 	}
-	if strings.Join(refs, ",") != strings.Join(wantRefs, ",") {
-		t.Fatalf("references: got %v want %v", refs, wantRefs)
+	if strings.Join(webRefs, ",") != strings.Join(wantWebRefs, ",") {
+		t.Fatalf("web-navigation references: got %v want %v", webRefs, wantWebRefs)
+	}
+
+	createSkill, err := plugin.getSkill("create-skill")
+	if err != nil {
+		t.Fatalf("expected seeded create-skill skill, got %v", err)
+	}
+	if !strings.Contains(createSkill.Description, "authoring") {
+		t.Fatalf("unexpected description: %q", createSkill.Description)
+	}
+
+	createRefs, err := listReferenceFiles(createSkill)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantCreateRefs := []string{
+		"interview-questions.md",
+		"skill-template.md",
+	}
+	if strings.Join(createRefs, ",") != strings.Join(wantCreateRefs, ",") {
+		t.Fatalf("create-skill references: got %v want %v", createRefs, wantCreateRefs)
 	}
 }
 
