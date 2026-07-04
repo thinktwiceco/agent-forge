@@ -56,3 +56,20 @@ func (m *JSONConversationMetadata) DeleteTitle(chatId string) error {
 	}
 	return nil
 }
+
+// LoadTitlesFromEntries reads title sidecars for all .title files in a directory listing.
+func (m *JSONConversationMetadata) LoadTitlesFromEntries(entries []os.DirEntry) map[string]string {
+	titles := make(map[string]string)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".title") {
+			continue
+		}
+		id := strings.TrimSuffix(entry.Name(), ".title")
+		data, err := os.ReadFile(filepath.Join(m.baseDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		titles[id] = strings.TrimSpace(string(data))
+	}
+	return titles
+}

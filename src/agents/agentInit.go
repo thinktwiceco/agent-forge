@@ -14,7 +14,7 @@
 // it. The initialization handler:
 //
 //   - Injects WorkingDir into WorkingDirAware plugins
-//   - Injects the agent inbox into InboxAware plugins (allows async injection)
+//   - Injects the agent turn inbox into InboxAware plugins (allows async injection)
 //   - Registers lifecycle hooks from HookProvider plugins
 //   - Appends tools from ToolProvider plugins to the agent's tool list
 //   - Appends system-prompt fragments from PromptProvider plugins
@@ -24,7 +24,6 @@
 package agents
 
 import (
-	"context"
 	"fmt"
 
 	agentforge "github.com/thinktwiceco/agent-forge/src"
@@ -34,9 +33,9 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/agents/prompts"
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
-	"github.com/thinktwiceco/agent-forge/src/plugins/registry"
 	"github.com/thinktwiceco/agent-forge/src/tools/expand"
 	"github.com/thinktwiceco/agent-forge/src/tools/meta"
+	"github.com/thinktwiceco/agent-forge/src/tools/searchlogs"
 	"github.com/thinktwiceco/agent-forge/src/tools/spawn"
 )
 
@@ -132,6 +131,9 @@ func (a *Agent) initSystemTools() {
 	mt := meta.NewMetaTool()
 	a.tools = append(a.tools, mt)
 
+	// Session log search - always add
+	a.tools = append(a.tools, searchlogs.NewSearchLogsTool())
+
 	// Expand Tool - add only if can expand
 	if a.config.CanExpand {
 		et := expand.NewExpandTool()
@@ -140,32 +142,10 @@ func (a *Agent) initSystemTools() {
 
 	// Spawn Subagent Tool - add only if enabled
 	if a.config.CanSpawnSubagent {
-		llmEngine := a.llmEngine
-		workingDir := a.config.WorkingDir
-		factory := func(ctx context.Context, prompt string, tools []llms.Tool) (string, error) {
-			b := NewBuilder(llmEngine, "subagent").WithTools(tools...)
-
-			// Attach the todo plugin when it has been registered (e.g. via allplugins blank import).
-			// Using the registry avoids a direct import of src/plugins/todo which would create
-			// a circular dependency (todo imports src/agents for its hook type).
-			if todoFactory, err := registry.Get("todo"); err == nil {
-				b = b.WithPlugins(todoFactory(workingDir))
-			}
-
-			sub, err := b.Build()
-			if err != nil {
-				return "", err
-			}
-			var finalContent string
-			for chunk := range sub.ChatStream(ctx, prompt, "").Start() {
-				if chunk.FullContent != "" {
-					finalContent = chunk.FullContent
-				}
-			}
-			return finalContent, nil
-		}
-		a.tools = append(a.tools, spawn.NewSpawnSubagentTool(factory))
+		a.tools = append(a.tools, spawn.NewSpawnSubagentTool(a.newAsyncSubagentSpawner()))
 	}
+
+	a.tools = dedupeToolsByName(a.tools)
 }
 
 // initAgentContext rebuilds the agent context and syncs all components.
@@ -191,10 +171,11 @@ func (a *Agent) initAgentContext() {
 // Called when tools change.
 func (a *Agent) ensureSystemPrompt() {
 	a.promptBuilder.UpdateConfig(prompts.Config{
-		SystemPrompt: a.config.SystemPrompt,
-		MainAgent:    a.config.MainAgent,
-		Tone:         a.config.Tone,
-		Tools:        a.tools,
+		SystemPrompt:     a.config.SystemPrompt,
+		MainAgent:        a.config.MainAgent,
+		Tone:             a.config.Tone,
+		Tools:            a.tools,
+		CanSpawnSubagent: a.config.CanSpawnSubagent,
 	})
 	a.systemPrompt = a.promptBuilder.Build()
 }
@@ -281,10 +262,10 @@ func (a *Agent) createPluginInitializationHandler() OnAgentInitializationHook {
 				}
 			}
 
-			// Inject inbox queue if the plugin supports it
+			// Inject turn inbox if the plugin supports it
 			if ia, ok := plugin.(core.InboxAware); ok {
-				agentforge.Debug("🔌 [handlePluginInitialization] Injecting inbox queue to plugin %s", plugin.Name())
-				ia.SetInbox(agent.inbox)
+				agentforge.Debug("🔌 [handlePluginInitialization] Injecting turn inbox to plugin %s", plugin.Name())
+				ia.SetInbox(agent.turnQueue)
 			}
 
 			// Inject LLM engine if the plugin supports it (e.g. brain dreaming runner).

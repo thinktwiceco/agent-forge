@@ -24,7 +24,7 @@ const appState = {
 
 const chatManager = new ChatManager(appState);
 const conversationManager = new ConversationManager(appState, chatManager);
-const todoManager = new TodoManager();
+const todoManager = new TodoManager(appState);
 const fsManager = new FileSystemManager();
 
 function setupSidebarNavActive() {

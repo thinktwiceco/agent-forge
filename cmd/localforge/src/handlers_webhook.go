@@ -16,7 +16,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/thinktwiceco/agent-forge/cmd/localforge/src/providers"
 	agentforge "github.com/thinktwiceco/agent-forge/src"
-	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/queue"
 )
 
@@ -675,23 +674,5 @@ func (s *Server) handleWebhookSync(c *gin.Context) {
 	responseCh := agent.ChatStream(ctx, enriched, conversationID)
 	stream := responseCh.Start()
 
-	for {
-		select {
-		case <-ctx.Done():
-			errorChunk := core.ExtendedChunkResponse{
-				Content: "Processing stopped",
-				Status:  "error",
-			}
-			_ = writer.WriteEvent("error", errorChunk)
-			return
-		case chunk, ok := <-stream:
-			if !ok {
-				return
-			}
-			eventType := EventTypeFromChunk(chunk)
-			if err := writer.WriteEvent(eventType, chunk); err != nil {
-				return
-			}
-		}
-	}
+	streamChunksToSSE(ctx, stream, writer, "Processing stopped")
 }

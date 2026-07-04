@@ -20,7 +20,7 @@ const pluginName = "heartbeat"
 type HeartbeatPlugin struct {
 	cfg        HeartbeatConfig
 	workingDir string
-	inbox      *queue.Queue
+	inbox      queue.Inbox
 	cancel     context.CancelFunc
 	manager    *HeartbeatManager
 }
@@ -50,7 +50,7 @@ func (p *HeartbeatPlugin) SetWorkingDir(dir string) {
 }
 
 // SetInbox implements core.InboxAware.
-func (p *HeartbeatPlugin) SetInbox(q *queue.Queue) {
+func (p *HeartbeatPlugin) SetInbox(q queue.Inbox) {
 	p.inbox = q
 }
 

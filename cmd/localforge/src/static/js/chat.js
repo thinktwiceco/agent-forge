@@ -1,39 +1,6 @@
-// ─── Sensitive key filtering ───────────────────────────────────────────────
-const SENSITIVE_KEYS = new Set([
-  "password", "passwd", "secret", "token", "apikey", "api_key", "apiKey",
-  "key", "authorization", "auth", "credentials",
-]);
-
-function truncate(str, maxLen = 50) {
-  if (typeof str !== "string") return String(str);
-  return str.length <= maxLen ? str : str.slice(0, maxLen) + "…";
-}
-
-function formatArguments(args) {
-  if (!args || typeof args !== "object") return "";
-  const parts = [];
-  for (const [key, value] of Object.entries(args)) {
-    if (SENSITIVE_KEYS.has(String(key).toLowerCase())) continue;
-    const str = typeof value === "object" ? JSON.stringify(value) : String(value ?? "");
-    parts.push(`${key}=${truncate(str, 40)}`);
-  }
-  return truncate(parts.join(", "), 100);
-}
-
-function formatToolCallSummary(call) {
-  const name = call?.function?.name || call?.name || "Unknown tool";
-  const args = call?.function?.arguments ?? call?.arguments ?? {};
-  const argSummary = formatArguments(args);
-  return argSummary ? `${name}: ${argSummary}` : name;
-}
-
-function formatToolResultSummary(result) {
-  const name = result?.toolName || "Tool";
-  if (!result?.success) return null;
-  const resultStr = (result?.result || "").trim();
-  const summary = resultStr ? truncate(resultStr, 80) : "";
-  return summary ? `✓ ${name}: ${summary}` : `✓ ${name}`;
-}
+import { renderMarkdown } from "./markdown.js";
+import { parseSSEStream, subscribeSSE } from "./sse.js";
+import { TurnManager } from "./chat-turns.js";
 
 // ─── Empty / welcome state HTML ────────────────────────────────────────────
 const EMPTY_STATE_HTML = `
@@ -56,36 +23,6 @@ const EMPTY_STATE_HTML = `
     </div>
   </div>
 `;
-
-function escapeHtml(s) {
-  if (typeof s !== "string") return "";
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-let markedCodeRendererInstalled = false;
-
-function ensureMarkedCodeRenderer() {
-  if (markedCodeRendererInstalled || typeof marked === "undefined") return;
-  marked.use({
-    renderer: {
-      // Marked v11+ invokes renderers with positional args (same as default Renderer.code).
-      code(src, infostring, escaped) {
-        const langRaw =
-          ((infostring || "").match(/^\S*/)?.[0] || "").trim() || "text";
-        const langDisplay = langRaw.toLowerCase();
-        const langSlug =
-          langRaw.replace(/[^a-zA-Z0-9_.-]/g, "").replace(/^\.+/, "") || "text";
-        const body = escaped ? src : escapeHtml(src);
-        return `<div class="code-block"><div class="code-header"><span class="code-lang">${escapeHtml(langDisplay)}</span><button type="button" class="code-copy-btn">Copy</button></div><pre><code class="language-${escapeHtml(langSlug)}">${body}</code></pre></div>`;
-      },
-    },
-  });
-  markedCodeRendererInstalled = true;
-}
 
 // ─── Thinking indicator HTML ───────────────────────────────────────────────
 function makeThinkingEl() {
@@ -121,16 +58,25 @@ export class ChatManager {
     this.imagePreviewEl = document.getElementById("image-preview");
     this.scrollBtn = document.getElementById("scroll-to-bottom");
 
-    // activeTurns: map from chatId → open assistant response container.
-    // Each unique chatId gets its own section; events are routed by chatId.
-    // { el, textEl, toolGroupEl, toolGroupBodyEl, toolCallEntries, rawText }
-    this.activeTurns = new Map();
+    this.turns = new TurnManager({
+      messagesEl: this.messagesEl,
+      scrollToBottom: () => this.scrollToBottom(),
+      clearEmptyState: () => this._clearEmptyState(),
+      removeThinking: () => this._removeThinking(),
+      formatAgentLabel: (payload) => this.formatAgentLabel(payload),
+      getConversationId: () => this.state.conversationId,
+      appendUserMessage: (...args) => this.appendUserMessage(...args),
+    });
     this.thinkingEl = null;
     this.abortController = null;
     this.pushController = null;
     this.pushChatId = null;
     this.heartbeatPushController = null;
     this.pendingUploads = [];
+    this.historyPageSize = 100;
+    this.historyOffset = 0;
+    this.historyHasMore = false;
+    this.loadEarlierBtn = null;
 
     this._bindEvents();
     this._bindScrollButton();
@@ -369,6 +315,9 @@ export class ChatManager {
     if (!this.statusEl) return;
     this.statusEl.className = `chat-status status--${text.toLowerCase()}`;
     if (this.statusTextEl) this.statusTextEl.textContent = text;
+    this.state.events.dispatchEvent(
+      new CustomEvent("agentStatusChanged", { detail: { status: text } })
+    );
   }
 
   showStopButton() {
@@ -407,25 +356,14 @@ export class ChatManager {
     this.stopPushListener();
     this.pushChatId = chatId;
     this.pushController = new AbortController();
-    const controller = this.pushController;
-
-    (async () => {
-      while (!controller.signal.aborted) {
-        try {
-          const res = await fetch(
-            `/api/chat/push?conversationId=${encodeURIComponent(chatId)}`,
-            { signal: controller.signal }
-          );
-          if (!res.ok || !res.body) break;
-          await parseSSEStream(res.body, (eventType, payload) => {
-            this.handlePushEvent(eventType, payload);
-          });
-        } catch (err) {
-          if (err.name === "AbortError") break;
-          await new Promise((r) => setTimeout(r, 2000));
-        }
+    subscribeSSE(
+      `/api/chat/push?conversationId=${encodeURIComponent(chatId)}`,
+      {
+        signal: this.pushController.signal,
+        breakOnNotOk: true,
+        onEvent: (eventType, payload) => this.handlePushEvent(eventType, payload),
       }
-    })();
+    );
   }
 
   stopPushListener() {
@@ -443,52 +381,48 @@ export class ChatManager {
   startHeartbeatListener() {
     if (this.heartbeatPushController) return;
     this.heartbeatPushController = new AbortController();
-    const controller = this.heartbeatPushController;
-
-    (async () => {
-      while (!controller.signal.aborted) {
-        try {
-          const res = await fetch(
-            "/api/chat/push?conversationId=heartbeat-live",
-            { signal: controller.signal }
-          );
-          if (!res.ok || !res.body) {
-            await new Promise((r) => setTimeout(r, 5000));
-            continue;
-          }
-          await parseSSEStream(res.body, (eventType, payload) => {
-            this.handlePushEvent(eventType, payload);
-          });
-        } catch (err) {
-          if (err.name === "AbortError") break;
-          await new Promise((r) => setTimeout(r, 2000));
-        }
-      }
-    })();
+    subscribeSSE("/api/chat/push?conversationId=heartbeat-live", {
+      signal: this.heartbeatPushController.signal,
+      notOkDelayMs: 5000,
+      onEvent: (eventType, payload) => this.handlePushEvent(eventType, payload),
+    });
   }
 
   handlePushEvent(eventType, payload) {
-    if (!payload) return;
-    if (eventType === "content") this.handleContentEvent(payload);
-    else if (eventType === "tool_call") this.handleToolCallEvent(payload);
-    else if (eventType === "tool_executing") this.handleToolExecutingEvent(payload);
-    else if (eventType === "tool_result") this.handleToolResultEvent(payload);
-    else if (eventType === "completed") {
-      const chatId = payload.chatId || this.state.conversationId;
-      this.activeTurns.delete(chatId);
-      if (chatId) {
-        this.state.events.dispatchEvent(
-          new CustomEvent("conversationUpdated", { detail: { id: chatId } })
-        );
-      }
-    }
+    this._routeChunkEvent(eventType, payload, { source: "push" });
   }
 
   // ── Conversation lifecycle ────────────────────────────────────────────────
   clearMessages() {
     this.messagesEl.innerHTML = "";
-    this.activeTurns.clear();
+    this.turns.clear();
     this.thinkingEl = null;
+    this.historyOffset = 0;
+    this.historyHasMore = false;
+    this._removeLoadEarlierButton();
+  }
+
+  _removeLoadEarlierButton() {
+    if (this.loadEarlierBtn) {
+      this.loadEarlierBtn.remove();
+      this.loadEarlierBtn = null;
+    }
+  }
+
+  _ensureLoadEarlierButton() {
+    if (!this.historyHasMore) {
+      this._removeLoadEarlierButton();
+      return;
+    }
+    if (this.loadEarlierBtn) return;
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn load-earlier-btn";
+    btn.textContent = "Load earlier messages";
+    btn.addEventListener("click", () => this.loadEarlierMessages());
+    this.messagesEl.prepend(btn);
+    this.loadEarlierBtn = btn;
   }
 
   async handleSubmit() {
@@ -516,7 +450,7 @@ export class ChatManager {
     this._clearEmptyState();
     this.appendUserMessage(text, previewUrls);
 
-    this.activeTurns.clear();
+    this.turns.clear();
 
     await this.startStream(message);
   }
@@ -537,15 +471,22 @@ export class ChatManager {
     this.startPushListener(conversationId);
     this.clearMessages();
     this.setStatus("Loading");
+    this.historyOffset = 0;
 
     try {
-      const res = await fetch(`/api/conversations/${conversationId}`);
+      const res = await fetch(
+        `/api/conversations/${conversationId}?limit=${this.historyPageSize}&offset=0`
+      );
       if (!res.ok) throw new Error("failed to load conversation");
-      const history = await res.json();
+      const data = await res.json();
+      const history = data.messages || [];
+      this.historyHasMore = Boolean(data.hasMore);
+      this._ensureLoadEarlierButton();
+
       if (history.length === 0) {
         this._showEmptyState();
       } else {
-        history.forEach((msg) => this.renderHistoryMessage(msg));
+        history.forEach((msg) => this.turns.renderHistoryMessage(msg));
       }
       this.setStatus("Idle");
     } catch {
@@ -556,70 +497,49 @@ export class ChatManager {
     }
   }
 
-  // ── History rendering (single source of truth) ────────────────────────────
-  renderHistoryMessage(msg) {
-    const role = msg.role || "assistant";
+  async loadEarlierMessages() {
+    if (!this.state.conversationId || !this.historyHasMore || !this.loadEarlierBtn) return;
 
-    // Hide system messages
-    if (role === "system") return;
+    const prevHeight = this.messagesEl.scrollHeight;
+    const prevTop = this.messagesEl.scrollTop;
+    this.loadEarlierBtn.disabled = true;
+    this.loadEarlierBtn.textContent = "Loading…";
 
-    // User messages: close all open turns, render user bubble
-    if (role === "user") {
-      this.activeTurns.clear();
-      let content = msg.content || "";
-      const sep = content.indexOf("\n\n");
-      if (sep !== -1 && /^sender:/m.test(content.slice(0, sep))) {
-        const headers = content.slice(0, sep);
-        // Browser chat uses sender: user; Telegram/webhook inbound uses sender: webhook.
-        // Other senders (scheduler, heartbeat, etc.) stay hidden here.
-        const showAsYou =
-          /^sender:\s*user\s*$/m.test(headers) ||
-          /^sender:\s*webhook\s*$/m.test(headers);
-        if (!showAsYou) return;
-        content = content.slice(sep + 2);
+    this.historyOffset += this.historyPageSize;
+
+    try {
+      const res = await fetch(
+        `/api/conversations/${this.state.conversationId}?limit=${this.historyPageSize}&offset=${this.historyOffset}`
+      );
+      if (!res.ok) throw new Error("failed to load earlier messages");
+      const data = await res.json();
+      const history = data.messages || [];
+      this.historyHasMore = Boolean(data.hasMore);
+
+      this.turns.clear();
+      const anchor = this.loadEarlierBtn.nextSibling;
+      history.forEach((msg) => this.turns.renderHistoryMessage(msg, { insertBeforeEl: anchor }));
+
+      this.messagesEl.scrollTop = this.messagesEl.scrollHeight - prevHeight + prevTop;
+      this._ensureLoadEarlierButton();
+    } catch {
+      this.historyOffset -= this.historyPageSize;
+      if (this.loadEarlierBtn) {
+        this.loadEarlierBtn.textContent = "Load earlier messages (failed)";
       }
-      this.appendUserMessage(content, []);
-      return;
-    }
-
-    const agentName = msg.name || "Assistant";
-
-    // Assistant content + optional tool calls
-    if (role === "assistant") {
-      if (msg.content) {
-        this.handleContentEvent({ agentName, content: msg.content });
+    } finally {
+      if (this.loadEarlierBtn) {
+        this.loadEarlierBtn.disabled = false;
+        if (this.loadEarlierBtn.textContent === "Loading…") {
+          this.loadEarlierBtn.textContent = "Load earlier messages";
+        }
       }
-      const toolCalls = msg.toolCalls || msg.tool_calls;
-      if (toolCalls && toolCalls.length > 0) {
-        this.handleToolCallEvent({ agentName, toolCalls });
-      }
-      return;
-    }
-
-    // Tool results
-    if (role === "tool") {
-      let isError = false;
-      let resultText = msg.content || "";
-      if (typeof resultText === "string" && resultText.startsWith("Error:")) {
-        isError = true;
-        resultText = resultText.substring(6).trim();
-      }
-      this.handleToolResultEvent({
-        agentName,
-        toolResults: [{
-          toolName: msg.toolName || msg.name || "Tool",
-          success: !isError,
-          result: resultText,
-          error: isError ? resultText : undefined
-        }]
-      });
-      return;
     }
   }
 
   // ── Message constructors ──────────────────────────────────────────────────
-  appendUserMessage(message, images = []) {
-    const el = this.appendMessage("You", message, ["message", "msg-user"]);
+  appendUserMessage(message, images = [], insertBeforeEl = null) {
+    const el = this.appendMessage("You", message, ["message", "msg-user"], false, insertBeforeEl);
     if (images.length > 0) {
       const imagesEl = document.createElement("div");
       imagesEl.className = "message-images";
@@ -635,7 +555,7 @@ export class ChatManager {
     return el;
   }
 
-  appendMessage(label, content, classes, enableMarkdown = false) {
+  appendMessage(label, content, classes, enableMarkdown = false, insertBeforeEl = null) {
     this._clearEmptyState();
     const messageEl = document.createElement("div");
     classes.filter(Boolean).forEach((cls) => messageEl.classList.add(cls));
@@ -649,7 +569,7 @@ export class ChatManager {
 
     if (enableMarkdown && content) {
       bodyEl.setAttribute("data-raw-content", content);
-      bodyEl.innerHTML = this.renderMarkdown(content);
+      bodyEl.innerHTML = renderMarkdown(content);
     } else {
       bodyEl.textContent = content;
     }
@@ -657,7 +577,6 @@ export class ChatManager {
     messageEl.appendChild(metaEl);
     messageEl.appendChild(bodyEl);
 
-    // Copy button
     const copyBtn = document.createElement("button");
     copyBtn.className = "copy-btn";
     copyBtn.textContent = "Copy";
@@ -674,30 +593,13 @@ export class ChatManager {
     });
     messageEl.appendChild(copyBtn);
 
-    this.messagesEl.appendChild(messageEl);
-    this.scrollToBottom();
+    if (insertBeforeEl) {
+      this.messagesEl.insertBefore(messageEl, insertBeforeEl);
+    } else {
+      this.messagesEl.appendChild(messageEl);
+      this.scrollToBottom();
+    }
     return messageEl;
-  }
-
-  // ── Tool group helpers ────────────────────────────────────────────────────
-  _appendToolGroupEntry(bodyEl, type, text, callId = null) {
-    const entry = document.createElement("div");
-    entry.className = `tool-group-entry entry-${type}`;
-    entry.textContent = text;
-    if (callId) entry.dataset.callId = callId;
-    bodyEl.appendChild(entry);
-    this.scrollToBottom();
-    return entry;
-  }
-
-  _updateToolGroupSummary(chatId) {
-    const turn = this.activeTurns.get(chatId);
-    if (!turn?.toolGroupEl) return;
-    const summary = turn.toolGroupEl.querySelector("summary");
-    if (!summary) return;
-    const entryCount = turn.toolGroupEl.querySelectorAll(".tool-group-entry").length;
-    const label = summary.dataset.label || "Assistant";
-    summary.textContent = `${label} — ${entryCount} tool action${entryCount !== 1 ? "s" : ""}`;
   }
 
   // ── Thinking indicator ────────────────────────────────────────────────────
@@ -759,9 +661,16 @@ export class ChatManager {
   }
 
   handleStreamEvent(eventType, payload) {
+    this._routeChunkEvent(eventType, payload, { source: "stream" });
+  }
+
+  // Shared dispatch for stream and push SSE paths.
+  // Stream-only: chatId binding, status UI, error handling.
+  // Both: content/tool events, completed cleanup, conversationUpdated.
+  _routeChunkEvent(eventType, payload, { source }) {
     if (!payload) return;
 
-    if (payload.chatId && payload.chatId !== this.state.conversationId) {
+    if (source === "stream" && payload.chatId && payload.chatId !== this.state.conversationId) {
       this.state.conversationId = payload.chatId;
       localStorage.setItem("currentConversationId", payload.chatId);
       this.state.events.dispatchEvent(
@@ -770,19 +679,29 @@ export class ChatManager {
       this.startPushListener(payload.chatId);
     }
 
-    if (eventType === "content") this.handleContentEvent(payload);
-    else if (eventType === "tool_call") this.handleToolCallEvent(payload);
-    else if (eventType === "tool_executing") this.handleToolExecutingEvent(payload);
-    else if (eventType === "tool_result") this.handleToolResultEvent(payload);
+    if (eventType === "content") this.turns.handleContentEvent(payload);
+    else if (eventType === "tool_call") this.turns.handleToolCallEvent(payload);
+    else if (eventType === "tool_executing") this.turns.handleToolExecutingEvent(payload);
+    else if (eventType === "tool_result") this.turns.handleToolResultEvent(payload);
     else if (eventType === "completed") {
-      this.setStatus("Idle");
-      this.hideStopButton();
-      this._removeThinking();
-      this.activeTurns.delete(this.state.conversationId);
-      this.state.events.dispatchEvent(
-        new CustomEvent("conversationUpdated", { detail: { id: this.state.conversationId } })
-      );
-    } else if (eventType === "error") {
+      this.turns.flushAllMarkdown();
+      const chatId = source === "push"
+        ? (payload.chatId || this.state.conversationId)
+        : this.state.conversationId;
+      this.turns.deleteTurn(chatId);
+      if (source === "stream") {
+        this.setStatus("Idle");
+        this.hideStopButton();
+        this._removeThinking();
+      }
+      if (chatId) {
+        this.state.events.dispatchEvent(
+          new CustomEvent("conversationUpdated", {
+            detail: { id: chatId, updatedAt: new Date().toISOString() },
+          })
+        );
+      }
+    } else if (eventType === "error" && source === "stream") {
       this.setStatus("Error");
       this.hideStopButton();
       this._removeThinking();
@@ -790,243 +709,14 @@ export class ChatManager {
     }
   }
 
-  // ── Turn management ────────────────────────────────────────────────────────
-  //
-  // One "turn" = one persistent container that holds all content and tool calls
-  // produced by the agent for a single user request. Events append *inside*
-  // the turn rather than creating new top-level bubbles, preventing fragmentation.
-
-  _startTurn(label) {
-    this._clearEmptyState();
-
-    const turnEl = document.createElement("div");
-    turnEl.className = "message msg-assistant";
-
-    // Header
-    const metaEl = document.createElement("div");
-    metaEl.className = "message-meta";
-    metaEl.textContent = label;
-    turnEl.appendChild(metaEl);
-
-    // Text region — streams content here continuously
-    const textEl = document.createElement("div");
-    textEl.className = "message-body turn-text";
-    turnEl.appendChild(textEl);
-
-    // Copy button (copies the raw text)
-    const copyBtn = document.createElement("button");
-    copyBtn.className = "copy-btn";
-    copyBtn.textContent = "Copy";
-    copyBtn.addEventListener("click", () => {
-      const text = textEl.getAttribute("data-raw-content") || textEl.textContent || "";
-      navigator.clipboard.writeText(text).then(() => {
-        copyBtn.textContent = "Copied!";
-        copyBtn.classList.add("copied");
-        setTimeout(() => {
-          copyBtn.textContent = "Copy";
-          copyBtn.classList.remove("copied");
-        }, 1500);
-      });
-    });
-    turnEl.appendChild(copyBtn);
-
-    this.messagesEl.appendChild(turnEl);
-    this.scrollToBottom();
-
-    return {
-      el: turnEl,
-      textEl,
-      toolGroupEl: null,
-      toolGroupBodyEl: null,
-      toolCallEntries: new Map(),
-      rawText: "",
-    };
-  }
-
-  _ensureTurn(chatId, label) {
-    if (!this.activeTurns.has(chatId)) {
-      const turn = this._startTurn(label);
-      this.activeTurns.set(chatId, turn);
-    }
-    return this.activeTurns.get(chatId);
-  }
-
-  _ensureToolGroup(chatId, label) {
-    const turn = this._ensureTurn(chatId, label);
-    if (!turn.toolGroupEl) {
-      // Insert tool group before the copy button
-      const details = document.createElement("details");
-      details.className = "tool-group turn-tool-group";
-
-      const summary = document.createElement("summary");
-      summary.dataset.label = label;
-      summary.textContent = `${label} — tool calls`;
-      details.appendChild(summary);
-
-      const body = document.createElement("div");
-      body.className = "tool-group-body";
-      details.appendChild(body);
-
-      // Insert before the copy button (last child)
-      const copyBtn = turn.el.querySelector(".copy-btn");
-      turn.el.insertBefore(details, copyBtn);
-
-      turn.toolGroupEl = details;
-      turn.toolGroupBodyEl = body;
-      this.scrollToBottom();
-    }
-    return turn;
-  }
-
-  handleContentEvent(payload) {
-    const delta = payload.delta || payload.content || "";
-    if (!delta) return;
-
-    this._removeThinking();
-
-    const chatId = payload.chatId || this.state.conversationId || "";
-    const label = this.formatAgentLabel(payload);
-    const turn = this._ensureTurn(chatId, label);
-
-    turn.rawText += delta;
-    turn.textEl.setAttribute("data-raw-content", turn.rawText);
-    turn.textEl.innerHTML = this.renderMarkdown(turn.rawText);
-    this.scrollToBottom();
-  }
-
-  handleToolCallEvent(payload) {
-    this._removeThinking();
-
-    const chatId = payload.chatId || this.state.conversationId || "";
-    const label = this.formatAgentLabel(payload);
-    const turn = this._ensureToolGroup(chatId, label);
-    const calls = payload.toolCalls || [];
-
-    calls.forEach((call, i) => {
-      const callId = call.id || `${formatToolCallSummary(call)}-${i}`;
-      if (!turn.toolCallEntries.has(callId)) {
-        const entry = this._appendToolGroupEntry(turn.toolGroupBodyEl, "call", formatToolCallSummary(call), callId);
-        turn.toolCallEntries.set(callId, entry);
-      }
-    });
-    this._updateToolGroupSummary(chatId);
-  }
-
-  handleToolExecutingEvent(payload) {
-    const call = payload.toolExecuting;
-    if (!call) return;
-
-    const chatId = payload.chatId || this.state.conversationId || "";
-    const label = this.formatAgentLabel(payload);
-    const turn = this._ensureToolGroup(chatId, label);
-
-    const callId = call.id || formatToolCallSummary(call);
-    const text = formatToolCallSummary(call);
-
-    if (turn.toolCallEntries.has(callId)) {
-      const entry = turn.toolCallEntries.get(callId);
-      entry.className = "tool-group-entry entry-running";
-      entry.textContent = text;
-    } else {
-      const entry = this._appendToolGroupEntry(turn.toolGroupBodyEl, "running", text, callId);
-      turn.toolCallEntries.set(callId, entry);
-      this._updateToolGroupSummary(chatId);
-    }
-  }
-
-  handleToolResultEvent(payload) {
-    const results = payload.toolResults || [];
-    if (results.length === 0) return;
-
-    const chatId = payload.chatId || this.state.conversationId || "";
-    const label = this.formatAgentLabel(payload);
-    const turn = this._ensureToolGroup(chatId, label);
-
-    results.forEach((result) => {
-      const callId = result.toolCallId || result.toolName;
-      if (!result.success) {
-        const toolName = result.toolName || "Tool";
-        const errorMsg = result.error || "Unknown error";
-        const text = `✗ ${toolName}: ${errorMsg}`;
-        if (callId && turn.toolCallEntries.has(callId)) {
-          const entry = turn.toolCallEntries.get(callId);
-          entry.className = "tool-group-entry entry-error";
-          entry.textContent = text;
-        } else {
-          this._appendToolGroupEntry(turn.toolGroupBodyEl, "error", text, callId);
-        }
-      } else if (!result.ephemeral) {
-        const summary = formatToolResultSummary(result);
-        if (summary) {
-          if (callId && turn.toolCallEntries.has(callId)) {
-            const entry = turn.toolCallEntries.get(callId);
-            entry.className = "tool-group-entry entry-success";
-            entry.textContent = summary;
-          } else {
-            this._appendToolGroupEntry(turn.toolGroupBodyEl, "success", summary, callId);
-          }
-        }
-      } else if (result.ephemeral && callId && turn.toolCallEntries.has(callId)) {
-        // Ephemeral tool completed — remove its entry entirely (no result to show)
-        turn.toolCallEntries.get(callId).remove();
-        turn.toolCallEntries.delete(callId);
-      }
-    });
-    this._updateToolGroupSummary(chatId);
-    // Close this chatId's turn — next content from the same chatId opens a fresh bubble.
-    this.activeTurns.delete(chatId);
-  }
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  formatAgentLabel(payload) {
+  formatAgentLabel(_payload) {
     // Always use the main agent's name for continuity, silencing sub-agent identity switches.
     return this.state.agentName || "Assistant";
-  }
-
-  renderMarkdown(text) {
-    if (typeof marked === "undefined" || typeof DOMPurify === "undefined") return text;
-    ensureMarkedCodeRenderer();
-    const raw = marked.parse(text);
-    return DOMPurify.sanitize(raw, {
-      ADD_TAGS: ["button", "div", "span"],
-      ADD_ATTR: ["class", "type"],
-    });
   }
 
   scrollToBottom() {
     this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     // Hide scroll button when we programmatically scroll to bottom
     if (this.scrollBtn) this.scrollBtn.style.display = "none";
-  }
-}
-
-// ─── SSE stream parser ─────────────────────────────────────────────────────
-async function parseSSEStream(body, onEvent) {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop() || "";
-
-    parts.forEach((part) => {
-      const lines = part.split("\n");
-      let eventType = "message";
-      let data = "";
-      lines.forEach((line) => {
-        if (line.startsWith("event:")) eventType = line.slice(6).trim();
-        else if (line.startsWith("data:")) data += line.slice(5).trim();
-      });
-      if (!data) return;
-      try {
-        onEvent(eventType, JSON.parse(data));
-      } catch {
-        onEvent("error", { content: "Failed to parse stream data" });
-      }
-    });
   }
 }

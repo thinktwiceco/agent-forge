@@ -8,7 +8,7 @@ import (
 )
 
 // ConsumerFn processes a due task by routing it to the agent inbox.
-type ConsumerFn func(task *Task, inbox *queue.Queue) error
+type ConsumerFn func(task *Task, inbox queue.Inbox) error
 
 func defaultConsumers() map[string]ConsumerFn {
 	return map[string]ConsumerFn{
@@ -18,7 +18,7 @@ func defaultConsumers() map[string]ConsumerFn {
 
 // agentReminderConsumer delivers the task payload as a message to the agent inbox.
 // The agent receives it like any other async message (sender=scheduler).
-func agentReminderConsumer(task *Task, inbox *queue.Queue) error {
+func agentReminderConsumer(task *Task, inbox queue.Inbox) error {
 	if inbox == nil {
 		return fmt.Errorf("inbox is nil")
 	}

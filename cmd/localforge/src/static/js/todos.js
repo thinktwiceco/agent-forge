@@ -1,26 +1,69 @@
 export class TodoManager {
-  constructor() {
+  constructor(appState) {
+    this.state = appState;
     this.container = document.getElementById("todos-panel");
     this.pollInterval = null;
     this.todos = [];
+    this.activePollMs = 3000;
+    this.idlePollMs = 10000;
+    this.agentActive = false;
+    this.visible = !document.hidden;
   }
 
   start() {
-    // Initial load
     this.load();
-    
-    // Poll every 3 seconds
-    this.pollInterval = setInterval(() => this.load(), 3000);
+
+    document.addEventListener("visibilitychange", () => {
+      this.visible = !document.hidden;
+      if (this.visible) {
+        this.load();
+        this._restartPolling();
+      } else {
+        this._stopPolling();
+      }
+    });
+
+    this.state.events.addEventListener("agentStatusChanged", (event) => {
+      const status = (event.detail?.status || "").toLowerCase();
+      const wasActive = this.agentActive;
+      this.agentActive = status === "streaming";
+      if (this.agentActive !== wasActive) {
+        this._restartPolling();
+      }
+      if (this.agentActive) {
+        this.load();
+      }
+    });
+
+    this.state.events.addEventListener("conversationUpdated", () => {
+      if (this.visible) this.load();
+    });
+
+    this._restartPolling();
   }
 
   stop() {
+    this._stopPolling();
+  }
+
+  _stopPolling() {
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
       this.pollInterval = null;
     }
   }
 
+  _restartPolling() {
+    this._stopPolling();
+    if (!this.visible) return;
+
+    const interval = this.agentActive ? this.activePollMs : this.idlePollMs;
+    this.pollInterval = setInterval(() => this.load(), interval);
+  }
+
   async load() {
+    if (!this.visible) return;
+
     try {
       const res = await fetch("/api/todos");
       if (!res.ok) {
@@ -42,7 +85,6 @@ export class TodoManager {
 
     let html = "";
 
-    // Header with count
     html += `
       <div class="todos-header">
         <h3>Active Tasks</h3>
@@ -50,7 +92,6 @@ export class TodoManager {
       </div>
     `;
 
-    // Pending todos
     if (pendingTodos.length > 0) {
       html += '<div class="todos-section">';
       html += '<h4>Pending</h4>';
@@ -60,7 +101,6 @@ export class TodoManager {
       html += "</div>";
     }
 
-    // Completed todos
     if (completedTodos.length > 0) {
       html += '<div class="todos-section">';
       html += '<h4>Completed</h4>';
@@ -70,7 +110,6 @@ export class TodoManager {
       html += "</div>";
     }
 
-    // Empty state
     if (this.todos.length === 0) {
       html += '<div class="todos-empty">No tasks yet.<br />They appear here when the agent uses the todo tool.</div>';
     }
@@ -81,7 +120,7 @@ export class TodoManager {
   renderTodoItem(todo, completed) {
     const statusClass = completed ? "completed" : "pending";
     const statusIcon = completed ? "✓" : "○";
-    
+
     return `
       <div class="todo-item ${statusClass}">
         <div class="todo-status">${statusIcon}</div>

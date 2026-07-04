@@ -1,5 +1,7 @@
 package main
 
+import "github.com/thinktwiceco/agent-forge/src/llms"
+
 // ─── HTTP Request / Response Types ───────────────────────────────────────────
 
 type ChatRequest struct {
@@ -25,6 +27,12 @@ type ConversationSummary struct {
 
 type RenameChatRequest struct {
 	Title string `json:"title" binding:"required"`
+}
+
+type ConversationHistoryResponse struct {
+	Messages []*llms.UnifiedMessage `json:"messages"`
+	Total    int                    `json:"total"`
+	HasMore  bool                   `json:"hasMore"`
 }
 
 // ─── Agent config – read ──────────────────────────────────────────────────────

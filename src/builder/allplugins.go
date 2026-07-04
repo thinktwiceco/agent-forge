@@ -5,6 +5,7 @@ package builder
 // then add a single blank import line here.
 import (
 	_ "github.com/thinktwiceco/agent-forge/src/plugins/brain"
+	_ "github.com/thinktwiceco/agent-forge/src/plugins/config"
 	_ "github.com/thinktwiceco/agent-forge/src/plugins/heartbeat"
 	_ "github.com/thinktwiceco/agent-forge/src/plugins/logger"
 	_ "github.com/thinktwiceco/agent-forge/src/plugins/scheduler"

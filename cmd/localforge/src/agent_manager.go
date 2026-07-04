@@ -95,6 +95,7 @@ func (am *AgentManager) Reload() error {
 	}
 
 	am.mu.Lock()
+	oldAgent := am.agent
 	am.agent = agent
 	if am.chunkRouter != nil {
 		agent.SetChunkRouter(am.chunkRouter)
@@ -103,6 +104,9 @@ func (am *AgentManager) Reload() error {
 		agent.SetTurnCompleteRouter(am.turnCompleteRouter)
 	}
 	am.mu.Unlock()
+	if oldAgent != nil {
+		oldAgent.Stop()
+	}
 	return nil
 }
 

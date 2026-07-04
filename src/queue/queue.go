@@ -56,3 +56,5 @@ func (q *Queue) Len() int {
 func (q *Queue) Close() {
 	close(q.ch)
 }
+
+var _ Inbox = (*Queue)(nil)

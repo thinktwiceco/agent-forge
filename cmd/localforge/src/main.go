@@ -14,6 +14,7 @@ import (
 
 	"github.com/joho/godotenv"
 	agentforge "github.com/thinktwiceco/agent-forge/src"
+	"github.com/thinktwiceco/agent-forge/src/builder"
 	"github.com/thinktwiceco/agent-forge/src/core"
 )
 
@@ -57,6 +58,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("agent error: %v", err)
 	}
+
+	builder.SetConfigWriter(newConfigWriterAdapter(configMgr, agentMgr))
 
 	server := NewServer(agentMgr, configMgr, todoMgr, *devMode, appDir)
 

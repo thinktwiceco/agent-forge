@@ -127,3 +127,32 @@ func (jp *JSONPersistence) GetHistory(chatId string, limit, offset int) []*llms.
 	agentforge.Debug("Retrieved %d messages from history (chatId: %s, offset: %d, limit: %d)", end-start, chatId, offset, limit)
 	return messages[start:end]
 }
+
+// tailSlice returns the most recent messages, skipping offsetFromEnd recent messages first.
+func tailSlice(messages []*llms.UnifiedMessage, limit, offsetFromEnd int) ([]*llms.UnifiedMessage, int, bool) {
+	total := len(messages)
+	if total == 0 {
+		return messages, 0, false
+	}
+	if limit <= 0 || limit >= total {
+		return messages, total, false
+	}
+	if offsetFromEnd < 0 {
+		offsetFromEnd = 0
+	}
+	end := total - offsetFromEnd
+	if end <= 0 {
+		return []*llms.UnifiedMessage{}, total, false
+	}
+	start := end - limit
+	if start < 0 {
+		start = 0
+	}
+	return messages[start:end], total, start > 0
+}
+
+// GetTailHistory loads full history then returns a tail window (offsetFromEnd skips recent messages).
+func (jp *JSONPersistence) GetTailHistory(chatId string, limit, offsetFromEnd int) ([]*llms.UnifiedMessage, int, bool) {
+	all := jp.GetHistory(chatId, 0, 0)
+	return tailSlice(all, limit, offsetFromEnd)
+}

@@ -2,7 +2,7 @@ function formatRelativeTime(isoString) {
   if (!isoString) return "";
   const now = Date.now();
   const then = new Date(isoString).getTime();
-  const diff = Math.floor((now - then) / 1000); // seconds
+  const diff = Math.floor((now - then) / 1000);
 
   if (diff < 60)      return "just now";
   if (diff < 3600)    return `${Math.floor(diff / 60)}m ago`;
@@ -18,9 +18,15 @@ export class ConversationManager {
     this.listEl = document.getElementById("conversation-list");
     this.newButton = document.getElementById("new-chat");
     this.newButtonHeader = document.getElementById("new-chat-header");
+    this.itemsById = new Map();
 
-    this.state.events.addEventListener("conversationUpdated", () => {
-      this.refreshList();
+    this.state.events.addEventListener("conversationUpdated", (event) => {
+      const detail = event.detail || {};
+      if (detail.id) {
+        this.touchConversation(detail);
+      } else {
+        this.refreshList();
+      }
     });
     this.state.events.addEventListener("conversationIdUpdated", (event) => {
       const id = event.detail?.id;
@@ -47,61 +53,96 @@ export class ConversationManager {
       this.renderList(list);
     } catch {
       this.listEl.innerHTML = "";
+      this.itemsById.clear();
     }
+  }
+
+  touchConversation({ id, updatedAt, title }) {
+    if (!id) return;
+
+    let el = this.listEl.querySelector(`[data-id="${id}"]`);
+    if (!el) {
+      const summary = {
+        id,
+        title: title || id.slice(0, 8).toUpperCase(),
+        updatedAt: updatedAt || new Date().toISOString(),
+      };
+      el = this.createItemElement(summary);
+      this.listEl.prepend(el);
+      this.itemsById.set(id, el);
+      return;
+    }
+
+    const timeEl = el.querySelector(".conv-time");
+    if (timeEl && updatedAt) {
+      timeEl.textContent = formatRelativeTime(updatedAt);
+    }
+    if (title) {
+      const titleEl = el.querySelector(".conv-title");
+      if (titleEl) titleEl.textContent = title;
+    }
+    this.listEl.prepend(el);
+  }
+
+  createItemElement(item) {
+    const el = document.createElement("div");
+    el.className = "conversation-item";
+    el.dataset.id = item.id;
+
+    const label = item.title || item.id.slice(0, 8).toUpperCase();
+    const relTime = formatRelativeTime(item.updatedAt);
+
+    const titleEl = document.createElement("span");
+    titleEl.className = "conv-title";
+    titleEl.textContent = label;
+
+    const timeEl = document.createElement("span");
+    timeEl.className = "conv-time";
+    timeEl.textContent = relTime;
+
+    const renameBtn = document.createElement("button");
+    renameBtn.className = "conv-rename";
+    renameBtn.title = "Rename conversation";
+    renameBtn.textContent = "✎";
+    renameBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this._startInlineRename(el, titleEl, item.id, label);
+    });
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "conv-delete";
+    deleteBtn.title = "Delete conversation";
+    deleteBtn.textContent = "×";
+    deleteBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await this.deleteConversation(item.id);
+    });
+
+    el.appendChild(titleEl);
+    el.appendChild(timeEl);
+    el.appendChild(renameBtn);
+    el.appendChild(deleteBtn);
+
+    el.addEventListener("click", () => {
+      this.setActive(item.id);
+      this.chatManager.loadConversation(item.id);
+    });
+
+    return el;
   }
 
   renderList(items) {
     this.listEl.innerHTML = "";
+    this.itemsById.clear();
     items.forEach((item) => {
-      const el = document.createElement("div");
-      el.className = "conversation-item";
-      el.dataset.id = item.id;
-
-      const label = item.title || item.id.slice(0, 8).toUpperCase();
-      const relTime = formatRelativeTime(item.updatedAt);
-
-      const titleEl = document.createElement("span");
-      titleEl.className = "conv-title";
-      titleEl.textContent = label;
-
-      const timeEl = document.createElement("span");
-      timeEl.className = "conv-time";
-      timeEl.textContent = relTime;
-
-      const renameBtn = document.createElement("button");
-      renameBtn.className = "conv-rename";
-      renameBtn.title = "Rename conversation";
-      renameBtn.textContent = "✎";
-      renameBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this._startInlineRename(el, titleEl, item.id, label);
-      });
-
-      const deleteBtn = document.createElement("button");
-      deleteBtn.className = "conv-delete";
-      deleteBtn.title = "Delete conversation";
-      deleteBtn.textContent = "×";
-      deleteBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        await this.deleteConversation(item.id);
-      });
-
-      el.appendChild(titleEl);
-      el.appendChild(timeEl);
-      el.appendChild(renameBtn);
-      el.appendChild(deleteBtn);
-
-      el.addEventListener("click", () => {
-        this.setActive(item.id);
-        this.chatManager.loadConversation(item.id);
-      });
-
+      const el = this.createItemElement(item);
       this.listEl.appendChild(el);
+      this.itemsById.set(item.id, el);
     });
   }
 
   _startInlineRename(itemEl, titleEl, id, currentLabel) {
-    if (itemEl.querySelector(".conv-rename-input")) return; // already editing
+    if (itemEl.querySelector(".conv-rename-input")) return;
 
     const input = document.createElement("input");
     input.type = "text";
@@ -143,7 +184,6 @@ export class ConversationManager {
     try {
       const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
       if (!res.ok && res.status !== 404) throw new Error("failed");
-      // If we deleted the active conversation, start fresh
       if (this.state.conversationId === id) {
         this.clearActive();
         this.chatManager.startNewConversation();

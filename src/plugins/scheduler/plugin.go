@@ -19,7 +19,7 @@ const pluginName = "scheduler"
 // SchedulerPlugin wires together the scheduler, tool, and agent lifecycle hooks.
 type SchedulerPlugin struct {
 	workingDir string
-	inbox      *queue.Queue // stored during EventAgentInitialization, applied when scheduler is created
+	inbox      queue.Inbox // stored during EventAgentInitialization, applied when scheduler is created
 	sched      *scheduler
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -47,7 +47,7 @@ func (p *SchedulerPlugin) SetWorkingDir(dir string) {
 // SetInbox implements core.InboxAware.
 // Called during EventAgentInitialization before the scheduler is created;
 // the reference is stored and forwarded once the scheduler is ready.
-func (p *SchedulerPlugin) SetInbox(q *queue.Queue) {
+func (p *SchedulerPlugin) SetInbox(q queue.Inbox) {
 	p.inbox = q
 	if p.sched != nil {
 		p.sched.setInbox(q)

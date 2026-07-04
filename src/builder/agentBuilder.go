@@ -57,6 +57,11 @@ type Config struct {
 		BrainPlugin *brain.PluginConfig `yaml:"brain_plugin,omitempty"`
 		// SpawnSubagent enables the built-in spawn_subagent tool (ephemeral child agent).
 		SpawnSubagent bool `yaml:"spawn_subagent,omitempty"`
+		// ConfigTool controls whether the config plugin loads. Omitting the field (nil)
+		// or setting it to true enables config. Set to false to opt out:
+		//   agent:
+		//     config_tool: false
+		ConfigTool *bool `yaml:"config_tool,omitempty"`
 	} `yaml:"agent"`
 	VectorStorage *VectorStorageConfig `yaml:"vector-storage,omitempty"`
 }
@@ -78,6 +83,7 @@ type AgentFactory struct {
 	brainPluginCfg   *brain.PluginConfig
 	modelName        string
 	canSpawnSubagent bool
+	configToolDisabled bool
 }
 
 // Public API methods
@@ -137,6 +143,7 @@ func newAgentFactoryFromConfigStruct(cfg Config) (*AgentFactory, error) {
 	b.brainDisabled = cfg.Agent.Brain != nil && !*cfg.Agent.Brain
 	b.brainPluginCfg = cfg.Agent.BrainPlugin
 	b.canSpawnSubagent = cfg.Agent.SpawnSubagent
+	b.configToolDisabled = cfg.Agent.ConfigTool != nil && !*cfg.Agent.ConfigTool
 
 	return b, nil
 }
@@ -285,6 +292,9 @@ func (b *AgentFactory) buildPlugins() ([]core.Plugin, error) {
 		effective = append(effective, "brain")
 	}
 	effective = append(effective, "skills")
+	if !b.configToolDisabled {
+		effective = append(effective, "config")
+	}
 	// Auto-activate heartbeat when the heartbeat section is configured, so
 	// users don't need to list "heartbeat" explicitly under plugins:.
 	heartbeatInPlugins := false
@@ -297,7 +307,7 @@ func (b *AgentFactory) buildPlugins() ([]core.Plugin, error) {
 		effective = append(effective, "heartbeat")
 	}
 	for _, name := range b.plugins {
-		if name == "brain" || name == "skills" {
+		if name == "brain" || name == "skills" || name == "config" {
 			continue // already included by default; skip to avoid double-init
 		}
 		effective = append(effective, name)

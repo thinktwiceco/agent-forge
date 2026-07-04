@@ -70,6 +70,13 @@ func (b *Builder) addSystemPrompt() string {
 			panic(err)
 		}
 		prompt += "\n\n" + mainAgent
+		if b.config.CanSpawnSubagent {
+			spawnPrompt, err := LoadMainPrompt("main-agent-spawn")
+			if err != nil {
+				panic(err)
+			}
+			prompt += "\n\n" + spawnPrompt
+		}
 		if tonePrompt := getTonePrompt(b.config.Tone); tonePrompt != "" {
 			prompt += "\n" + tonePrompt
 		}

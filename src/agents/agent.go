@@ -2,9 +2,7 @@ package agents
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -14,7 +12,6 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/history"
 	"github.com/thinktwiceco/agent-forge/src/llms"
-	"github.com/thinktwiceco/agent-forge/src/queue"
 )
 
 // Agent represents an advanced agent with an LLM engine.
@@ -55,16 +52,16 @@ type Agent struct {
 	tokenCounter         llms.TokenCounter
 	// History factory creates a new history Manager for each ChatStream call
 	historyFactory func(chatId string) history.Manager
-	// inbox is the agent's message queue.
-	// Created automatically at construction time; replaced when Drain is called with an external queue.
-	inbox *queue.Queue
-	// inboxCancel cancels the current background inbox drain goroutine.
-	// Called when Drain replaces the internal queue with an external one.
-	inboxCancel context.CancelFunc
-	// chunkRouter is an optional callback that receives each chunk produced by the background drain.
+	// turnQueue is the single admission point for all agent turns.
+	turnQueue *TurnQueue
+	// spawnMu protects spawnRegistry.
+	spawnMu sync.Mutex
+	// spawnRegistry tracks in-flight async subagent jobs.
+	spawnRegistry map[string]spawnJob
+	// chunkRouter is an optional callback that receives each chunk produced by autonomous turns.
 	// The HTTP layer sets this to route background responses to the appropriate push SSE connection.
 	chunkRouter func(chatId string, chunk core.ExtendedChunkResponse)
-	// turnCompleteRouter is called after each background drain turn with the accumulated full content.
+	// turnCompleteRouter is called after each autonomous turn with the accumulated full content.
 	// It is not called when content is empty (e.g. suppressed HEARTBEAT_OK turns).
 	turnCompleteRouter func(chatId string, fullContent string)
 	// memoryPrefixProvider is optional; when set, injectSystemPrompt prepends its return value
@@ -99,14 +96,15 @@ func NewAgent(config *AgentConfig) *Agent {
 	// Initialize prompt builder early (before plugins) with minimal config
 	// Plugins may need to update the system prompt during initialization
 	a.promptBuilder = prompts.NewBuilder(prompts.Config{
-		SystemPrompt: config.SystemPrompt,
-		MainAgent:    config.MainAgent,
-		Tone:         config.Tone,
-		Tools:        []llms.Tool{}, // Will be populated later
+		SystemPrompt:     config.SystemPrompt,
+		MainAgent:        config.MainAgent,
+		Tone:             config.Tone,
+		Tools:            []llms.Tool{}, // Will be populated later
+		CanSpawnSubagent: config.CanSpawnSubagent,
 	})
 
 	a.ensureHooks()
-	a.inbox = queue.New(64)
+	a.turnQueue = NewTurnQueue(64, a.handleTurn)
 	a.registerPlugins()
 
 	errs := a.hooks.agentInitializationEvent(a, config)
@@ -143,10 +141,11 @@ func NewAgent(config *AgentConfig) *Agent {
 
 	// Update prompt builder with final tools, then build system prompt
 	a.promptBuilder.UpdateConfig(prompts.Config{
-		SystemPrompt: a.config.SystemPrompt,
-		MainAgent:    a.config.MainAgent,
-		Tone:         a.config.Tone,
-		Tools:        a.tools,
+		SystemPrompt:     a.config.SystemPrompt,
+		MainAgent:        a.config.MainAgent,
+		Tone:             a.config.Tone,
+		Tools:            a.tools,
+		CanSpawnSubagent: a.config.CanSpawnSubagent,
 	})
 	a.systemPrompt = a.promptBuilder.Build()
 
@@ -154,7 +153,7 @@ func NewAgent(config *AgentConfig) *Agent {
 	a.executor = a.createExecutor()
 
 	a.executor.UpdateTools(a.tools)
-	a.startBackgroundDrain()
+	a.startTurnWorker()
 
 	// System callbacks: registerSystemCallbacks in agentInit.go (handlers package).
 	a.registerSystemCallbacks()
@@ -175,12 +174,7 @@ func NewAgent(config *AgentConfig) *Agent {
 
 // ===== Public Methods =====
 
-// ChatStream sends a message to the underlying LLM engine and returns a response channel
-// for streaming responses with agent-specific context.
-//
-// This method creates a ResponseCh with channels for receiving streaming chunks
-// and errors. The chunks are forwarded from the underlying LLM's ResponseCh and enriched
-// with agent name and trace information.
+// ChatStream enqueues a turn and returns a response channel for streaming results.
 //
 // Parameters:
 //   - ctx: Context for cancellation and deadline control
@@ -190,79 +184,22 @@ func NewAgent(config *AgentConfig) *Agent {
 // Returns:
 //   - *core.ResponseCh: Response channel that can be used to receive streaming chunks
 func (a *Agent) ChatStream(ctx context.Context, message string, chatId string) *core.ResponseCh {
-	// Pre-generate a UUID for new conversations so the chatId is known for the
-	// entire duration of this turn — including during tool execution. Without this,
-	// plugins (e.g. brain) and memory tools cannot create per-conversation files on
-	// the first message because the chatId is only assigned by hm.Save() at the end.
-	// hm.Save() will reuse this ID rather than generating a new one.
 	if chatId == "" {
 		chatId = uuid.NewString()
 	}
 
-	// Create a new History instance for this request (per-request history)
-	// This eliminates concurrency issues with shared state
-	hm := a.createHistory(chatId)
-	a.injectSystemPrompt(hm)
-	prevMessages := append([]*llms.UnifiedMessage(nil), hm.Messages()...)
-	hm.AddUserMessage(message)
-	errs := a.hooks.newUserMessageEvent(a, message)
-	logHookErrors(errs)
+	responseCh := core.NewResponseCh(a.config.AgentName, a.config.Trace, chatId, a.onChunkReadHook())
 
-	// Notify plugins that a chat turn has started with this conversation ID.
-	errs = a.hooks.chatStartEvent(a, chatId)
-	logHookErrors(errs)
-
-	// Create a new response channel for this ChatStream call
-	// The hook callback triggers agent hooks when chunks are read
-	onChunkRead := func(extendedChunk *core.ExtendedChunkResponse) error {
-		// Trigger hooks with extended chunk (includes AgentName and Trace)
-		errs := a.hooks.newChunkEvent(a, extendedChunk)
-		for _, err := range errs {
-			if err != nil {
-				return err
-			}
-		}
-		return nil
+	if err := a.turnQueue.Submit(turnRequest{
+		Ctx:        ctx,
+		Body:       message,
+		ChatID:     chatId,
+		ResponseCh: responseCh,
+		Source:     "direct",
+	}); err != nil {
+		responseCh.Error <- err
+		responseCh.Close()
 	}
-	responseCh := core.NewResponseCh(a.config.AgentName, a.config.Trace, chatId, onChunkRead)
-
-	// Start the tool execution loop in a goroutine
-	go func() {
-		defer responseCh.Close()
-
-		execResult, err := a.executor.ExecuteChatWithTools(ctx, hm, responseCh)
-		if err != nil {
-			responseCh.Error <- err
-		} else if execResult.HeartbeatAckSuppressed {
-			hm.SetMessages(prevMessages)
-		}
-
-		var finalChatId string
-		if err == nil && !execResult.HeartbeatAckSuppressed {
-			saveId, saveErr := hm.Save()
-			if saveErr != nil {
-				agentforge.Error("Failed to save history: %v", saveErr)
-			}
-			finalChatId = saveId
-			responseCh.SetChatId(finalChatId)
-		}
-
-		// Send final chunk with chatId so frontend receives it before stream closes.
-		// Without this, new conversations never propagate the generated ID to the client.
-		if finalChatId != "" {
-			chatIdChunk := core.ExtendedChunkResponse{
-				ChatId:    finalChatId,
-				Status:    llms.StatusCompleted,
-				Type:      llms.TypeCompletion,
-				Content:   "",
-				AgentName: a.config.AgentName,
-				Trace:     a.config.Trace,
-			}
-			if chunkBytes, err := json.Marshal(chatIdChunk); err == nil {
-				responseCh.TrySend(chunkBytes)
-			}
-		}
-	}()
 
 	return responseCh
 }
@@ -398,101 +335,37 @@ func (a *Agent) InitAgentContext() {
 	a.initAgentContext()
 }
 
-// SetTurnCompleteRouter sets a callback that is invoked after each background drain turn
+// SetTurnCompleteRouter sets a callback that is invoked after each autonomous turn
 // with the accumulated full content. Not called for suppressed turns (empty content).
 func (a *Agent) SetTurnCompleteRouter(fn func(chatId string, fullContent string)) {
 	a.turnCompleteRouter = fn
 }
 
-// SetChunkRouter sets a callback that receives each chunk produced by the background drain.
+// SetChunkRouter sets a callback that receives each chunk produced by autonomous turns.
 // The HTTP layer uses this to forward background responses to the appropriate push SSE connection.
 func (a *Agent) SetChunkRouter(fn func(chatId string, chunk core.ExtendedChunkResponse)) {
 	a.chunkRouter = fn
+}
+
+// Stop cancels in-flight subagent jobs and shuts down the turn queue worker.
+// Call when discarding an agent instance (e.g. on reload).
+func (a *Agent) Stop() {
+	a.spawnMu.Lock()
+	for _, job := range a.spawnRegistry {
+		job.cancel()
+	}
+	a.spawnRegistry = nil
+	a.spawnMu.Unlock()
+
+	if a.turnQueue != nil {
+		a.turnQueue.Stop()
+	}
 }
 
 // routeChunk forwards a chunk through the chunk router if one is set and the chunk has a chatId.
 func (a *Agent) routeChunk(chunk core.ExtendedChunkResponse) {
 	if a.chunkRouter != nil && chunk.ChatId != "" {
 		a.chunkRouter(chunk.ChatId, chunk)
-	}
-}
-
-// startBackgroundDrain starts an internal goroutine that drains a.inbox.
-// It is cancelled by calling a.inboxCancel(). Used for the automatic internal queue
-// created at agent construction time.
-func (a *Agent) startBackgroundDrain() {
-	ctx, cancel := context.WithCancel(context.Background())
-	a.inboxCancel = cancel
-	q := a.inbox
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg, ok := <-q.C():
-				if !ok {
-					return
-				}
-				responseCh := a.ChatStream(ctx, msg.Format(), msg.ChatId)
-				var sb strings.Builder
-				finalChatId := msg.ChatId
-				for chunk := range responseCh.Start() {
-					a.routeChunk(chunk)
-					if chunk.Content != "" {
-						sb.WriteString(chunk.Content)
-					}
-					if chunk.ChatId != "" {
-						finalChatId = chunk.ChatId
-					}
-				}
-				if a.turnCompleteRouter != nil && sb.Len() > 0 {
-					a.turnCompleteRouter(finalChatId, sb.String())
-				}
-			}
-		}
-	}()
-}
-
-// Drain replaces the internal inbox queue with q and drains it in the calling goroutine,
-// blocking until ctx is cancelled or q is closed.
-//
-// Each message is routed to its own conversation via the ChatId embedded in the message.
-// The formatted message content (headers + body) is what the agent receives, allowing it
-// to observe metadata such as the sender identity, timestamp, and reqId.
-//
-// Calling Drain stops the internal background drain goroutine (started automatically at
-// construction) and switches to the provided queue. This is useful when the caller needs
-// direct control over the inbox, e.g. to inject messages from the web UI.
-//
-// Example:
-//
-//	q := queue.New(32)
-//	go agent.Drain(ctx, q)
-//	q.Enqueue("Ciao!", "conv-1", map[string]string{"sender": "user"})
-func (a *Agent) Drain(ctx context.Context, q *queue.Queue) {
-	// Cancel the background drain goroutine that was started at construction.
-	if a.inboxCancel != nil {
-		a.inboxCancel()
-		a.inboxCancel = nil
-	}
-	a.inbox = q
-	a.toolsMu.RLock()
-	a.executor.UpdateTools(a.tools)
-	a.toolsMu.RUnlock()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case msg, ok := <-q.C():
-			if !ok {
-				return
-			}
-			responseCh := a.ChatStream(ctx, msg.Format(), msg.ChatId)
-			for chunk := range responseCh.Start() {
-				a.routeChunk(chunk)
-			}
-		}
 	}
 }
 

@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Changed
+
+- **`spawn_subagent`**: now asynchronous — tool returns immediately with `spawn_id`; subagent result arrives as a follow-up turn on the parent conversation via `TurnQueue.submitSpawnResult` (`src/tools/spawn`, `src/agents/agent_spawn.go`).
+
 ## [0.8.1] - 2026-05-25
 - [4c3119e](http://github.com/thinktwiceco/agent-forge/commit/4c3119e85ccd5daed88d3ad8fa011d5e3da0050f) - Merge pull request #54 from thinktwiceco/fix/issue-53-skills-concurrent-map-writes
 - [934dd1f](http://github.com/thinktwiceco/agent-forge/commit/934dd1f1ecf78f29aee59d7c418245cf5c60f4c6) - fix(skills): guard skill cache with RWMutex for parallel tool calls

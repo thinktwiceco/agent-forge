@@ -10,6 +10,7 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/core"
 	"github.com/thinktwiceco/agent-forge/src/llms"
 	"github.com/thinktwiceco/agent-forge/src/plugins/registry"
+	"github.com/thinktwiceco/agent-forge/src/sessionlog"
 )
 
 const (
@@ -96,6 +97,7 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 		// Print agent name header
 		agentLabel := formatLabelWithRules(agentName, trace, p.labelRules)
 		_, _ = fmt.Fprintf(p.output, "\n%s%s%s%s\n", ColorBold, color, agentLabel, ColorReset)
+		p.writeSession(extendedChunk.ChatId, "\n"+agentLabel+"\n")
 	}
 
 	// Handle different chunk types
@@ -108,30 +110,40 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 				content = extendedChunk.Delta
 			}
 			_, _ = fmt.Fprintf(p.output, "%s%s%s", color, content, ColorReset)
+			p.writeSession(extendedChunk.ChatId, content)
 		}
 
 	case llms.TypeCompletion:
 		// Final completion - display token usage if available
 		if extendedChunk.TotalTokens > 0 {
+			line := fmt.Sprintf("\n📊 Tokens: %d prompt + %d completion = %d total\n",
+				extendedChunk.PromptTokens, extendedChunk.CompletionTokens, extendedChunk.TotalTokens)
 			_, _ = fmt.Fprintf(p.output, "\n%s%s📊 Tokens: %d prompt + %d completion = %d total%s\n",
 				ColorBlue, ColorDim,
 				extendedChunk.PromptTokens, extendedChunk.CompletionTokens, extendedChunk.TotalTokens,
 				ColorReset)
+			p.writeSession(extendedChunk.ChatId, line)
 		}
 
 	case llms.TypeToolExecuting:
 		if extendedChunk.ToolExecuting != nil {
+			line := fmt.Sprintf("\n⚙️  Executing tool: %s\n", extendedChunk.ToolExecuting.Name)
 			_, _ = fmt.Fprintf(p.output, "\n%s%s⚙️  Executing tool: %s%s\n", ColorMagenta, ColorBold, extendedChunk.ToolExecuting.Name, ColorReset)
+			p.writeSession(extendedChunk.ChatId, line)
 		}
 
 	case llms.TypeToolResult:
 		if len(extendedChunk.ToolResults) > 0 {
 			for _, result := range extendedChunk.ToolResults {
+				var line string
 				if result.Success {
+					line = fmt.Sprintf("✓ Tool completed: %s\n", result.ToolName)
 					_, _ = fmt.Fprintf(p.output, "%s%s✓ Tool completed: %s%s\n", ColorGreen, ColorBold, result.ToolName, ColorReset)
 				} else {
+					line = fmt.Sprintf("✗ Tool failed: %s - %s\n", result.ToolName, result.Error)
 					_, _ = fmt.Fprintf(p.output, "%s%s✗ Tool failed: %s - %s%s\n", ColorRed, ColorBold, result.ToolName, result.Error, ColorReset)
 				}
+				p.writeSession(extendedChunk.ChatId, line)
 			}
 		}
 	}
@@ -147,6 +159,13 @@ func (p *LoggerPlugin) handleNewChunk(a *agents.Agent, extendedChunk *core.Exten
 	}
 
 	return nil
+}
+
+func (p *LoggerPlugin) writeSession(chatId, text string) {
+	if chatId == "" || text == "" {
+		return
+	}
+	sessionlog.Write(chatId, text)
 }
 
 // ResetState resets the internal state tracking (useful for new conversations)

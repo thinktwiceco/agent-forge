@@ -62,14 +62,31 @@ func TestBuilderBuild_MainAgentKeepsLeanNormalizedPrompt(t *testing.T) {
 	if !strings.Contains(got, "[ROLE]") {
 		t.Fatalf("Build() = %q, want main-agent role guidance", got)
 	}
-	if !strings.Contains(got, "Use spawn_subagent only for focused work") {
-		t.Fatalf("Build() = %q, want lean spawn_subagent guidance", got)
+	if strings.Contains(got, "spawn_subagent") {
+		t.Fatalf("Build() = %q, want no spawn guidance when CanSpawnSubagent is false", got)
 	}
 	if strings.Contains(got, "\t") {
 		t.Fatalf("Build() = %q, want tabs normalized out of the prompt", got)
 	}
 	if strings.Contains(got, "\n    [ROLE]") {
 		t.Fatalf("Build() = %q, want normalized indentation for main-agent prompt", got)
+	}
+}
+
+func TestBuilderBuild_MainAgentWithSpawnAddsSpawnGuidance(t *testing.T) {
+	builder := NewBuilder(Config{
+		SystemPrompt:     "Base instructions",
+		MainAgent:        true,
+		CanSpawnSubagent: true,
+	})
+
+	got := builder.Build()
+
+	if !strings.Contains(got, "[SPAWN]") {
+		t.Fatalf("Build() = %q, want spawn section when CanSpawnSubagent is true", got)
+	}
+	if !strings.Contains(got, "task_type: subagent_result") {
+		t.Fatalf("Build() = %q, want subagent_result handling guidance", got)
 	}
 }
 

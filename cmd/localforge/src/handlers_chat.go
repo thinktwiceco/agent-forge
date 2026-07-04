@@ -44,7 +44,7 @@ func (s *Server) handleChat(c *gin.Context) {
 
 	// Register cancel function if we have a conversation ID
 	// Note: For new conversations, we'll get the ID from the first chunk
-	var registeredConvID string
+	var chatReg *ChatRegistration
 
 	writer := NewSSEWriter(c)
 	writer.SetHeaders()
@@ -53,17 +53,15 @@ func (s *Server) handleChat(c *gin.Context) {
 	responseCh := agent.ChatStream(ctx, enriched, conversationID)
 	stream := responseCh.Start()
 
-	// Clean up function
 	defer func() {
-		if registeredConvID != "" {
-			s.convRegistry.Unregister(registeredConvID)
+		if chatReg != nil {
+			s.convRegistry.Unregister(chatReg)
 		}
 	}()
 
 	for {
 		select {
 		case <-ctx.Done():
-			// Context cancelled - send error event and return
 			errorChunk := core.ExtendedChunkResponse{
 				Content: "Agent stopped",
 				Status:  "error",
@@ -75,10 +73,8 @@ func (s *Server) handleChat(c *gin.Context) {
 				return
 			}
 
-			// Extract conversation ID from chunk if we haven't registered yet
-			if registeredConvID == "" && chunk.ChatId != "" {
-				registeredConvID = chunk.ChatId
-				s.convRegistry.Register(chunk.ChatId, cancel)
+			if chatReg == nil && chunk.ChatId != "" {
+				chatReg = s.convRegistry.Register(chunk.ChatId, cancel)
 			}
 
 			eventType := EventTypeFromChunk(chunk)

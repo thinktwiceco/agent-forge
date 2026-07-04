@@ -19,7 +19,7 @@ const (
 
 type scheduler struct {
 	db        *sql.DB
-	inbox     *queue.Queue
+	inbox     queue.Inbox
 	consumers map[string]ConsumerFn
 }
 
@@ -43,7 +43,7 @@ func newScheduler(workingDir string) (*scheduler, error) {
 	}, nil
 }
 
-func (s *scheduler) setInbox(q *queue.Queue) {
+func (s *scheduler) setInbox(q queue.Inbox) {
 	s.inbox = q
 }
 

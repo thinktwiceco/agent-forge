@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,7 +40,7 @@ func (s *Server) handleListConversations(c *gin.Context) {
 		return
 	}
 
-	meta := persistence.NewJSONConversationMetadata(baseDir)
+	titles := persistence.NewJSONConversationMetadata(baseDir).LoadTitlesFromEntries(entries)
 
 	type item struct {
 		summary ConversationSummary
@@ -62,7 +63,7 @@ func (s *Server) handleListConversations(c *gin.Context) {
 		items = append(items, item{
 			summary: ConversationSummary{
 				ID:        id,
-				Title:     meta.GetTitle(id),
+				Title:     titles[id],
 				UpdatedAt: info.ModTime().UTC().Format(time.RFC3339),
 			},
 			modTime: info.ModTime(),
@@ -94,10 +95,34 @@ func (s *Server) handleGetConversation(c *gin.Context) {
 		return
 	}
 
+	limit := 100
+	offset := 0
+	if raw := c.Query("limit"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid limit"})
+			return
+		}
+		limit = parsed
+	}
+	if raw := c.Query("offset"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid offset"})
+			return
+		}
+		offset = parsed
+	}
+
 	baseDir := s.conversationsBaseDir()
 	store := persistence.NewJSONPersistence(baseDir)
-	history := store.GetHistory(chatID, 0, 0)
-	c.JSON(http.StatusOK, history)
+	page, total, hasMore := store.GetTailHistory(chatID, limit, offset)
+
+	c.JSON(http.StatusOK, ConversationHistoryResponse{
+		Messages: page,
+		Total:    total,
+		HasMore:  hasMore,
+	})
 }
 
 func (s *Server) handleDeleteConversation(c *gin.Context) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -59,5 +60,32 @@ func EventTypeFromChunk(chunk core.ExtendedChunkResponse) string {
 			return SSEEventContent
 		}
 		return SSEEventContent
+	}
+}
+
+func streamChunksToSSE(
+	ctx context.Context,
+	stream <-chan core.ExtendedChunkResponse,
+	writer *SSEWriter,
+	cancelErrorContent string,
+) {
+	for {
+		select {
+		case <-ctx.Done():
+			errorChunk := core.ExtendedChunkResponse{
+				Content: cancelErrorContent,
+				Status:  "error",
+			}
+			_ = writer.WriteEvent("error", errorChunk)
+			return
+		case chunk, ok := <-stream:
+			if !ok {
+				return
+			}
+			eventType := EventTypeFromChunk(chunk)
+			if err := writer.WriteEvent(eventType, chunk); err != nil {
+				return
+			}
+		}
 	}
 }

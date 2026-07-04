@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/thinktwiceco/agent-forge/src/sessionlog"
 )
 
 // LogLevel represents the severity level of a log message.
@@ -193,7 +195,9 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 	if level >= currentLevel {
 		prefix := fmt.Sprintf("[%s] ", level.String())
 		message := fmt.Sprintf(format, args...)
-		l.logger.Printf("%s%s", prefix, message)
+		line := prefix + message
+		l.logger.Println(line)
+		sessionlog.WriteBound(line + "\n")
 	}
 }
 

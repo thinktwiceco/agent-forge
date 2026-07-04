@@ -31,7 +31,7 @@ A Go framework and application for building AI agents with LLM integration, tool
 **Library:**
 - Simple agent creation with fluent API
 - Extensible tool system with custom tool support
-- Optional **spawn_subagent** tool for synchronous ephemeral sub-tasks with a subset of tools
+- Optional **spawn_subagent** tool for async ephemeral sub-tasks with a subset of tools
 - Real-time streaming responses
 - Multiple LLM providers (OpenAI, DeepSeek, TogetherAI, OpenRouter)
 - Built-in tools (filesystem, git, web, postgres, API client, Instagram Graph, update script, Telegram dev helper, vector DB when configured)
@@ -162,7 +162,7 @@ agent, err := agents.NewBuilder(llm, "main").
 
 - **Parameters:** `prompt` (task for the child), `tools` (names from the parent’s tool list).
 - The child agent always gets **meta** and **expand**; it also gets the **todo** plugin if that plugin is registered in the binary.
-- The call is **synchronous**: the tool returns the subagent’s final text when done.
+- The call is **asynchronous**: the tool returns a `spawn_id` immediately; the subagent result arrives as a follow-up turn in the same conversation.
 
 YAML (Localforge): set `agent.spawn_subagent: true` in `config.yaml`. See [docs/TOOLS.md](docs/TOOLS.md) for the full tool contract.
 

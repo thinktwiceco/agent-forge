@@ -84,10 +84,10 @@ type WorkingDirAware interface {
 }
 
 // InboxAware is an optional interface for plugins that need a reference
-// to the agent's inbox queue so they can inject messages autonomously
-// (e.g. scheduled tasks, webhooks).
+// to the agent's turn inbox so they can inject messages autonomously
+// (e.g. scheduled tasks, heartbeat).
 type InboxAware interface {
-	SetInbox(q *queue.Queue)
+	SetInbox(q queue.Inbox)
 }
 
 // LLMEngineAware is an optional interface for plugins that need direct LLM

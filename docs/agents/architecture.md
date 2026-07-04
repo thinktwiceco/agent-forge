@@ -1,5 +1,22 @@
 # Architecture
 
+## Turn queue
+
+All agent turns — web chat, webhooks, heartbeat, scheduler — enter through a single `TurnQueue` (`src/agents/turn_queue.go`) before the executor runs.
+
+```mermaid
+flowchart LR
+    UI[ChatStream callers] --> TQ[TurnQueue]
+    PL[InboxAware plugins] --> TQ
+    TQ -->|per-chatId lock| EX[executeTurn → executor → LLM]
+```
+
+- `ChatStream` enqueues a turn and returns a `ResponseCh` immediately.
+- Plugins implement `core.InboxAware` and receive `queue.Inbox` (implemented by `TurnQueue`).
+- Async **spawn_subagent** completions re-enter the parent conversation via `TurnQueue.submitSpawnResult` (same autonomous path as heartbeat/scheduler).
+- Same `chatId` turns are serialized; different conversations may run concurrently.
+- `Len()` reflects ingress depth only (turns waiting, not in-flight).
+
 ## Package Dependencies
 
 ```mermaid

@@ -6,50 +6,70 @@ import (
 	"github.com/thinktwiceco/agent-forge/src/core"
 )
 
-// PushRegistry maps conversationId → buffered channel of chunks.
-// The handlePush SSE handler registers a channel here; the agent's chunk router pushes into it.
+// PushRegistration identifies a single SSE push subscription. Unregister only
+// removes the registration if it still owns the chatId slot.
+type PushRegistration struct {
+	chatId string
+	ch     chan core.ExtendedChunkResponse
+}
+
+func (r *PushRegistration) Channel() <-chan core.ExtendedChunkResponse {
+	return r.ch
+}
+
+// PushRegistry maps conversationId → active push registration.
+// The handlePush SSE handler registers here; the agent's chunk router pushes into it.
 type PushRegistry struct {
-	mu    sync.RWMutex
-	chans map[string]chan core.ExtendedChunkResponse
+	mu   sync.RWMutex
+	regs map[string]*PushRegistration
 }
 
 func NewPushRegistry() *PushRegistry {
 	return &PushRegistry{
-		chans: make(map[string]chan core.ExtendedChunkResponse),
+		regs: make(map[string]*PushRegistration),
 	}
 }
 
-// Register creates and returns a buffered channel for chatId.
-// Call Unregister when the SSE connection closes to clean up.
-func (r *PushRegistry) Register(chatId string) <-chan core.ExtendedChunkResponse {
+// Register creates a new buffered channel for chatId, closing any prior registration.
+func (r *PushRegistry) Register(chatId string) *PushRegistration {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if old, ok := r.regs[chatId]; ok {
+		close(old.ch)
+		delete(r.regs, chatId)
+	}
 	ch := make(chan core.ExtendedChunkResponse, 64)
-	r.chans[chatId] = ch
-	return ch
+	reg := &PushRegistration{chatId: chatId, ch: ch}
+	r.regs[chatId] = reg
+	return reg
 }
 
-// Unregister removes and closes the channel for chatId.
-func (r *PushRegistry) Unregister(chatId string) {
+// Unregister removes and closes the registration only if it still owns chatId.
+func (r *PushRegistry) Unregister(reg *PushRegistration) {
+	if reg == nil {
+		return
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if ch, ok := r.chans[chatId]; ok {
-		close(ch)
-		delete(r.chans, chatId)
+	current, ok := r.regs[reg.chatId]
+	if !ok || current != reg {
+		return
 	}
+	close(reg.ch)
+	delete(r.regs, reg.chatId)
 }
 
 // Push sends a chunk to the channel registered for chatId.
 // Non-blocking: silently drops if there is no listener or the buffer is full.
 func (r *PushRegistry) Push(chatId string, chunk core.ExtendedChunkResponse) {
 	r.mu.RLock()
-	ch, ok := r.chans[chatId]
+	reg, ok := r.regs[chatId]
 	r.mu.RUnlock()
 	if !ok {
 		return
 	}
 	select {
-	case ch <- chunk:
+	case reg.ch <- chunk:
 	default:
 	}
 }
@@ -59,9 +79,9 @@ func (r *PushRegistry) Push(chatId string, chunk core.ExtendedChunkResponse) {
 func (r *PushRegistry) Broadcast(chunk core.ExtendedChunkResponse) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	for _, ch := range r.chans {
+	for _, reg := range r.regs {
 		select {
-		case ch <- chunk:
+		case reg.ch <- chunk:
 		default:
 		}
 	}

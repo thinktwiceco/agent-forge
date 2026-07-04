@@ -26,6 +26,8 @@ agent:
   # brain is loaded by default (no need to list it here).
   # To disable: uncomment the line below.
   # brain: false
+  # config tool is loaded by default. To disable:
+  # config_tool: false
   # Optional dreaming (distil conversations → brain/persistence/):
   # brain_plugin:
   #   dream: "on"       # or "off"

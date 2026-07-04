@@ -20,8 +20,9 @@ func (s *Server) handlePush(c *gin.Context) {
 		return
 	}
 
-	ch := s.pushRegistry.Register(chatId)
-	defer s.pushRegistry.Unregister(chatId)
+	reg := s.pushRegistry.Register(chatId)
+	defer s.pushRegistry.Unregister(reg)
+	ch := reg.Channel()
 
 	writer := NewSSEWriter(c)
 	writer.SetHeaders()

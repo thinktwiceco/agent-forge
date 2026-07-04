@@ -469,6 +469,12 @@ body {
   box-sizing: border-box;
 }
 
+.load-earlier-btn {
+  display: block;
+  margin: 0 auto 16px;
+  font-size: 12px;
+}
+
 /* ─── Scroll-to-bottom button ────────────────────────────────────────────── */
 .scroll-to-bottom {
   position: absolute;

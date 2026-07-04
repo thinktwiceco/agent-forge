@@ -25,7 +25,7 @@ Tools are the primary way agents interact with external systems. Each tool:
 - Returns structured responses
 - Can be configured via code or YAML
 
-**Documented in this guide:** filesystem (`fs`), git, postgres, API client, web browser, update script, image loader, Instagram Graph, Telegram dev helper, vector DB (when configured). The framework may also inject **meta**, **expand**, and **spawn_subagent**; see [docs/agents/how-to-tools.md](agents/how-to-tools.md).
+**Documented in this guide:** filesystem (`fs`), git, postgres, API client, web browser, update script, image loader, Instagram Graph, Telegram dev helper, vector DB (when configured). The framework may also inject **meta**, **expand**, and **spawn_subagent** (async — result via follow-up turn); see [docs/agents/how-to-system-agents.md](agents/how-to-system-agents.md).
 
 ## File System Tool
 

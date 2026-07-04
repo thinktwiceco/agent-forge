@@ -132,10 +132,10 @@ type WorkingDirAware interface {
     SetWorkingDir(dir string)
 }
 
-// InboxAware — provides a reference to the agent's inbox queue so the plugin
-// can inject autonomous messages (e.g. scheduled ticks, webhooks).
+// InboxAware — provides a reference to the agent turn inbox so the plugin
+// can inject autonomous messages (e.g. scheduled ticks, heartbeat).
 type InboxAware interface {
-    SetInbox(q *queue.Queue)
+    SetInbox(q queue.Inbox)
 }
 
 // LLMEngineAware — provides direct LLM access for background tasks.
@@ -151,7 +151,7 @@ type LLMEngineAware interface {
 - **Folder-based plugins**: If a plugin operates inside a folder (e.g. `vault/`, `skills/`), it should auto-create that folder at initialization time (e.g. in `EventAgentInitialized` or when the plugin is constructed). This avoids errors when the agent first uses the plugin.
 - **Paths are relative to working_dir**: All plugin folder paths are relative to the agent's `working_dir`. The factory receives `workingDir` and should use it as the base (e.g. `filepath.Join(workingDir, "vault")`).
 - **Goroutine lifecycle**: Plugins that start goroutines (e.g. tickers) must pair `context.WithCancel` with a stored `cancel` func so the goroutine stops cleanly on plugin teardown or config reload.
-- **Inbox-injecting plugins**: Use `core.InboxAware` to receive the queue reference. Check `q.Len() > 0` before enqueueing to avoid flooding a busy agent.
+- **Inbox-injecting plugins**: Use `core.InboxAware` to receive the turn inbox (`queue.Inbox`, backed by `agents.TurnQueue`). Check `q.Len() > 0` before enqueueing to avoid flooding a busy ingress buffer.
 
 ## Available Plugins
 
